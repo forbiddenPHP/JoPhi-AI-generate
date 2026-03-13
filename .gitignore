@@ -1,0 +1,54 @@
+# Model weights & checkpoints (multi-GB)
+music_models/ckpt/
+rvc_models/
+enhance_worker/resemble-enhance/
+
+# Model backup (offline restore)
+models/
+models.zip
+
+# ACE-Step: uv venv + HuggingFace model cache (code IS committed)
+ace_worker/ACE-Step-1.5/.venv/
+ace_worker/ACE-Step-1.5/checkpoints/
+
+# Generated audio
+demos/
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+build/
+dist/
+
+# Conda / venv
+.conda/
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Server PID
+.server.pid
+
+# Test artifacts
+test_*.wav
+test_*.mp3
+
+# Temp
+*.tmp
+*.bak

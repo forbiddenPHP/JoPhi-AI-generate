@@ -1,0 +1,6 @@
+# tts-mist env — CLI + Web-App
+flask
+requests
+huggingface-hub
+librosa
+scipy

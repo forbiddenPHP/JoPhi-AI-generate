@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Revoicer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: #0a0a0a; color: #e0e0e0; }
+
+        .container { max-width: 960px; margin: 0 auto; padding: 2rem; }
+        h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+        h2 { font-size: 1.2rem; margin-bottom: 1rem; color: #888; font-weight: normal; }
+        h3 { font-size: 1rem; margin-bottom: 0.8rem; }
+
+        .status { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+        .status.on { background: #4caf50; }
+        .status.off { background: #f44336; }
+
+        .card { background: #141414; border: 1px solid #222; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+
+        .tabs { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 1px solid #222; }
+        .tab { padding: 0.8rem 1.5rem; cursor: pointer; border-bottom: 2px solid transparent; color: #888; }
+        .tab.active { color: #fff; border-bottom-color: #4caf50; }
+        .tab:hover { color: #ccc; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        input, select, button { font-family: inherit; font-size: 0.9rem; }
+        input[type="text"], input[type="number"], select {
+            background: #1a1a1a; border: 1px solid #333; color: #e0e0e0;
+            padding: 0.5rem 0.8rem; border-radius: 4px; width: 100%;
+        }
+        input[type="file"] { color: #e0e0e0; }
+
+        button {
+            background: #4caf50; color: #fff; border: none; padding: 0.6rem 1.2rem;
+            border-radius: 4px; cursor: pointer;
+        }
+        button:hover { background: #45a049; }
+        button:disabled { background: #333; cursor: not-allowed; }
+        button.secondary { background: #333; }
+        button.secondary:hover { background: #444; }
+        button.danger { background: #c62828; }
+        button.danger:hover { background: #b71c1c; }
+
+        .form-row { display: flex; gap: 1rem; margin-bottom: 1rem; align-items: end; }
+        .form-group { flex: 1; }
+        .form-group label { display: block; margin-bottom: 0.3rem; font-size: 0.85rem; color: #888; }
+
+        .model-list { list-style: none; }
+        .model-list li { padding: 0.6rem 0; border-bottom: 1px solid #1a1a1a; display: flex; justify-content: space-between; align-items: center; }
+
+        .search-results { margin-top: 1rem; }
+        .search-result { padding: 0.8rem; border: 1px solid #222; border-radius: 4px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; }
+        .search-result .meta { color: #888; font-size: 0.85rem; }
+
+        .audio-player { margin-top: 1rem; }
+        .audio-player audio { width: 100%; }
+        .audio-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+        .audio-compare .label { font-size: 0.85rem; color: #888; margin-bottom: 0.3rem; }
+
+        .log { font-family: monospace; font-size: 0.85rem; background: #0d0d0d; padding: 1rem; border-radius: 4px; max-height: 200px; overflow-y: auto; color: #888; }
+
+        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #333; border-top-color: #4caf50; border-radius: 50%; animation: spin 0.6s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Revoicer</h1>
+        <h2>Voice Conversion</h2>
+
+        <div class="card" id="status-bar">
+            <span class="status off" id="status-dot"></span>
+            <span id="status-text">Checking RVC worker...</span>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" data-tab="convert">Convert</div>
+            <div class="tab" data-tab="models">Models</div>
+            <div class="tab" data-tab="search">Search HF</div>
+        </div>
+
+        <!-- Convert Tab -->
+        <div class="tab-content active" id="tab-convert">
+            <div class="card">
+                <h3>Convert Audio</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Audio File</label>
+                        <input type="file" id="conv-file" accept=".wav,.mp3,.flac,.ogg,.m4a">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Voice Model</label>
+                        <select id="conv-voice"><option value="">-- select --</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Pitch Method</label>
+                        <select id="conv-f0">
+                            <option value="rmvpe" selected>RMVPE</option>
+                            <option value="crepe">CREPE</option>
+                            <option value="harvest">Harvest</option>
+                            <option value="pm">PM</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Pitch Shift</label>
+                        <input type="number" id="conv-pitch" value="0" min="-24" max="24">
+                    </div>
+                </div>
+                <button id="conv-btn" onclick="doConvert()">Convert</button>
+
+                <div class="audio-compare" id="conv-result" style="display:none">
+                    <div>
+                        <div class="label">Original</div>
+                        <audio id="audio-original" controls></audio>
+                    </div>
+                    <div>
+                        <div class="label">Converted</div>
+                        <audio id="audio-converted" controls></audio>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Models Tab -->
+        <div class="tab-content" id="tab-models">
+            <div class="card">
+                <h3>Installed Models</h3>
+                <ul class="model-list" id="model-list">
+                    <li>Loading...</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Search Tab -->
+        <div class="tab-content" id="tab-search">
+            <div class="card">
+                <h3>Search HuggingFace</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <input type="text" id="search-query" placeholder="e.g. neutral male, female english ...">
+                    </div>
+                    <button onclick="doSearch()">Search</button>
+                </div>
+                <div class="search-results" id="search-results"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tabs
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Status check
+        async function checkStatus() {
+            try {
+                const r = await fetch('/api/status');
+                const d = await r.json();
+                const dot = document.getElementById('status-dot');
+                const txt = document.getElementById('status-text');
+                if (d.running) {
+                    dot.className = 'status on';
+                    txt.textContent = `RVC worker running — ${d.models.length} model(s)`;
+                    updateModelSelect(d.models);
+                    updateModelList(d.models);
+                } else {
+                    dot.className = 'status off';
+                    txt.textContent = 'RVC worker not running — start with: python revoicer.py server start';
+                }
+            } catch(e) {
+                document.getElementById('status-text').textContent = 'Error checking status';
+            }
+        }
+
+        function updateModelSelect(models) {
+            const sel = document.getElementById('conv-voice');
+            const current = sel.value;
+            sel.innerHTML = '<option value="">-- select --</option>';
+            models.forEach(m => {
+                const name = typeof m === 'string' ? m : (m.name || m.model_name || JSON.stringify(m));
+                sel.innerHTML += `<option value="${name}">${name}</option>`;
+            });
+            sel.value = current;
+        }
+
+        function updateModelList(models) {
+            const list = document.getElementById('model-list');
+            if (!models.length) {
+                list.innerHTML = '<li>No models installed. Use the Search tab to find and install models.</li>';
+                return;
+            }
+            list.innerHTML = models.map(m => {
+                const name = typeof m === 'string' ? m : (m.name || m.model_name || JSON.stringify(m));
+                return `<li><span>${name}</span><button class="danger" onclick="removeModel('${name}')">Remove</button></li>`;
+            }).join('');
+        }
+
+        // Convert
+        async function doConvert() {
+            const fileInput = document.getElementById('conv-file');
+            const voice = document.getElementById('conv-voice').value;
+            const f0 = document.getElementById('conv-f0').value;
+            const pitch = document.getElementById('conv-pitch').value;
+            const btn = document.getElementById('conv-btn');
+
+            if (!fileInput.files.length) { alert('Select a file first'); return; }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Converting...';
+
+            const fd = new FormData();
+            fd.append('file', fileInput.files[0]);
+            fd.append('voice', voice);
+            fd.append('f0_method', f0);
+            fd.append('pitch', pitch);
+
+            try {
+                const r = await fetch('/api/convert', { method: 'POST', body: fd });
+                const d = await r.json();
+                if (d.ok) {
+                    document.getElementById('conv-result').style.display = 'grid';
+                    document.getElementById('audio-original').src = URL.createObjectURL(fileInput.files[0]);
+                    document.getElementById('audio-converted').src = '/api/audio/' + d.filename;
+                } else {
+                    alert('Error: ' + (d.error || 'Unknown error'));
+                }
+            } catch(e) {
+                alert('Error: ' + e.message);
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Convert';
+        }
+
+        // Search
+        async function doSearch() {
+            const query = document.getElementById('search-query').value;
+            if (!query) return;
+
+            const results = document.getElementById('search-results');
+            results.innerHTML = '<span class="spinner"></span> Searching...';
+
+            try {
+                const r = await fetch('/api/models/search?q=' + encodeURIComponent(query));
+                const d = await r.json();
+                if (d.error) { results.innerHTML = 'Error: ' + d.error; return; }
+                if (!d.results.length) { results.innerHTML = 'No results found.'; return; }
+
+                results.innerHTML = d.results.map(m => `
+                    <div class="search-result">
+                        <div>
+                            <div>${m.id}</div>
+                            <div class="meta">${m.downloads.toLocaleString()} downloads</div>
+                        </div>
+                        <button onclick="installModel('${m.id}', this)">Install</button>
+                    </div>
+                `).join('');
+            } catch(e) {
+                results.innerHTML = 'Error: ' + e.message;
+            }
+        }
+
+        // Install model
+        async function installModel(modelId, btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>';
+
+            try {
+                const r = await fetch('/api/models/install', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({model_id: modelId}),
+                });
+                const d = await r.json();
+                if (d.ok) {
+                    btn.textContent = 'Installed';
+                    btn.className = 'secondary';
+                    checkStatus();
+                } else {
+                    btn.textContent = 'Error';
+                    alert(d.error);
+                }
+            } catch(e) {
+                btn.textContent = 'Error';
+                alert(e.message);
+            }
+        }
+
+        // Remove model
+        async function removeModel(name) {
+            if (!confirm(`Remove model "${name}"?`)) return;
+            await fetch('/api/models/' + name, {method: 'DELETE'});
+            checkStatus();
+        }
+
+        // Enter key for search
+        document.getElementById('search-query').addEventListener('keydown', e => {
+            if (e.key === 'Enter') doSearch();
+        });
+
+        // Init
+        checkStatus();
+        setInterval(checkStatus, 10000);
+    </script>
+</body>
+</html>
