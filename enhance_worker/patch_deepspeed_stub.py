@@ -37,6 +37,19 @@ rt.mkdir(exist_ok=True)
 (rt / "engine.py").write_text("class DeepSpeedEngine: pass\n")
 (rt / "utils.py").write_text("def clip_grad_norm_(*a, **kw): pass\n")
 
+# pip-compatible metadata so pip sees deepspeed==0.12.4 as installed
+dist = pathlib.Path(sp) / "deepspeed-0.12.4.dist-info"
+dist.mkdir(exist_ok=True)
+(dist / "METADATA").write_text(
+    "Metadata-Version: 2.1\n"
+    "Name: deepspeed\n"
+    "Version: 0.12.4\n"
+    "Summary: Stub for macOS (inference only)\n"
+)
+(dist / "INSTALLER").write_text("pip\n")
+(dist / "RECORD").write_text("")
+(dist / "top_level.txt").write_text("deepspeed\n")
+
 print("  \033[0;32m✓\033[0m deepspeed stubs installed")
 
 # ── Patch download.py to skip git clone when model_repo was restored ──────

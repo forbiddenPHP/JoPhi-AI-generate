@@ -4,7 +4,7 @@ set -e
 # ── Revoicer — Master Installer ─────────────────────────────────────────────
 # Creates nine conda environments + one uv project:
 #   1. rvc        — Python 3.10 + pip<=23.3 for RVC voice conversion worker
-#   2. enhance    — Python 3.10 for resemble-enhance (audio post-processing)
+#   2. enhance    — Python 3.12 for resemble-enhance (audio post-processing, MPS)
 #   3. heartmula  — Python 3.10 for HeartMuLa music generation
 #   4. acestep    — ACE-Step 1.5 music generation (managed by uv, not conda)
 #   5. whisper    — Python 3.12 for mlx-whisper transcription (Apple Silicon)

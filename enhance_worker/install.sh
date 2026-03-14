@@ -53,8 +53,8 @@ if "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} "; then
     "$CONDA_BIN" env remove -y -n "$ENV_NAME" > /dev/null 2>&1
 fi
 
-echo "  Creating env: $ENV_NAME (Python 3.10) ..."
-"$CONDA_BIN" create -y -q -n "$ENV_NAME" python=3.10 > /dev/null 2>&1
+echo "  Creating env: $ENV_NAME (Python 3.12) ..."
+"$CONDA_BIN" create -y -q -n "$ENV_NAME" python=3.12 > /dev/null 2>&1
 echo -e "${GREEN}✓${NC} Env created"
 
 # ── Install resemble-enhance ────────────────────────────────────────────────
@@ -68,12 +68,17 @@ echo "  Installing resemble-enhance (this may take several minutes) ..."
 if [ -d "$WHEELS_DIR" ] && [ "$(ls -A "$WHEELS_DIR"/*.whl 2>/dev/null)" ]; then
     # Offline install from cached wheels — works even if PyPI is gone
     echo "  Using cached wheels (offline) ..."
-    "$CONDA_BIN" run -n "$ENV_NAME" pip install --no-index --find-links="$WHEELS_DIR" -r "$LOCKFILE" 2>&1 | \
-        grep -E "^(Successfully|Installing|ERROR)" | head -5
-    # deepspeed doesn't compile on macOS ARM64 but resemble-enhance imports it.
-    # Install minimal stubs so inference works (training is not supported).
+    # resemble-enhance has a hard deepspeed dep that doesn't build on macOS.
+    # Install it --no-deps first, then install everything else from the lockfile.
+    # 1) resemble-enhance --no-deps (skip deepspeed, won't compile on macOS)
+    "$CONDA_BIN" run -n "$ENV_NAME" pip install --no-index --no-deps --find-links="$WHEELS_DIR" resemble-enhance 2>&1 | \
+        grep -E "^(Successfully|Installing|ERROR)" | head -3
+    # 2) deepspeed stub so pip sees it as satisfied
     echo "  Installing deepspeed stubs (inference only) ..."
     "$CONDA_BIN" run -n "$ENV_NAME" python "$SCRIPT_DIR/patch_deepspeed_stub.py"
+    # 3) remaining deps from lockfile
+    "$CONDA_BIN" run -n "$ENV_NAME" pip install --no-index --find-links="$WHEELS_DIR" -r "$LOCKFILE" 2>&1 | \
+        grep -E "^(Successfully|Installing|ERROR)" | head -5
 elif [ -f "$LOCKFILE" ]; then
     # Online install with pinned versions
     echo "  Using pinned versions from requirements.lock ..."

@@ -33,6 +33,9 @@ Usage:
   python generate.py text --engine whisper audio.wav --model large-v3 --format srt
   python generate.py text --engine whisper audio.wav --input-language de
   python generate.py text --engine heartmula-transcribe song.mp3       Extract lyrics
+  python generate.py output --engine audio-concatenate a.wav b.mp3 -o out.wav  Concatenate audio files
+  python generate.py output --engine audio-concatenate a.wav b.wav --output-bitrate 320k -o out.mp3
+  python generate.py output --engine audio-concatenate a.wav b.wav c.mp3 --clip 0:fade-in=0.3 --clip 1:crossfade=0.5,volume=1.2 --clip 2:fade-out=0.5 -o out.mp3
   python generate.py models list                           List installed models
   python generate.py models search "neutral male"          Search HuggingFace
   python generate.py models install <id-or-url>            Download from HuggingFace or URL
@@ -1576,6 +1579,264 @@ def cmd_ps(args):
     print("Supported formats: WAV, MP3, FLAC, OGG, M4A")
 
 
+# ── Output (concatenation, mixing) ────────────────────────────────────────────
+
+def cmd_output(args):
+    engine = args.engine
+
+    if engine == "audio-concatenate":
+        _output_audio_concatenate(args)
+    elif engine == "audio-mucs":
+        _output_audio_mucs(args)
+    else:
+        _emit(f"ERROR: Unknown output engine: {engine}", "error")
+        sys.exit(1)
+
+
+def _parse_clip_opts(clip_args: list[str] | None, n: int) -> list[dict]:
+    """Parse --clip arguments into per-input option dicts.
+
+    Each --clip value has the form 'INDEX:key=val,key=val'.
+    Returns a list of n dicts with keys: fade_in, fade_out, crossfade, volume,
+    start, end.
+    """
+    opts = [{"fade_in": None, "fade_out": None, "crossfade": None,
+             "volume": None, "start": None, "end": None, "pan": None}
+            for _ in range(n)]
+    if not clip_args:
+        return opts
+
+    for spec in clip_args:
+        if ":" not in spec:
+            _emit(f"ERROR: Invalid --clip format (missing ':'): {spec}", "error")
+            sys.exit(1)
+        idx_str, kv_str = spec.split(":", 1)
+        try:
+            idx = int(idx_str)
+        except ValueError:
+            _emit(f"ERROR: Invalid --clip index: {idx_str}", "error")
+            sys.exit(1)
+        if idx < 0 or idx >= n:
+            _emit(f"ERROR: --clip index {idx} out of range (0..{n - 1})", "error")
+            sys.exit(1)
+        for pair in kv_str.split(","):
+            if "=" not in pair:
+                _emit(f"ERROR: Invalid --clip key=value: {pair}", "error")
+                sys.exit(1)
+            key, val = pair.split("=", 1)
+            key = key.strip().replace("-", "_")
+            if key not in ("fade_in", "fade_out", "crossfade", "volume", "start", "end", "pan"):
+                _emit(f"ERROR: Unknown --clip option: {key}", "error")
+                sys.exit(1)
+            try:
+                opts[idx][key] = float(val)
+            except ValueError:
+                _emit(f"ERROR: Invalid --clip value for {key}: {val}", "error")
+                sys.exit(1)
+
+    # crossfade on index 0 makes no sense
+    if opts[0]["crossfade"]:
+        _emit("WARNING: crossfade on first clip ignored (no previous clip).", "warning")
+        opts[0]["crossfade"] = None
+
+    return opts
+
+
+def _output_audio_concatenate(args):
+    """Concatenate multiple audio files into one via ffmpeg."""
+    inputs = args.input
+    if not inputs or len(inputs) < 2:
+        _emit("ERROR: Need at least 2 input files to concatenate.", "error")
+        sys.exit(1)
+
+    # Validate inputs exist
+    for f in inputs:
+        if not Path(f).exists():
+            _emit(f"ERROR: Input file not found: {f}", "error")
+            sys.exit(1)
+
+    # Determine output path
+    out = args.output
+    if not out:
+        ext = Path(inputs[0]).suffix
+        out = str(Path(inputs[0]).parent / f"concatenated{ext}")
+
+    out_path = Path(out)
+    n = len(inputs)
+    clip_opts = _parse_clip_opts(getattr(args, "clip", None), n)
+
+    # Build ffmpeg command
+    cmd = ["ffmpeg", "-y"]
+    for f in inputs:
+        cmd += ["-i", f]
+
+    # Build filter chain
+    filter_parts = []
+
+    # 1. Normalize each input to 44100 Hz stereo
+    for i in range(n):
+        filter_parts.append(f"[{i}:a]aresample=44100,aformat=channel_layouts=stereo[norm_{i}]")
+
+    # 2. Per-clip: trim, volume, fade-in, fade-out
+    for i in range(n):
+        co = clip_opts[i]
+        effects = []
+        # Trim (start/end)
+        if co["start"] is not None or co["end"] is not None:
+            trim_args = []
+            if co["start"] is not None:
+                trim_args.append(f"start={co['start']}")
+            if co["end"] is not None:
+                trim_args.append(f"end={co['end']}")
+            effects.append(f"atrim={':'.join(trim_args)},asetpts=PTS-STARTPTS")
+        if co["volume"] is not None:
+            effects.append(f"volume={co['volume']}")
+        if co["pan"] is not None:
+            # Stereo balance: -1.0 = full left, 0 = center, +1.0 = full right
+            # pan <= 0: L unchanged, R attenuated (R_gain = 1 + pan)
+            # pan >= 0: R unchanged, L attenuated (L_gain = 1 - pan)
+            p = max(-1.0, min(1.0, co["pan"]))
+            l_gain = max(0.0, 1.0 - p)
+            r_gain = max(0.0, 1.0 + p)
+            effects.append(f"pan=stereo|c0={l_gain}*c0|c1={r_gain}*c1")
+        if co["fade_in"] is not None:
+            effects.append(f"afade=t=in:d={co['fade_in']}")
+        if co["fade_out"] is not None:
+            # areverse trick: fade from the end without knowing duration
+            effects.append(f"areverse,afade=t=in:d={co['fade_out']},areverse")
+
+        if effects:
+            filter_parts.append(f"[norm_{i}]{','.join(effects)}[a_{i}]")
+        else:
+            filter_parts.append(f"[norm_{i}]acopy[a_{i}]")
+
+    # 3. Chain clips: crossfade or concat, pairwise L→R
+    has_any_crossfade = any(co["crossfade"] for co in clip_opts[1:])
+
+    if has_any_crossfade:
+        prev = "a_0"
+        for i in range(1, n):
+            out_label = f"ch_{i}" if i < n - 1 else "out"
+            cf = clip_opts[i]["crossfade"]
+            if cf and cf > 0:
+                filter_parts.append(
+                    f"[{prev}][a_{i}]acrossfade=d={cf}:c1=tri:c2=tri[{out_label}]"
+                )
+            else:
+                filter_parts.append(
+                    f"[{prev}][a_{i}]concat=n=2:v=0:a=1[{out_label}]"
+                )
+            prev = out_label
+    else:
+        concat_inputs = "".join(f"[a_{i}]" for i in range(n))
+        filter_parts.append(f"{concat_inputs}concat=n={n}:v=0:a=1[out]")
+
+    filter_str = ";".join(filter_parts)
+    cmd += ["-filter_complex", filter_str, "-map", "[out]"]
+
+    # Bitrate (optional)
+    if args.output_bitrate:
+        cmd += ["-b:a", args.output_bitrate]
+
+    cmd.append(str(out_path))
+
+    _emit(f"Concatenating {n} files → {out_path.name}", "stage")
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        _emit(f"ERROR: ffmpeg failed:\n{result.stderr[-500:]}", "error")
+        sys.exit(1)
+
+    _emit(f"Output: {out_path}")
+
+
+def _output_audio_mucs(args):
+    """Mix (overlay) multiple audio files in parallel into one via ffmpeg."""
+    inputs = args.input
+    if not inputs or len(inputs) < 2:
+        _emit("ERROR: Need at least 2 input files to mix.", "error")
+        sys.exit(1)
+
+    for f in inputs:
+        if not Path(f).exists():
+            _emit(f"ERROR: Input file not found: {f}", "error")
+            sys.exit(1)
+
+    out = args.output
+    if not out:
+        ext = Path(inputs[0]).suffix
+        out = str(Path(inputs[0]).parent / f"mixed{ext}")
+
+    out_path = Path(out)
+    n = len(inputs)
+    clip_opts = _parse_clip_opts(getattr(args, "clip", None), n)
+
+    # Warn about crossfade (not applicable for parallel mix)
+    for i, co in enumerate(clip_opts):
+        if co["crossfade"]:
+            _emit(f"WARNING: crossfade on clip {i} ignored (not applicable for parallel mix).", "warning")
+
+    cmd = ["ffmpeg", "-y"]
+    for f in inputs:
+        cmd += ["-i", f]
+
+    filter_parts = []
+
+    # 1. Normalize each input to 44100 Hz stereo
+    for i in range(n):
+        filter_parts.append(f"[{i}:a]aresample=44100,aformat=channel_layouts=stereo[norm_{i}]")
+
+    # 2. Per-clip: trim, volume, pan, fade-in, fade-out
+    for i in range(n):
+        co = clip_opts[i]
+        effects = []
+        if co["start"] is not None or co["end"] is not None:
+            trim_args = []
+            if co["start"] is not None:
+                trim_args.append(f"start={co['start']}")
+            if co["end"] is not None:
+                trim_args.append(f"end={co['end']}")
+            effects.append(f"atrim={':'.join(trim_args)},asetpts=PTS-STARTPTS")
+        if co["volume"] is not None:
+            effects.append(f"volume={co['volume']}")
+        if co["pan"] is not None:
+            p = max(-1.0, min(1.0, co["pan"]))
+            l_gain = max(0.0, 1.0 - p)
+            r_gain = max(0.0, 1.0 + p)
+            effects.append(f"pan=stereo|c0={l_gain}*c0|c1={r_gain}*c1")
+        if co["fade_in"] is not None:
+            effects.append(f"afade=t=in:d={co['fade_in']}")
+        if co["fade_out"] is not None:
+            effects.append(f"areverse,afade=t=in:d={co['fade_out']},areverse")
+
+        if effects:
+            filter_parts.append(f"[norm_{i}]{','.join(effects)}[a_{i}]")
+        else:
+            filter_parts.append(f"[norm_{i}]acopy[a_{i}]")
+
+    # 3. Mix all clips in parallel + limiter to prevent clipping
+    mix_inputs = "".join(f"[a_{i}]" for i in range(n))
+    filter_parts.append(f"{mix_inputs}amix=inputs={n}:normalize=0[mix]")
+    filter_parts.append("[mix]alimiter=limit=0.95[out]")
+
+    filter_str = ";".join(filter_parts)
+    cmd += ["-filter_complex", filter_str, "-map", "[out]"]
+
+    if args.output_bitrate:
+        cmd += ["-b:a", args.output_bitrate]
+
+    cmd.append(str(out_path))
+
+    _emit(f"Mixing {n} files (parallel) → {out_path.name}", "stage")
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        _emit(f"ERROR: ffmpeg failed:\n{result.stderr[-500:]}", "error")
+        sys.exit(1)
+
+    _emit(f"Output: {out_path}")
+
+
 # ── Stub handler for future mediums ──────────────────────────────────────────
 
 def _stub_medium(args):
@@ -1726,6 +1987,21 @@ def build_parser():
     p_text.add_argument("-o", "--output",
                         help="Output directory or file")
     p_text.set_defaults(func=cmd_text)
+
+    # ── output ────────────────────────────────────────────────────────────
+    p_output = sub.add_parser("output",
+                              help="Post-processing: concatenation, mixing")
+    p_output.add_argument("input", nargs="*", help="Input files")
+    p_output.add_argument("--engine", required=True,
+                          choices=["audio-concatenate", "audio-mucs"],
+                          help="Output engine")
+    p_output.add_argument("-o", "--output", help="Output file path")
+    p_output.add_argument("--output-bitrate", default=None,
+                          help="Audio bitrate (e.g. '192k', '320k')")
+    p_output.add_argument("--clip", action="append", default=None,
+                          help="Per-clip options: INDEX:key=val,key=val "
+                               "(keys: fade-in, fade-out, crossfade, volume, start, end, pan)")
+    p_output.set_defaults(func=cmd_output)
 
     # ── Stubs for future mediums ──────────────────────────────────────────
     for stub_name in ["image", "video", "vision", "translation", "comparison"]:

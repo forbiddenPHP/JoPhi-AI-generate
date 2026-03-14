@@ -2,9 +2,7 @@
 
 CLI for voice synthesis, voice conversion, audio enhancement, AI music generation, lyrics transcription, speaker diarization, and audio source separation. macOS Apple Silicon only.
 
-**Two entry points:**
-- `generate.py` — New unified ABI (active development)
-- `revoicer.py` — Legacy CLI (still works, not updated)
+**Entry point:** `generate.py`
 
 ## Quick Setup
 
@@ -56,6 +54,8 @@ generate.py <medium> --engine <backend> [--model <variant>] [input] [options]
 | `audio` | `diarize` | Speaker diarization |
 | `text` | `whisper` | Audio transcription |
 | `text` | `heartmula-transcribe` | Lyrics extraction |
+| `output` | `audio-concatenate` | Concatenate audio files (with per-clip trim, fades, volume, crossfade) |
+| `output` | `audio-mucs` | Mix/overlay audio files in parallel (with per-clip trim, fades, volume, pan) |
 | `server` | — | RVC worker management |
 | `models` | — | Model install/search/remove |
 | `ps` | — | System status |
@@ -457,6 +457,84 @@ python generate.py text --engine heartmula-transcribe song.mp3 -o lyrics.txt
 
 ---
 
+### Audio Concatenation (`output --engine audio-concatenate`)
+
+Concatenate multiple audio files into one. Supports per-clip trim, volume, fades, and crossfade via `--clip`.
+
+```bash
+# Simple concatenation
+python generate.py output --engine audio-concatenate a.wav b.wav c.mp3 -o out.wav
+
+# With bitrate (for compressed formats)
+python generate.py output --engine audio-concatenate a.wav b.wav -o out.mp3 --output-bitrate 128k
+
+# Per-clip options via --clip INDEX:key=val,key=val
+python generate.py output --engine audio-concatenate \
+  intro.wav speech.wav outro.wav background.mp3 \
+  --clip 0:fade-in=0.3 \
+  --clip 1:crossfade=0.5,volume=1.2 \
+  --clip 3:start=0,end=6.9,volume=0.5,fade-out=0.5 \
+  -o final.wav
+```
+
+<details>
+<summary>Options</summary>
+
+- `-o, --output` — Output file path (format from extension: .wav, .mp3, .ogg, .m4a, .opus, .aiff)
+- `--output-bitrate` — Audio bitrate for compressed formats (e.g. `128k`, `320k`)
+- `--clip INDEX:key=val,key=val` — Per-clip options (repeatable)
+
+**Per-clip keys:**
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `fade-in` | float (s) | Fade in from silence at clip start |
+| `fade-out` | float (s) | Fade out to silence at clip end |
+| `crossfade` | float (s) | Crossfade from previous clip (ignored on first clip) |
+| `volume` | float | Volume factor (0.5 = half, 2.0 = double) |
+| `start` | float (s) | Trim: start position |
+| `end` | float (s) | Trim: end position |
+| `pan` | float (-1..+1) | Stereo panning: -1 = left, 0 = center (default), +1 = right |
+
+Clips without `--clip` entry are used as-is. All inputs are normalized to 44100 Hz stereo before processing.
+
+</details>
+
+---
+
+### Audio Mixing (`output --engine audio-mucs`)
+
+Mix multiple audio files in parallel (overlay). Supports per-clip trim, volume, pan, and fades via `--clip`.
+
+```bash
+# Simple mix (all tracks overlaid)
+python generate.py output --engine audio-mucs track1.wav track2.wav -o mix.wav
+
+# Stereo remix with per-clip pan and volume
+python generate.py output --engine audio-mucs \
+  vocals.wav drums.wav bass.wav guitars.wav \
+  --clip 0:pan=-0.2,volume=0.8 \
+  --clip 1:pan=0.3,volume=0.6 \
+  --clip 2:pan=0.0,volume=0.7 \
+  --clip 3:pan=-0.5,volume=0.5 \
+  -o remix.wav
+```
+
+<details>
+<summary>Options</summary>
+
+- `-o, --output` — Output file path
+- `--output-bitrate` — Audio bitrate for compressed formats (e.g. `128k`, `320k`)
+- `--clip INDEX:key=val,key=val` — Per-clip options (repeatable)
+
+**Per-clip keys:** Same as `audio-concatenate` (`fade-in`, `fade-out`, `volume`, `start`, `end`, `pan`). `crossfade` is ignored (not applicable for parallel mix).
+
+All inputs are normalized to 44100 Hz stereo. Output is passed through `alimiter` to prevent clipping.
+
+</details>
+
+---
+
 ### Model Management (`models`)
 
 ```bash
@@ -517,22 +595,6 @@ Shows installed models, target pitch settings, server status, and supported form
 
 ---
 
-## Legacy CLI Mapping
-
-| revoicer.py (legacy) | generate.py (current) |
-|---|---|
-| `convert input.wav` | `voice --engine rvc --model x input.wav` |
-| `enhance input.wav` | `audio --engine enhance input.wav` |
-| `separate input.wav` | `audio --engine demucs input.wav` |
-| `music -l "..." -t "..."` | `audio --engine ace-step -l "..." -t "..."` |
-| `music --engine heart` | `audio --engine heartmula` |
-| `transcribe audio.wav` | `text --engine whisper audio.wav` |
-| `transcribe-lyrics song.mp3` | `text --engine heartmula-transcribe song.mp3` |
-| `diarize interview.wav` | `audio --engine diarize interview.wav` |
-| `server start\|stop\|status` | `server start\|stop\|status` |
-| `models list\|search\|...` | `models list\|search\|...` |
-| `--PS` | `ps` |
-
 ---
 
 <details>
@@ -544,7 +606,7 @@ Shows installed models, target pitch settings, server status, and supported form
 |-----|--------|---------|---------|
 | `tts-mist` | 3.11 | conda | Main CLI |
 | `rvc` | 3.10 | conda | RVC voice conversion worker |
-| `enhance` | 3.10 | conda | Audio enhancement (resemble-enhance) |
+| `enhance` | 3.12 | conda | Audio enhancement (resemble-enhance) |
 | `whisper` | 3.12 | conda | Audio transcription (mlx-whisper) |
 | `heartmula` | 3.10 | conda | HeartMuLa music + lyrics transcription |
 | `diarize` | 3.10 | conda | Speaker diarization (pyannote.audio) |
@@ -590,8 +652,7 @@ Internal library for real-time streaming of worker output. All workers run throu
 
 ```
 tts-mist/
-├── generate.py             # Unified CLI entry point (current)
-├── revoicer.py             # Legacy CLI (still functional)
+├── generate.py             # Unified CLI entry point
 ├── progress.py             # Worker subprocess streaming library
 ├── setup.sh                # Master installer (all envs + models)
 ├── backup-models.sh        # Model checkpoint backup

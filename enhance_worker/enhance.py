@@ -26,13 +26,45 @@ os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 import torch
 import torchaudio
 
+# MPS Conv1d is broken for >65536 output channels (PyTorch bug).
+# The UnivNet vocoder's KernelPredictor has kernel_conv with 221184 channels.
+# Fix: patch kernel_conv.forward to run in chunks of max 65536.
+_MPS_CONV1D_MAX_OUT = 65536
+
 
 def get_device() -> str:
-    """Device for resemble-enhance — CPU only.
-
-    MPS crashes with resemble-enhance (Abort trap on aten ops).
-    """
+    """Device for resemble-enhance."""
+    if torch.backends.mps.is_available():
+        return "mps"
     return "cpu"
+
+
+def _patch_mps_conv1d(enhancer):
+    """Patch all Conv1d layers in vocoder that exceed MPS channel limit."""
+    for block in enhancer.vocoder.blocks:
+        kp = block.kernel_predictor
+        conv = kp.kernel_conv
+        out_channels = conv.weight.shape[0]
+        if out_channels <= _MPS_CONV1D_MAX_OUT:
+            continue
+
+        _orig = conv.forward
+
+        def chunked_forward(x, _conv=conv, _out=out_channels):
+            # Compute the full weight once (triggers weight_norm parametrization)
+            weight = _conv.weight
+            bias = _conv.bias
+            chunks_w = weight.split(_MPS_CONV1D_MAX_OUT, dim=0)
+            chunks_b = bias.split(_MPS_CONV1D_MAX_OUT, dim=0) if bias is not None else [None] * len(chunks_w)
+            parts = []
+            for w, b in zip(chunks_w, chunks_b):
+                parts.append(torch.nn.functional.conv1d(
+                    x, w, b, stride=_conv.stride, padding=_conv.padding,
+                    dilation=_conv.dilation, groups=_conv.groups,
+                ))
+            return torch.cat(parts, dim=1)
+
+        conv.forward = chunked_forward
 
 
 def process_file(
@@ -45,7 +77,7 @@ def process_file(
     steps: int = 32,
 ):
     """Enhance a single audio file."""
-    from resemble_enhance.enhancer.inference import denoise, enhance
+    from resemble_enhance.enhancer.inference import denoise, enhance, load_enhancer
 
     dwav, sr = torchaudio.load(str(input_path))
 
@@ -57,22 +89,30 @@ def process_file(
 
     if denoise_only:
         out_wav, new_sr = denoise(dwav, sr, device)
-    elif enhance_only:
-        out_wav, new_sr = enhance(
-            dwav, sr, device,
-            nfe=steps,
-            solver="midpoint",
-            lambd=0.0,
-            tau=0.5,
-        )
     else:
-        out_wav, new_sr = enhance(
-            dwav, sr, device,
-            nfe=steps,
-            solver="midpoint",
-            lambd=strength,
-            tau=0.5,
-        )
+        # Patch MPS Conv1d bug (>65536 output channels broken)
+        if device == "mps":
+            enhancer = load_enhancer(None, device)
+            if not hasattr(enhancer, '_mps_patched'):
+                _patch_mps_conv1d(enhancer)
+                enhancer._mps_patched = True
+
+        if enhance_only:
+            out_wav, new_sr = enhance(
+                dwav, sr, device,
+                nfe=steps,
+                solver="midpoint",
+                lambd=0.0,
+                tau=0.5,
+            )
+        else:
+            out_wav, new_sr = enhance(
+                dwav, sr, device,
+                nfe=steps,
+                solver="midpoint",
+                lambd=strength,
+                tau=0.5,
+            )
 
     # Save output
     output_path.parent.mkdir(parents=True, exist_ok=True)
