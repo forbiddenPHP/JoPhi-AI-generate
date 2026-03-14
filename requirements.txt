@@ -1,6 +1,6 @@
 # tts-mist env — CLI + Web-App
-flask
-requests
-huggingface-hub
-librosa
-scipy
+flask==3.0.3
+requests==2.32.3
+huggingface-hub==0.24.7
+librosa==0.10.2.post1
+scipy==1.13.1

@@ -38,3 +38,31 @@ rt.mkdir(exist_ok=True)
 (rt / "utils.py").write_text("def clip_grad_norm_(*a, **kw): pass\n")
 
 print("  \033[0;32m✓\033[0m deepspeed stubs installed")
+
+# ── Patch download.py to skip git clone when model_repo was restored ──────
+dl = pathlib.Path(sp) / "resemble_enhance" / "enhancer" / "download.py"
+if dl.exists():
+    code = dl.read_text()
+    marker = "restored from backup"
+    if marker not in code:
+        old = 'def download():\n    logger.info("Downloading the model...")\n\n    if REPO_DIR.exists() and (REPO_DIR / ".git").exists():'
+        new = (
+            'def download():\n'
+            '    logger.info("Downloading the model...")\n'
+            '\n'
+            '    run_dir = REPO_DIR / "enhancer_stage2"\n'
+            '\n'
+            '    # If model_repo was restored from backup (no .git), skip download\n'
+            '    if REPO_DIR.exists() and not (REPO_DIR / ".git").exists() and run_dir.exists():\n'
+            '        logger.info("Model repo already present (restored from backup), skipping download.")\n'
+            '        return run_dir\n'
+            '\n'
+            '    if REPO_DIR.exists() and (REPO_DIR / ".git").exists():'
+        )
+        # Also remove the duplicate run_dir assignment at the end
+        code = code.replace(old, new)
+        code = code.replace('\n    run_dir = REPO_DIR / "enhancer_stage2"\n\n    return run_dir', '\n    return run_dir')
+        dl.write_text(code)
+        print("  \033[0;32m✓\033[0m download.py patched (skip clone for restored models)")
+    else:
+        print("  \033[0;32m✓\033[0m download.py already patched")

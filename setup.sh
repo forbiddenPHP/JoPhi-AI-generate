@@ -2,15 +2,17 @@
 set -e
 
 # ── Revoicer — Master Installer ─────────────────────────────────────────────
-# Creates seven conda environments + one uv project:
-#   1. rvc       — Python 3.10 + pip<=23.3 for RVC voice conversion worker
-#   2. enhance   — Python 3.10 for resemble-enhance (audio post-processing)
-#   3. heartmula — Python 3.10 for HeartMuLa music generation
-#   4. acestep   — ACE-Step 1.5 music generation (managed by uv, not conda)
-#   5. whisper   — Python 3.12 for mlx-whisper transcription (Apple Silicon)
-#   6. diarize   — Python 3.10 for speaker diarization (pyannote.audio)
-#   7. separate  — Python 3.10 for audio source separation (demucs)
-#   8. tts-mist  — Python 3.11 for CLI + Web-App
+# Creates nine conda environments + one uv project:
+#   1. rvc        — Python 3.10 + pip<=23.3 for RVC voice conversion worker
+#   2. enhance    — Python 3.10 for resemble-enhance (audio post-processing)
+#   3. heartmula  — Python 3.10 for HeartMuLa music generation
+#   4. acestep    — ACE-Step 1.5 music generation (managed by uv, not conda)
+#   5. whisper    — Python 3.12 for mlx-whisper transcription (Apple Silicon)
+#   6. diarize    — Python 3.10 for speaker diarization (pyannote.audio)
+#   7. separate   — Python 3.10 for audio source separation (demucs)
+#   8. ai-tts     — Python 3.11 for Qwen3-TTS (mlx-audio, Apple Silicon)
+#   9. lang-detect — Python 3.11 for language detection (langdetect)
+#  10. tts-mist   — Python 3.11 for CLI + Web-App
 #
 # Why separate envs?
 #   RVC depends on omegaconf 2.0.6 and fairseq 0.12.2 (broken metadata,
@@ -107,49 +109,61 @@ echo -e "${GREEN}✓${NC} Prerequisites OK"
 # ── Step 1: RVC Worker Env ───────────────────────────────────────────────────
 
 echo ""
-echo "── Step 1/8: RVC Worker ──"
+echo "── Step 1/10: RVC Worker ──"
 bash "$SCRIPT_DIR/rvc_worker/install.sh"
 
 # ── Step 2: Enhance Worker Env ───────────────────────────────────────────────
 
 echo ""
-echo "── Step 2/8: Enhance Worker ──"
+echo "── Step 2/10: Enhance Worker ──"
 bash "$SCRIPT_DIR/enhance_worker/install.sh"
 
 # ── Step 3: HeartMuLa Music Worker Env ───────────────────────────────────────
 
 echo ""
-echo "── Step 3/8: HeartMuLa Music Worker ──"
+echo "── Step 3/10: HeartMuLa Music Worker ──"
 bash "$SCRIPT_DIR/music_worker/install.sh"
 
 # ── Step 4: ACE-Step Music Worker (uv) ───────────────────────────────────────
 
 echo ""
-echo "── Step 4/8: ACE-Step Music Worker ──"
+echo "── Step 4/10: ACE-Step Music Worker ──"
 bash "$SCRIPT_DIR/ace_worker/install.sh"
 
 # ── Step 5: Whisper Worker Env ────────────────────────────────────────────────
 
 echo ""
-echo "── Step 5/8: Whisper Worker ──"
+echo "── Step 5/10: Whisper Worker ──"
 bash "$SCRIPT_DIR/whisper_worker/install.sh"
 
 # ── Step 6: Diarize Worker Env ───────────────────────────────────────────────
 
 echo ""
-echo "── Step 6/8: Diarize Worker ──"
+echo "── Step 6/10: Diarize Worker ──"
 bash "$SCRIPT_DIR/diarize_worker/install.sh"
 
 # ── Step 7: Separate Worker Env ──────────────────────────────────────────────
 
 echo ""
-echo "── Step 7/8: Separate Worker ──"
+echo "── Step 7/10: Separate Worker ──"
 bash "$SCRIPT_DIR/separate_worker/install.sh"
 
-# ── Step 8: Main App Env ─────────────────────────────────────────────────────
+# ── Step 8: AI-TTS Worker Env ────────────────────────────────────────────────
 
 echo ""
-echo "── Step 8/8: Main App (tts-mist) ──"
+echo "── Step 8/10: AI-TTS Worker ──"
+bash "$SCRIPT_DIR/tts_worker/install.sh"
+
+# ── Step 9: Language Detect Worker Env ───────────────────────────────────────
+
+echo ""
+echo "── Step 9/10: Language Detect Worker ──"
+bash "$SCRIPT_DIR/langdetect_worker/install.sh"
+
+# ── Step 10: Main App Env ────────────────────────────────────────────────────
+
+echo ""
+echo "── Step 10/10: Main App (tts-mist) ──"
 
 ENV_NAME="tts-mist"
 
@@ -215,7 +229,7 @@ if [ -d "$MODELS_DIR" ]; then
                 cp -a "$model_dir" "$HF_CACHE/$model_name"
             fi
         done
-        echo -e "  ${GREEN}✓${NC} HuggingFace models restored (pyannote, whisper)"
+        echo -e "  ${GREEN}✓${NC} HuggingFace models restored (pyannote, whisper, Qwen3-TTS)"
     fi
 
     # Torch hub (demucs) → ~/.cache/torch/hub/checkpoints/
@@ -303,6 +317,18 @@ print(f'  Model cached at: {path}')
 "
     echo -e "${GREEN}✓${NC} Whisper model downloaded"
 
+    # ── Qwen3-TTS models ─────────────────────────────────────────────
+    echo ""
+    echo "── Qwen3-TTS models ──"
+    "$CONDA_BIN" run -n ai-tts python -c "
+from huggingface_hub import snapshot_download
+path = snapshot_download('mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit')
+print(f'  1.7B cached at: {path}')
+path = snapshot_download('mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit')
+print(f'  0.6B cached at: {path}')
+"
+    echo -e "${GREEN}✓${NC} Qwen3-TTS models downloaded"
+
     echo ""
     echo -e "${GREEN}✓${NC} All model downloads complete"
 fi
@@ -317,22 +343,23 @@ echo ""
 echo "  Usage:"
 echo "    conda activate tts-mist"
 echo ""
+echo "    # AI Text-to-Speech"
+echo "    python generate.py voice --engine ai-tts --text 'Hello world' -o demos/"
+echo "    python generate.py voice --engine ai-tts -v Serena -t 'dramatic' --text 'Silence.' -o demos/"
+echo ""
 echo "    # Start RVC worker"
-echo "    python revoicer.py server start"
+echo "    python generate.py server start"
 echo ""
 echo "    # Show available models"
-echo "    python revoicer.py --PS"
+echo "    python generate.py ps"
 echo ""
 echo "    # Install a voice model"
-echo "    python revoicer.py models search \"neutral male\""
-echo "    python revoicer.py models install <model-id>"
+echo "    python generate.py models search \"neutral male\""
+echo "    python generate.py models install <model-id>"
 echo ""
-echo "    # Convert audio"
-echo "    python revoicer.py convert input.wav -o output/"
+echo "    # Voice conversion"
+echo "    python generate.py voice --engine rvc --model my-voice input.wav -o output/"
 echo ""
 echo "    # Generate music"
-echo "    python revoicer.py music -l 'In der Disco' -t 'disco,happy,synthesizer' -o music.mp3"
-echo ""
-echo "    # Start web app"
-echo "    python app.py"
+echo "    python generate.py audio --engine ace-step -l 'In der Disco' -t 'disco,happy' -o music.mp3"
 echo ""

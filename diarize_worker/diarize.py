@@ -137,6 +137,93 @@ def verify_stats(segments_json: list[dict], total_duration: float,
             print(f"      ... and {len(stats['overlaps']) - 5} more")
 
 
+CONDA_BIN = "/opt/miniconda3/bin/conda"
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = SCRIPT_DIR.parent
+
+
+def verify_transcription(speaker_segments: dict[str, list[tuple[float, float]]],
+                         speakers: list[str], data: np.ndarray, sr: int,
+                         output_dir: Path, stem: str):
+    """Verify diarization by transcribing each segment clip individually.
+
+    For each speaker segment:
+    1. Extract the clip from the speaker track via soundfile to /tmp
+    2. Transcribe the clip with whisper
+    3. Report the text per segment for manual comparison
+    """
+    print("\n  ── Verify: Transcribing segments ──")
+
+    transcribe_script = PROJECT_DIR / "whisper_worker" / "transcribe.py"
+    total_samples = len(data)
+    is_stereo = data.ndim == 2
+    verify_results = []
+
+    for speaker in speakers:
+        segs = speaker_segments[speaker]
+        print(f"\n    {speaker}: {len(segs)} segments")
+
+        for i, (start, end) in enumerate(segs):
+            duration = end - start
+            if duration < 0.5:
+                # Too short to transcribe meaningfully
+                verify_results.append({
+                    "speaker": speaker, "segment": i,
+                    "start": round(start, 3), "end": round(end, 3),
+                    "text": "(too short)",
+                })
+                continue
+
+            # Extract clip from original audio at segment timestamps
+            start_sample = max(0, int(start * sr))
+            end_sample = min(total_samples, int(end * sr))
+            clip = data[start_sample:end_sample]
+
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                tmp_path = tmp.name
+            sf.write(tmp_path, clip, sr)
+
+            try:
+                result = subprocess.run(
+                    [CONDA_BIN, "run", "-n", "whisper",
+                     "python", str(transcribe_script), tmp_path],
+                    capture_output=True, text=True, timeout=120,
+                )
+                if result.returncode == 0:
+                    # Parse JSON output from whisper
+                    out = result.stdout.strip()
+                    if out:
+                        transcripts = json.loads(out)
+                        text = transcripts[0].get("text", "").strip() if transcripts else ""
+                    else:
+                        text = "(empty)"
+                else:
+                    text = f"(error: {result.stderr.strip()[:100]})"
+            except subprocess.TimeoutExpired:
+                text = "(timeout)"
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
+
+            verify_results.append({
+                "speaker": speaker, "segment": i,
+                "start": round(start, 3), "end": round(end, 3),
+                "duration": round(duration, 3),
+                "text": text,
+            })
+
+            # Print inline
+            text_preview = text[:60] + "..." if len(text) > 60 else text
+            print(f"      [{start:.1f}s–{end:.1f}s] {text_preview}")
+
+    # Save verify results
+    verify_path = output_dir / f"{stem}_verify.json"
+    verify_path.write_text(
+        json.dumps(verify_results, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    print(f"\n  ✓ {verify_path.name} ({len(verify_results)} segments transcribed)")
+
+
 def diarize(input_path: Path, output_dir: Path,
             num_speakers: int | None = None, hf_token: str | None = None,
             verify: bool = False):
@@ -238,20 +325,6 @@ def diarize(input_path: Path, output_dir: Path,
         sf.write(str(out_path), track, sr)
         print(f"  ✓ {out_path.name}")
 
-    # ── Create compact WAVs (active parts only, for transcription) ──────
-    for speaker in speakers:
-        chunks = []
-        for start, end in speaker_segments[speaker]:
-            start_sample = max(0, int(start * sr))
-            end_sample = min(total_samples, int(end * sr))
-            chunks.append(data[start_sample:end_sample])
-
-        if chunks:
-            compact = np.concatenate(chunks)
-            compact_path = output_dir / f"{stem}_{speaker}_compact.wav"
-            sf.write(str(compact_path), compact, sr)
-            print(f"  ✓ {compact_path.name} (compact, {len(chunks)} segments)")
-
     # ── Save diarization JSON ─────────────────────────────────────────────
     segments_json = []
     for turn, _, speaker in diarization.itertracks(yield_label=True):
@@ -271,6 +344,8 @@ def diarize(input_path: Path, output_dir: Path,
     # ── Verify stats ──────────────────────────────────────────────────────
     if verify:
         verify_stats(segments_json, total_duration, output_dir, stem)
+        verify_transcription(speaker_segments, speakers, data, sr,
+                             output_dir, stem)
 
     print(f"\n  Done — {len(speakers)} speaker tracks written to {output_dir}")
 
@@ -285,7 +360,7 @@ def main():
     parser.add_argument("--hf-token", default=None,
                         help="HuggingFace token (or set HF_TOKEN env var)")
     parser.add_argument("--verify", action="store_true",
-                        help="Show diarization statistics (segments, coverage, gaps, overlaps)")
+                        help="Stats + transcribe each segment to verify diarization quality")
     parser.add_argument("--stats-only", action="store_true",
                         help="Only run stats on existing diarize JSON (no pyannote needed)")
     parser.add_argument("--prefix", default="",

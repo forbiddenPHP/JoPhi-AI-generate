@@ -1,25 +1,29 @@
-# Revoicer
+# generate — Unified Media Generation Toolkit
 
-CLI + Web-UI for voice conversion, audio enhancement, AI music generation, lyrics transcription, speaker diarization, and audio source separation.
+CLI for voice synthesis, voice conversion, audio enhancement, AI music generation, lyrics transcription, speaker diarization, and audio source separation. macOS Apple Silicon only.
+
+**Two entry points:**
+- `generate.py` — New unified ABI (active development)
+- `revoicer.py` — Legacy CLI (still works, not updated)
 
 ## Quick Setup
 
 ```bash
-# 1. Install all environments (6 conda envs + 1 uv project)
+# 1. Install all environments (9 conda envs + 1 uv project)
 bash setup.sh
 
 # 2. Activate main env
 conda activate tts-mist
 
-# 3. Start RVC worker (background server for voice conversion)
-python revoicer.py server start
+# 3. Start RVC worker (needed for voice conversion)
+python generate.py server start
 
 # 4. Install a voice model
-python revoicer.py models search "neutral male"
-python revoicer.py models install User/ModelName
+python generate.py models search "neutral male"
+python generate.py models install User/ModelName
 
 # 5. Ready!
-python revoicer.py convert input.wav
+python generate.py voice --engine rvc --model my-voice input.wav
 ```
 
 ### Requirements
@@ -29,173 +33,350 @@ python revoicer.py convert input.wav
 - uv (`brew install uv`) — for ACE-Step music generation
 - ffmpeg (`brew install ffmpeg`)
 - git-lfs (`brew install git-lfs`)
+- Xcode CLI tools with accepted license (`sudo xcodebuild -license accept`)
 - ~20 GB disk for model checkpoints
 
-### Environments
+---
 
-`setup.sh` creates 7 isolated conda environments + 1 uv project to avoid dependency conflicts:
-
-| Env | Python | Manager | Purpose |
-|-----|--------|---------|---------|
-| `tts-mist` | 3.11 | conda | Main CLI + Web UI |
-| `rvc` | 3.10 | conda | RVC voice conversion worker |
-| `enhance` | 3.10 | conda | Audio enhancement (resemble-enhance) |
-| `whisper` | 3.12 | conda | Audio transcription (mlx-whisper) |
-| `heartmula` | 3.10 | conda | HeartMuLa music generation + lyrics transcription |
-| `diarize` | 3.10 | conda | Speaker diarization (pyannote.audio) |
-| `separate` | 3.10 | conda | Audio source separation (demucs) |
-| `ace_worker` | 3.11+ | uv | ACE-Step 1.5 music generation (default engine) |
-
-### Offline Safety (Wheels Cache)
-
-Each worker has a local `wheels/` directory with cached Python packages and a `requirements.lock` with pinned versions. This is intentional — for several reasons:
-
-- **RVC, resemble-enhance, and heartlib had to be partially rewritten** to run on macOS/Apple Silicon (MPS instead of CUDA, deepspeed workarounds, FAISS fixes, etc.). If the upstream repos introduce breaking changes or disappear, these modifications would be lost.
-- **Reproducible builds**: The exact same package versions are installed every time. No "works on my machine".
-- **Offline install**: Works without internet access — ideal for air-gapped systems or unreliable connections.
-
-The install scripts check in this order:
-1. `wheels/` present → Offline install from local `.whl` files
-2. `requirements.lock` present → Online install with pinned versions
-3. Neither found → Fallback to PyPI, then generate lockfile
+## ABI Overview
 
 ```
-rvc_worker/wheels/      — 283 MB (71 packages)
-enhance_worker/wheels/  — 216 MB (99 packages)
-music_worker/wheels/    — 199 MB (95 packages)
-separate_worker/wheels/ —  92 MB (29 packages)
+generate.py <medium> --engine <backend> [--model <variant>] [input] [options]
 ```
 
-### Model Backup (Offline Restore)
+| Medium | Engine | Purpose |
+|--------|--------|---------|
+| `voice` | `ai-tts` | Neural TTS via Qwen3-TTS (text → audio) |
+| `voice` | `say` | macOS native TTS (text → audio) |
+| `voice` | `rvc` | RVC voice conversion (audio → audio) |
+| `audio` | `enhance` | Denoise + super-resolution |
+| `audio` | `demucs` | Source separation (stems) |
+| `audio` | `ace-step` | AI music generation |
+| `audio` | `heartmula` | AI music generation (alt engine) |
+| `audio` | `diarize` | Speaker diarization |
+| `text` | `whisper` | Audio transcription |
+| `text` | `heartmula-transcribe` | Lyrics extraction |
+| `server` | — | RVC worker management |
+| `models` | — | Model install/search/remove |
+| `ps` | — | System status |
 
-All model checkpoints (~39 GB total) can be backed up for offline restore on a fresh system. This ensures that even if HuggingFace, PyTorch Hub, or upstream repos go offline, the project can be fully restored.
+Future mediums (stubs): `image`, `video`, `vision`, `translation`, `comparison`
+
+---
+
+## Global Options
+
+### `--screen-log-format json`
+
+Switches all status/progress output from human-readable TUI to machine-readable JSON events. Works with every command.
 
 ```bash
-# Create backup after initial setup
-bash backup-models.sh          # → ./models/ directory
-bash backup-models.sh --zip    # → ./models/ + models.zip
-
-# Restore on fresh system: place models/ or models.zip next to setup.sh
-bash setup.sh                  # auto-detects and restores models
+python generate.py voice --engine rvc --model my-voice input.wav --screen-log-format json
+python generate.py ps --screen-log-format json
 ```
 
-**What gets backed up:**
+<details>
+<summary>JSON event format</summary>
 
-| Backup path | Source | Size |
-|---|---|---|
-| `models/rvc_models/` | Installed RVC voice models | ~2.4 GB |
-| `models/music_models/` | HeartMuLa checkpoints | ~24 GB |
-| `models/ace_checkpoints/` | ACE-Step 1.5 DiT + LM | ~9.4 GB |
-| `models/enhance_model_repo/` | resemble-enhance weights | ~1.5 GB |
-| `models/huggingface/` | pyannote + mlx-whisper (HF cache) | ~1.5 GB |
-| `models/torch_hub/` | demucs models (torch cache) | ~169 MB |
+```json
+{"type": "stage", "message": "Loading model ...", "ts": 1710000000.0}
+{"type": "progress", "message": "45%|████▍     | 45/100", "percent": 45.0, "ts": 1710000001.0}
+{"type": "log", "message": "Processing complete", "ts": 1710000002.0}
+```
 
-Both `models/` and `models.zip` are gitignored.
+Worker results (JSON) are always printed to stdout, regardless of mode.
+
+</details>
+
+---
+
+## Text Input (unified)
+
+All engines that accept text input use the same flags:
+
+| Flag | Short | Purpose |
+|------|-------|---------|
+| `--text` / `--lyrics` | `-l` | Inline text |
+| `--text-file` / `--lyrics-file` | `-f` | Read text from file |
+
+Both `--lyrics` and `--text` are aliases — they resolve to the same internal field. Use whichever name fits your context (lyrics for music, text for TTS). `--text-file` / `--lyrics-file` reads the file contents and resolves before the engine runs.
 
 ---
 
 ## Features
 
-### Voice Conversion (`convert`)
+### Voice — AI TTS (`voice --engine ai-tts`)
 
-Convert audio to a different voice using RVC with automatic pitch detection.
+Neural text-to-speech via Qwen3-TTS (mlx-audio). Runs locally on Apple Silicon.
 
 ```bash
-# Single file
-python revoicer.py convert input.wav
+# Basic
+python generate.py voice --engine ai-tts --text "Hello world" -o demos/
 
-# With specific voice model
-python revoicer.py convert input.wav --voice my-model
+# With preset voice
+python generate.py voice --engine ai-tts -v Serena --text "Hello" -o demos/
 
-# Batch conversion
-python revoicer.py convert *.wav -o ./output/
+# With style instructions (refine mode)
+python generate.py voice --engine ai-tts -v Aiden -t "dramatic, slow" --text "Silence." -o demos/
 
-# Manual pitch shift (semitones)
-python revoicer.py convert input.wav --pitch 12
+# Smaller model (faster, less quality)
+python generate.py voice --engine ai-tts --tts-model small --text "Quick test" -o demos/
 
-# Set target pitch directly
-python revoicer.py convert input.wav --target-hz 280
+# Auto-detect language
+python generate.py voice --engine ai-tts --text "Der Fuchs springt über den Bach" -o demos/
 
-# Choose pitch detection algorithm
-python revoicer.py convert input.wav --decoder crepe
+# Explicit language
+python generate.py voice --engine ai-tts -v Dylan --language de --text "Hallo Welt" -o demos/
+
+# Text from file
+python generate.py voice --engine ai-tts --text-file story.txt -o demos/
+
+# Dialog (multiple voices)
+python generate.py voice --engine ai-tts --text "[Aiden] Hi! [Serena] Hello there!" -o demos/
+
+# Dialog with per-segment style instructions
+python generate.py voice --engine ai-tts --text "[Aiden: excited, fast] Hi! [Serena: calm, slow] Hello there." -o demos/
+
+# Reproduce from prompt sidecar file
+python generate.py voice --engine ai-tts --prompt-file demos/speech.txt -o demos/
+
+# Reproduce with different voice (CLI flags override sidecar values)
+python generate.py voice --engine ai-tts --prompt-file demos/speech.txt -v Dylan -o demos/
+
+# List available voices
+python generate.py voice --engine ai-tts --list-voices
 ```
 
-**Options:**
+<details>
+<summary>Voices</summary>
+
+| Name | Gender |
+|------|--------|
+| Aiden | Male |
+| Dylan | Male |
+| Eric | Male |
+| Ryan | Male |
+| Uncle_Fu | Male |
+| Vivian | Female |
+| Serena | Female |
+| Ono_Anna | Female |
+| Sohee | Female |
+
+</details>
+
+<details>
+<summary>Languages</summary>
+
+Chinese, English, Japanese, Korean, German, French, Russian, Portuguese, Spanish, Italian
+
+Language is auto-detected if `--language` is not set (via langdetect).
+
+</details>
+
+<details>
+<summary>Options</summary>
+
+- `--text`, `-l` — Inline text to speak
+- `--text-file`, `-f` — Path to text file
+- `--prompt-file`, `-p` — Load text + params from prompt sidecar (.txt)
+- `-v`, `--voice` — Preset voice (Aiden, Serena, ...)
+- `-t`, `--tags` — Style instructions for refine mode ("dramatic, slow, whispering")
+- `--tts-model` — Model size: `large` (default, 1.7B) or `small` (0.6B)
+- `--language` — ISO language code: de, en, fr, ja, ko, zh, ru, pt, es, it (auto-detected if omitted)
+- `--list-voices` — Show available voices
 - `-o, --output` — Output directory
-- `-v, --voice` — Voice model name
-- `--decoder` — Pitch detection: `rmvpe` (default), `crepe`, `harvest`, `pm`
-- `--pitch` — Manual pitch shift in semitones (disables auto-pitch)
-- `--target-hz` — Target voice pitch in Hz
+
+**Refine mode:** When `--tags` is set, the model uses an instruction-guided generation pipeline for more expressive speech. Without `--tags`, text is synthesized directly.
+
+**Dialog:** Use `[VoiceName]` markers in text to switch between speakers. Each segment is generated separately and concatenated with 0.4s silence gaps. Without markers, the `-v` voice is used for the entire text.
+
+**Per-segment style:** Use `[VoiceName: style instructions]` to set style per segment. Per-segment instructions override global `--tags`. Example: `[Dylan: excited, fast] Wow! [Serena: calm, slow] Indeed.`
+
+**Prompt sidecar:** Every generation saves a `.txt` file alongside the `.wav` with all parameters (voice, language, model, tags) and the full text. Use `--prompt-file` to reload and reproduce a generation. CLI flags override sidecar values.
+
+**Audio format:** WAV at native model sample rate.
+
+</details>
 
 ---
 
-### Audio Enhancement (`enhance`)
+### Voice — macOS TTS (`voice --engine say`)
+
+Generate speech from text using macOS `say` command. Optionally pipe through RVC for voice conversion.
+
+```bash
+# System default voice
+python generate.py voice --engine say --text "Hallo Welt" -o demos/
+
+# Specific macOS voice
+python generate.py voice --engine say -v Anna --text "Hallo Welt" -o demos/
+
+# With speaking rate
+python generate.py voice --engine say -v Samantha --rate 180 --text "Hello world" -o demos/
+
+# Text from file
+python generate.py voice --engine say --text-file story.txt -o demos/
+
+# Say + RVC voice conversion pipeline
+python generate.py voice --engine say --model my-voice --text "Hallo Welt" -o demos/
+python generate.py voice --engine say -v Anna --model my-voice --text "Hallo" -o demos/
+```
+
+<details>
+<summary>Options & details</summary>
+
+**Options:**
+- `--text`, `-l` — Inline text to speak
+- `--text-file`, `-f` — Path to text file
+- `-v`, `--voice` — macOS voice name (default: system voice). List with `say -v '?'`
+- `--rate` — Speaking rate in words per minute
+- `--model` — RVC model for voice conversion post-processing (optional)
+- `-o, --output` — Output directory
+
+**Pipeline:**
+- Without `--model`: `say` → 44100 Hz WAV → done
+- With `--model`: `say` → temp WAV → RVC conversion → output (temp WAV cleaned up)
+
+**Audio format:** Always outputs 44100 Hz, 16-bit WAV (`--data-format=LEI16@44100`).
+
+
+
+</details>
+
+---
+
+### Voice — RVC Conversion (`voice --engine rvc`)
+
+Convert audio to a different voice using RVC with automatic pitch detection. Requires running server (`generate.py server start`).
+
+```bash
+# Single file (auto-pitch from model config)
+python generate.py voice --engine rvc --model my-voice input.wav
+
+# Batch conversion
+python generate.py voice --engine rvc --model my-voice *.wav -o ./output/
+
+# Manual pitch shift (semitones, disables auto-pitch)
+python generate.py voice --engine rvc --model my-voice input.wav --pitch 12
+
+# Set target pitch directly (Hz)
+python generate.py voice --engine rvc --model my-voice input.wav --target-hz 280
+
+# Choose pitch detection algorithm
+python generate.py voice --engine rvc --model my-voice input.wav --decoder crepe
+```
+
+<details>
+<summary>Options & details</summary>
+
+**Options:**
+- `--model` — RVC voice model name (required)
+- `-o, --output` — Output directory
+- `--decoder` — Pitch detection: `rmvpe` (default), `crepe`, `harvest`, `pm`
+- `--pitch` — Manual pitch shift in semitones (disables auto-pitch)
+- `--target-hz` — Target voice pitch in Hz (overrides model config)
+
+**Auto-Pitch (default behavior):**
+
+When neither `--pitch` nor `--target-hz` is set:
+1. Detects input file's fundamental frequency (F0) using `pyworld.harvest()`
+2. Reads model's `target_f0` from `rvc_models/<model>/revoicer.json`
+3. Computes pitch shift: `semitones = 12 * log2(target_f0 / input_f0)`
+4. Applies the shift via RVC's `f0up_key` parameter
+
+If the model has no `target_f0`, run `models set-pitch` first.
+
+**Implicit behaviors:**
+- Non-WAV files are auto-converted to WAV (44.1 kHz) via ffmpeg
+- Output format is always WAV
+- All output paths are printed as JSON array to stdout
+
+</details>
+
+---
+
+### Audio Enhancement (`audio --engine enhance`)
 
 Denoise and super-resolve audio using resemble-enhance.
 
 ```bash
-# Full enhancement (denoise + super-resolution)
-python revoicer.py enhance input.wav -o ./enhanced/
-
-# Denoise only (faster)
-python revoicer.py enhance input.wav --denoise-only
-
-# Batch
-python revoicer.py enhance *.wav -o ./enhanced/
+python generate.py audio --engine enhance input.wav -o ./enhanced/
+python generate.py audio --engine enhance input.wav --denoise-only
+python generate.py audio --engine enhance input.wav --enhance-only
+python generate.py audio --engine enhance *.wav -o ./enhanced/
 ```
 
-**Options:**
+<details>
+<summary>Options</summary>
+
 - `-o, --output` — Output directory
 - `--denoise-only` — Skip super-resolution
 - `--enhance-only` — Only super-resolution, skip denoising
 
+</details>
+
 ---
 
-### Music Generation (`music`)
+### Audio Separation (`audio --engine demucs`)
 
-Generate music from lyrics using ACE-Step 1.5 (default) or HeartMuLa.
+Split audio into stems (vocals, drums, bass, other) using demucs.
 
 ```bash
-# ACE-Step (default engine)
-python revoicer.py music \
-  -f lyrics.txt \
-  -t "upbeat electronic dance music with synth bass" \
-  -s 30 -o song.mp3
-
-# HeartMuLa engine
-python revoicer.py music --engine heart \
-  -f lyrics.txt \
-  -t "disco,happy,synthesizer" \
-  -s 30 -o song.mp3
-
-# ACE-Step with advanced params
-python revoicer.py music -f lyrics.txt \
-  -t "cinematic orchestral" \
-  --steps 16 --cfg-scale 10.0 --seed 42 -s 60
+python generate.py audio --engine demucs song.mp3 -o ./stems/
+python generate.py audio --engine demucs song.mp3 -o ./stems/ --model htdemucs_ft
 ```
 
-**Common options (both engines):**
-- `--engine {ace,ace-turbo,ace-sft,ace-base,heart}` — Music engine (default: `ace`)
-  - `ace` / `ace-turbo` — ACE-Step 1.5 turbo (8 steps, fast)
-  - `ace-sft` — ACE-Step 1.5 SFT (50 steps, high quality)
-  - `ace-base` — ACE-Step 1.5 base (50 steps, all features)
-  - `heart` — HeartMuLa
-- `-l, --lyrics` — Inline lyrics text
-- `-f, --lyrics-file` — Path to lyrics file
-- `-t, --tags` — Style tags or caption (required)
-- `-o, --output` — Output path (default: `./music_<timestamp>.mp3`)
-- `-s, --seconds` — Max audio length in seconds (default: 20)
-- `--duration` — Max audio length in ms (overrides `--seconds`)
-- `--seed` — Random seed for reproducibility
-- `--topk` — Top-k sampling (heart: 50, ace: 0=off)
-- `--temperature` — Sampling temperature (heart: 1.0, ace: 0.85)
-- `--cfg-scale` — CFG scale (heart: 1.5, ace: 7.0)
-- `--bpm` — Beats per minute (default: auto)
-- `--keyscale` — Musical key, e.g. `"C Major"`, `"Am"` (default: auto)
-- `--timesignature` — Time signature: `2`=2/4, `3`=3/4, `4`=4/4, `6`=6/8 (default: auto)
-- `--timeout` — Generation timeout in seconds (default: 1800)
+Output: `song_vocals.wav`, `song_drums.wav`, `song_bass.wav`, `song_other.wav`
 
-**ACE-Step specific options:**
+<details>
+<summary>Options</summary>
+
+- `-o, --output` — Output directory
+- `--model` — Demucs model (default: `htdemucs`, alt: `htdemucs_ft`)
+
+</details>
+
+---
+
+### Music Generation (`audio --engine ace-step` / `audio --engine heartmula`)
+
+Generate music from lyrics and style tags.
+
+```bash
+# ACE-Step (default turbo model)
+python generate.py audio --engine ace-step \
+  -l "[Verse] La la la" -t "upbeat disco" -s 30 -o song.mp3
+
+# ACE-Step SFT (50 steps)
+python generate.py audio --engine ace-step --model sft \
+  -f lyrics.txt -t "cinematic orchestral" -s 60
+
+# HeartMuLa
+python generate.py audio --engine heartmula \
+  -l "[Verse] La la la" -t "disco,happy" -s 30 -o song.mp3
+```
+
+<details>
+<summary>Common options (both engines)</summary>
+
+- `--lyrics` / `--text`, `-l` — Inline lyrics
+- `--lyrics-file` / `--text-file`, `-f` — Lyrics from file
+- `--tags`, `-t` — Style tags or caption (required)
+- `-o, --output` — Output path (default: `./music_<timestamp>.mp3`)
+- `-s, --seconds` — Duration in seconds (default: 20)
+- `--duration` — Duration in ms (overrides `--seconds`)
+- `--seed` — Random seed
+- `--topk` — Top-k sampling
+- `--temperature` — Sampling temperature
+- `--cfg-scale` — CFG scale
+
+ACE-Step `--model` variants: `turbo` (default if omitted, 8 steps), `sft` (50 steps), `base` (50 steps)
+
+</details>
+
+<details>
+<summary>ACE-Step specific options</summary>
+
 - `--steps` — Inference steps (default: 8)
 - `--shift` — Timestep shift (default: 3.0)
 - `--no-thinking` — Disable LM chain-of-thought
@@ -204,150 +385,111 @@ python revoicer.py music -f lyrics.txt \
 - `--top-p` — Nucleus sampling (default: 0.9)
 - `--batch-size` — Parallel samples (default: 1)
 - `--instrumental` — Force instrumental output
+- `--bpm` — Beats per minute
+- `--keyscale` — Musical key (e.g. `"C Major"`, `"Am"`)
+- `--timesignature` — Time signature: `2`=2/4, `3`=3/4, `4`=4/4, `6`=6/8
+
+</details>
 
 **Lyrics format:** Use section tags like `[Verse]`, `[Chorus]`, `[Bridge]`, `[Intro]`, `[Outro]`.
 
+**Prompt guides:** See [prompt-guides/ACE-Step.md](prompt-guides/ACE-Step.md) and [prompt-guides/HeartMuLa.md](prompt-guides/HeartMuLa.md).
+
 ---
 
-### Audio Transcription (`transcribe`)
+### Speaker Diarization (`audio --engine diarize`)
+
+Split dialogue audio into separate tracks per speaker using pyannote.audio (MPS).
+
+```bash
+python generate.py audio --engine diarize interview.wav -o ./speakers/
+python generate.py audio --engine diarize podcast.wav -o ./speakers/ --speakers 3
+python generate.py audio --engine diarize dialog.wav -o ./speakers/ --verify
+```
+
+<details>
+<summary>Options</summary>
+
+- `-o, --output` — Output directory
+- `--speakers` — Number of speakers (auto-detect if not set)
+- `--hf-token` — HuggingFace token (or `HF_TOKEN` env var)
+- `--verify` — Transcribe each segment to verify diarization quality
+
+**Note:** Requires accepting pyannote model terms on HuggingFace and setting `HF_TOKEN`.
+
+</details>
+
+---
+
+### Transcription (`text --engine whisper`)
 
 Transcribe audio to text using mlx-whisper (Apple Silicon optimized).
 
 ```bash
-# Transcribe to JSON (default)
-python revoicer.py transcribe audio.wav
-
-# All formats (json, txt, srt, vtt, tsv)
-python revoicer.py transcribe audio.wav --format all -o ./output/
-
-# With language hint and word timestamps
-python revoicer.py transcribe audio.wav --input-language en --word-timestamps
-
-# Specific model
-python revoicer.py transcribe audio.wav --model large-v3
-
-# Batch transcription
-python revoicer.py transcribe *.wav --format srt -o ./transcripts/
+python generate.py text --engine whisper audio.wav
+python generate.py text --engine whisper audio.wav --format srt -o ./transcripts/
+python generate.py text --engine whisper audio.wav --input-language de --word-timestamps
+python generate.py text --engine whisper audio.wav --model large-v3
 ```
 
-**Options:**
+<details>
+<summary>Options</summary>
+
 - `--model` — Whisper model: `tiny`, `base`, `small`, `medium`, `large-v3`, `large-v3-turbo` (default)
 - `--input-language` — Language hint (e.g. `en`, `de`, `ja`)
-- `--word-timestamps` — Include word-level timing
-- `--format` — Output format: `json` (default), `txt`, `srt`, `vtt`, `tsv`, `all`
-- `-o, --output` — Output directory for transcript files
+- `--word-timestamps` — Word-level timing
+- `--format` — Output: `json` (default), `txt`, `srt`, `vtt`, `tsv`, `all`
+- `-o, --output` — Output directory
 - `--timeout` — Timeout in seconds (default: 600)
 
----
-
-### Speaker Diarization (`diarize`)
-
-Split dialogue audio into separate tracks per speaker using pyannote.audio (runs on MPS). Each output file has the full length of the original — silence where the speaker is not active.
-
-```bash
-# Auto-detect speakers
-python revoicer.py diarize interview.wav -o ./speakers/
-
-# Known number of speakers
-python revoicer.py diarize podcast.wav -o ./speakers/ --speakers 3
-
-# With statistics (gaps, overlaps, coverage)
-python revoicer.py diarize dialog.wav -o ./speakers/ --verify
-```
-
-**Output:**
-- `dialog_SPEAKER_00.wav` — Full length, only Speaker 0, silence elsewhere
-- `dialog_SPEAKER_01.wav` — Full length, only Speaker 1, silence elsewhere
-- `dialog_SPEAKER_00_compact.wav` — Active parts only (for transcription)
-- `dialog_diarize.json` — Diarization segments (start, end, speaker)
-- `dialog_stats.json` — Statistics (with `--verify`)
-
-**Options:**
-- `-o, --output` — Output directory
-- `--speakers` — Number of speakers (auto-detect if not set)
-- `--hf-token` — HuggingFace token (or set `HF_TOKEN` env var)
-- `--verify` — Show diarization statistics (segments, coverage, gaps, overlaps)
-
-**Note:** pyannote.audio models are gated on HuggingFace. You need to accept the terms at [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1) and [pyannote/segmentation-3.0](https://huggingface.co/pyannote/segmentation-3.0), then set `HF_TOKEN` or run `huggingface-cli login`.
+</details>
 
 ---
 
-### Audio Source Separation (`separate`)
-
-Split audio into stems (vocals, drums, bass, other) using demucs. Each stem has the full length of the original.
-
-```bash
-# Default model (htdemucs)
-python revoicer.py separate song.mp3 -o ./stems/
-
-# Fine-tuned model (higher quality)
-python revoicer.py separate song.mp3 -o ./stems/ --model htdemucs_ft
-
-# Batch separation
-python revoicer.py separate *.mp3 -o ./stems/
-```
-
-**Output:**
-- `song_vocals.wav`
-- `song_drums.wav`
-- `song_bass.wav`
-- `song_other.wav`
-
-**Options:**
-- `-o, --output` — Output directory
-- `--model` — Demucs model (default: `htdemucs`, alt: `htdemucs_ft`)
-
----
-
-### Lyrics Transcription (`transcribe-lyrics`)
+### Lyrics Extraction (`text --engine heartmula-transcribe`)
 
 Extract lyrics from audio using HeartTranscriptor.
 
 ```bash
-# Print to stdout
-python revoicer.py transcribe-lyrics song.mp3
-
-# Save to file
-python revoicer.py transcribe-lyrics song.mp3 -o lyrics.txt
+python generate.py text --engine heartmula-transcribe song.mp3
+python generate.py text --engine heartmula-transcribe song.mp3 -o lyrics.txt
 ```
-
-**Options:**
-- `-o, --output` — Output file (default: print to stdout)
-- `--timeout` — Timeout in seconds (default: 600)
-
-**Tip:** For best results, separate vocals first (e.g. with demucs) before transcribing.
 
 ---
 
 ### Model Management (`models`)
 
 ```bash
-# List installed models
-python revoicer.py models list
-
-# Search HuggingFace + voice-models.com
-python revoicer.py models search "female singer"
-python revoicer.py models search "anime" --limit 50
-
-# Install from HuggingFace
-python revoicer.py models install User/ModelRepo
-python revoicer.py models install User/MultiModelRepo --file "specific_voice"
-python revoicer.py models install User/Repo --name "my-custom-name"
-
-# Install from direct URL
-python revoicer.py models install "https://huggingface.co/.../model.zip"
-
-# Remove
-python revoicer.py models remove my-model
-
-# Calibrate pitch (auto-detect target F0)
-python revoicer.py models calibrate my-model
-
-# Set pitch manually
-python revoicer.py models set-pitch my-model 120   # male ~120 Hz
-python revoicer.py models set-pitch my-model 220   # female ~220 Hz
-python revoicer.py models set-pitch my-model 280   # child ~280 Hz
+python generate.py models list
+python generate.py models search "female singer"
+python generate.py models search "anime" --limit 50
+python generate.py models install User/ModelRepo
+python generate.py models install User/MultiModelRepo --file "specific_voice"
+python generate.py models install User/Repo --name "my-custom-name"
+python generate.py models install "https://example.com/model.zip"
+python generate.py models remove my-model
+python generate.py models calibrate my-model        # guess target F0 from model name (heuristic)
+python generate.py models set-pitch my-model 120   # male ~120 Hz
+python generate.py models set-pitch my-model 220   # female ~220 Hz
+python generate.py models set-pitch my-model 280   # child ~280 Hz
 ```
+
+<details>
+<summary>Details</summary>
+
+- Accepts HuggingFace repo IDs or direct download URLs
+- Supports `.pth`, `.zip`, `.rar`, `.7z` archives
+- Multi-model repos: auto-installs all models found
+- Auto-calibrates target F0 after install
+
+**Calibration heuristics:**
+- Child/young voices: 280 Hz
+- Female voices: 220 Hz
+- Male voices: 120 Hz
+
+**Model config:** `rvc_models/<model>/revoicer.json` with `target_f0` and optional `hf_repo_id`.
+
+</details>
 
 ---
 
@@ -356,66 +498,118 @@ python revoicer.py models set-pitch my-model 280   # child ~280 Hz
 The RVC worker runs as a background API server on port 5100.
 
 ```bash
-python revoicer.py server start          # Start (default port 5100)
-python revoicer.py server start -p 5200  # Custom port
-python revoicer.py server status         # Check status
-python revoicer.py server stop           # Stop
+python generate.py server start              # default port 5100
+python generate.py server start -p 5200      # custom port
+python generate.py server status
+python generate.py server stop
 ```
 
 ---
 
-### System Status (`--PS`)
+### System Status (`ps`)
 
 ```bash
-python revoicer.py --PS
+python generate.py ps
+python generate.py ps --screen-log-format json
 ```
 
-Shows installed models, target pitch settings, and server status.
+Shows installed models, target pitch settings, server status, and supported formats.
 
 ---
 
-### Web UI (`app.py`)
+## Legacy CLI Mapping
 
-```bash
-python app.py
-# Open http://localhost:5000
-```
-
-Features:
-- Dashboard with RVC worker status
-- Model browser (search + install from HuggingFace)
-- Audio conversion with playback
-- Batch conversion
-
-API endpoints:
-- `GET /api/status` — Server status
-- `GET /api/models` — List models
-- `GET /api/models/search?q=query` — Search models
-- `POST /api/models/install` — Install model
-- `DELETE /api/models/<name>` — Remove model
-- `POST /api/convert` — Convert audio
-- `GET /api/audio/<filename>` — Download result
+| revoicer.py (legacy) | generate.py (current) |
+|---|---|
+| `convert input.wav` | `voice --engine rvc --model x input.wav` |
+| `enhance input.wav` | `audio --engine enhance input.wav` |
+| `separate input.wav` | `audio --engine demucs input.wav` |
+| `music -l "..." -t "..."` | `audio --engine ace-step -l "..." -t "..."` |
+| `music --engine heart` | `audio --engine heartmula` |
+| `transcribe audio.wav` | `text --engine whisper audio.wav` |
+| `transcribe-lyrics song.mp3` | `text --engine heartmula-transcribe song.mp3` |
+| `diarize interview.wav` | `audio --engine diarize interview.wav` |
+| `server start\|stop\|status` | `server start\|stop\|status` |
+| `models list\|search\|...` | `models list\|search\|...` |
+| `--PS` | `ps` |
 
 ---
 
-## TODOs
+<details>
+<summary><strong>Environments</strong></summary>
 
-### app.py Web UI
-- [ ] Add music generation page (lyrics input, tag picker, duration slider, generate + play)
-- [ ] Add lyrics transcription page (upload audio, show extracted text)
-- [ ] Add audio enhancement page (upload, denoise/enhance, download)
-- [ ] Add model calibration UI (pitch detection visualization, manual F0 override)
-- [ ] Real-time generation progress (WebSocket or SSE for progress bars)
-- [ ] Audio waveform visualization
-- [ ] Drag & drop file upload
+`setup.sh` creates 9 isolated conda environments + 1 uv project:
 
-### Pipeline
-- [ ] Queue system for long-running generation jobs
-- [ ] GPU memory management (load/unload models on demand)
-- [ ] Audio output normalization (consistent loudness across engines and tools)
+| Env | Python | Manager | Purpose |
+|-----|--------|---------|---------|
+| `tts-mist` | 3.11 | conda | Main CLI |
+| `rvc` | 3.10 | conda | RVC voice conversion worker |
+| `enhance` | 3.10 | conda | Audio enhancement (resemble-enhance) |
+| `whisper` | 3.12 | conda | Audio transcription (mlx-whisper) |
+| `heartmula` | 3.10 | conda | HeartMuLa music + lyrics transcription |
+| `diarize` | 3.10 | conda | Speaker diarization (pyannote.audio) |
+| `separate` | 3.10 | conda | Audio source separation (demucs) |
+| `ai-tts` | 3.11 | conda | Qwen3-TTS neural speech (mlx-audio) |
+| `lang-detect` | 3.11 | conda | Language detection (langdetect) |
+| `ace_worker` | 3.11+ | uv | ACE-Step 1.5 music generation |
 
-### Music Generation
-- [ ] MPS float16/bfloat16 support (currently float32 — autocast warning)
-- [ ] HeartCLAP integration (audio-text alignment, when heartlib implements the pipeline)
-- [ ] Song structure support (generate full songs with verse/chorus/bridge transitions)
-- [x] Vocal separation (demucs) as preprocessing for transcription
+</details>
+
+<details>
+<summary><strong>Offline Safety (Wheels Cache)</strong></summary>
+
+Each worker has a local `wheels/` directory with cached `.whl` files and `requirements.lock`. Install scripts check:
+1. `wheels/` present → Offline install from local wheels
+2. `requirements.lock` → Online install with pinned versions
+3. Neither → Fallback to PyPI, then generate lockfile
+
+</details>
+
+<details>
+<summary><strong>progress.py — Worker subprocess streaming</strong></summary>
+
+Internal library for real-time streaming of worker output. All workers run through `run_worker()` which streams stderr, parses progress events (tqdm, ffmpeg, counters), and collects stdout for JSON results.
+
+</details>
+
+<details>
+<summary><strong>Environment Variables</strong></summary>
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `RVC_API_URL` | `http://127.0.0.1:5100` | RVC worker API endpoint |
+| `CONDA_BIN` | `/opt/miniconda3/bin/conda` | Path to conda binary |
+| `UV_BIN` | `~/.local/bin/uv` or `uv` in PATH | Path to uv binary |
+| `HF_TOKEN` | — | HuggingFace token (diarize, model downloads) |
+| `HF_HOME` | `~/.cache/huggingface` | HuggingFace cache directory |
+
+</details>
+
+<details>
+<summary><strong>Project Structure</strong></summary>
+
+```
+tts-mist/
+├── generate.py             # Unified CLI entry point (current)
+├── revoicer.py             # Legacy CLI (still functional)
+├── progress.py             # Worker subprocess streaming library
+├── setup.sh                # Master installer (all envs + models)
+├── backup-models.sh        # Model checkpoint backup
+├── requirements.txt        # Main env dependencies (pinned)
+├── rvc_worker/             # RVC voice conversion worker
+├── enhance_worker/         # resemble-enhance worker
+├── music_worker/           # HeartMuLa worker
+├── ace_worker/             # ACE-Step 1.5 worker (uv project)
+├── whisper_worker/         # mlx-whisper worker
+├── diarize_worker/         # pyannote diarization worker
+├── separate_worker/        # demucs separation worker
+├── tts_worker/             # Qwen3-TTS worker (mlx-audio)
+├── langdetect_worker/      # Language detection worker
+├── rvc_models/             # Installed RVC voice models
+├── models/                 # All model checkpoints (gitignored)
+├── tests/                  # Test scripts
+├── demos/                  # Demo output files
+└── prompt-guides/          # ACE-Step + HeartMuLa prompt guides
+```
+
+</details>

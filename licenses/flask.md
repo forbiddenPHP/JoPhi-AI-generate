@@ -7,4 +7,4 @@
 
 ## Notes
 
-Used as the web framework for `app.py` (Web UI + REST API).
+Web framework dependency (reserved for future web UI).

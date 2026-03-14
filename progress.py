@@ -300,20 +300,54 @@ def run_worker(
 
 # ── CLI display ───────────────────────────────────────────────────────────────
 
+_last_was_progress = False
+_CLEAR_LINE = "\033[2K"  # ANSI: erase entire line
+
+
 def print_event_tui(event: ProgressEvent):
-    """Print a progress event to stderr in TUI format (human-readable)."""
+    """Print a progress event to stderr in TUI format (human-readable).
+
+    While a progress bar is active, log lines are suppressed to keep
+    the bar overwriting on a single line.  Stage/error/warning always
+    break through (they mark a new phase).
+    """
+    global _last_was_progress
+
     if event.type == "progress" and event.percent is not None:
-        # Overwrite current line with progress bar
+        # Counter lines like [1/10] — show step + bar on two lines, update in-place
+        if _COUNTER_RE.search(event.message or ""):
+            if _last_was_progress:
+                # Move up one line (bar) to overwrite previous step+bar
+                print(f"\033[A{_CLEAR_LINE}\r{_CLEAR_LINE}", end="", file=sys.stderr)
+            # Step info line
+            print(f"\r{_CLEAR_LINE}  {event.message}", file=sys.stderr, flush=True)
         bar_width = 30
         filled = int(bar_width * event.percent / 100)
         bar = "█" * filled + "░" * (bar_width - filled)
-        print(f"\r  {bar} {event.percent:5.1f}%  {event.message[:60]}",
+        print(f"\r{_CLEAR_LINE}  {bar} {event.percent:5.1f}%",
               end="", file=sys.stderr, flush=True)
+        _last_was_progress = True
+
     elif event.type == "stage":
+        if _last_was_progress:
+            print("", file=sys.stderr)
         print(f"\n  {event.message}", file=sys.stderr, flush=True)
+        _last_was_progress = False
+
+    elif event.type == "error":
+        if _last_was_progress:
+            print("", file=sys.stderr)
+        print(f"\n  ERROR: {event.message}", file=sys.stderr, flush=True)
+        _last_was_progress = False
+
+    elif event.type == "warning":
+        # suppress warnings while progress bar is active
+        if not _last_was_progress:
+            print(f"  {event.message}", file=sys.stderr, flush=True)
+
     else:
-        # log, error, warning — print as-is (the message already contains the marker)
-        if event.message:
+        # log — suppress while progress bar is active
+        if not _last_was_progress and event.message:
             print(f"  {event.message}", file=sys.stderr, flush=True)
 
 
