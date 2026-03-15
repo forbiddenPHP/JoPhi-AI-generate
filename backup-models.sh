@@ -36,9 +36,9 @@ mkdir -p "$MODELS_DIR"
 
 # ── RVC voice models ─────────────────────────────────────────────────────────
 
-if [ -d "$SCRIPT_DIR/rvc_models" ] && [ "$(ls -A "$SCRIPT_DIR/rvc_models" 2>/dev/null)" ]; then
+if [ -d "$SCRIPT_DIR/worker/rvc/models" ] && [ "$(ls -A "$SCRIPT_DIR/worker/rvc/models" 2>/dev/null)" ]; then
     echo "  Backing up RVC models ..."
-    cp -a "$SCRIPT_DIR/rvc_models" "$MODELS_DIR/rvc_models"
+    cp -a "$SCRIPT_DIR/worker/rvc/models" "$MODELS_DIR/rvc_models"
     echo -e "  ${GREEN}✓${NC} RVC models ($(du -sh "$MODELS_DIR/rvc_models" | cut -f1))"
 else
     echo "  ── RVC models: not found, skipping"
@@ -46,10 +46,10 @@ fi
 
 # ── HeartMuLa checkpoints ────────────────────────────────────────────────────
 
-if [ -d "$SCRIPT_DIR/music_models/ckpt" ] && [ "$(ls -A "$SCRIPT_DIR/music_models/ckpt" 2>/dev/null)" ]; then
+if [ -d "$SCRIPT_DIR/worker/music/models/ckpt" ] && [ "$(ls -A "$SCRIPT_DIR/worker/music/models/ckpt" 2>/dev/null)" ]; then
     echo "  Backing up HeartMuLa models ..."
     mkdir -p "$MODELS_DIR/music_models"
-    cp -a "$SCRIPT_DIR/music_models/ckpt" "$MODELS_DIR/music_models/ckpt"
+    cp -a "$SCRIPT_DIR/worker/music/models/ckpt" "$MODELS_DIR/music_models/ckpt"
     echo -e "  ${GREEN}✓${NC} HeartMuLa models ($(du -sh "$MODELS_DIR/music_models" | cut -f1))"
 else
     echo "  ── HeartMuLa models: not found, skipping"
@@ -57,7 +57,7 @@ fi
 
 # ── ACE-Step checkpoints ─────────────────────────────────────────────────────
 
-ACE_CKPT="$SCRIPT_DIR/ace_worker/ACE-Step-1.5/checkpoints"
+ACE_CKPT="$SCRIPT_DIR/worker/ace/ACE-Step-1.5/checkpoints"
 if [ -d "$ACE_CKPT" ] && [ "$(ls -A "$ACE_CKPT" 2>/dev/null)" ]; then
     echo "  Backing up ACE-Step checkpoints ..."
     cp -a "$ACE_CKPT" "$MODELS_DIR/ace_checkpoints"

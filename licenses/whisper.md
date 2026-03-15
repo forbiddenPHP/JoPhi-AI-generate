@@ -15,4 +15,4 @@
 
 ## Notes
 
-No modifications to the upstream package. Our changes are only in `whisper_worker/transcribe.py` (our own wrapper script).
+No modifications to the upstream package. Our changes are only in `worker/whisper/transcribe.py` (our own wrapper script).

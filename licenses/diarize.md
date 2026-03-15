@@ -16,4 +16,4 @@ A HuggingFace token (`HF_TOKEN`) is required for model download.
 
 ## Notes
 
-No modifications to the upstream package. Our changes are only in `diarize_worker/diarize.py` (our own wrapper script).
+No modifications to the upstream package. Our changes are only in `worker/diarize/diarize.py` (our own wrapper script).

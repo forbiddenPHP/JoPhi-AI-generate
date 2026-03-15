@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-set -e
-
 # ── Revoicer — Master Installer ─────────────────────────────────────────────
 # Creates nine conda environments + one uv project:
 #   1. rvc        — Python 3.10 + pip<=23.3 for RVC voice conversion worker
@@ -110,55 +108,55 @@ echo -e "${GREEN}✓${NC} Prerequisites OK"
 
 echo ""
 echo "── Step 1/10: RVC Worker ──"
-bash "$SCRIPT_DIR/rvc_worker/install.sh"
+bash "$SCRIPT_DIR/worker/rvc/install.sh"
 
 # ── Step 2: Enhance Worker Env ───────────────────────────────────────────────
 
 echo ""
 echo "── Step 2/10: Enhance Worker ──"
-bash "$SCRIPT_DIR/enhance_worker/install.sh"
+bash "$SCRIPT_DIR/worker/enhance/install.sh"
 
 # ── Step 3: HeartMuLa Music Worker Env ───────────────────────────────────────
 
 echo ""
 echo "── Step 3/10: HeartMuLa Music Worker ──"
-bash "$SCRIPT_DIR/music_worker/install.sh"
+bash "$SCRIPT_DIR/worker/music/install.sh"
 
 # ── Step 4: ACE-Step Music Worker (uv) ───────────────────────────────────────
 
 echo ""
 echo "── Step 4/10: ACE-Step Music Worker ──"
-bash "$SCRIPT_DIR/ace_worker/install.sh"
+bash "$SCRIPT_DIR/worker/ace/install.sh"
 
 # ── Step 5: Whisper Worker Env ────────────────────────────────────────────────
 
 echo ""
 echo "── Step 5/10: Whisper Worker ──"
-bash "$SCRIPT_DIR/whisper_worker/install.sh"
+bash "$SCRIPT_DIR/worker/whisper/install.sh"
 
 # ── Step 6: Diarize Worker Env ───────────────────────────────────────────────
 
 echo ""
 echo "── Step 6/10: Diarize Worker ──"
-bash "$SCRIPT_DIR/diarize_worker/install.sh"
+bash "$SCRIPT_DIR/worker/diarize/install.sh"
 
 # ── Step 7: Separate Worker Env ──────────────────────────────────────────────
 
 echo ""
 echo "── Step 7/10: Separate Worker ──"
-bash "$SCRIPT_DIR/separate_worker/install.sh"
+bash "$SCRIPT_DIR/worker/separate/install.sh"
 
 # ── Step 8: AI-TTS Worker Env ────────────────────────────────────────────────
 
 echo ""
 echo "── Step 8/10: AI-TTS Worker ──"
-bash "$SCRIPT_DIR/tts_worker/install.sh"
+bash "$SCRIPT_DIR/worker/tts/install.sh"
 
 # ── Step 9: Language Detect Worker Env ───────────────────────────────────────
 
 echo ""
 echo "── Step 9/10: Language Detect Worker ──"
-bash "$SCRIPT_DIR/langdetect_worker/install.sh"
+bash "$SCRIPT_DIR/worker/langdetect/install.sh"
 
 # ── Step 10: Main App Env ────────────────────────────────────────────────────
 
@@ -167,9 +165,10 @@ echo "── Step 10/10: Main App (tts-mist) ──"
 
 ENV_NAME="tts-mist"
 
-if "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} "; then
+if "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} " || [ -d "/opt/miniconda3/envs/$ENV_NAME" ]; then
     echo "  Removing old '$ENV_NAME' env ..."
     "$CONDA_BIN" env remove -y -n "$ENV_NAME" > /dev/null 2>&1
+    rm -rf "/opt/miniconda3/envs/$ENV_NAME" 2>/dev/null || true
 fi
 
 echo "  Creating env: $ENV_NAME (Python 3.11) ..."
@@ -189,23 +188,23 @@ if [ -d "$MODELS_DIR" ]; then
     echo "══════════════════════════════════════════════════════════════"
     echo ""
 
-    # RVC voice models → ./rvc_models/
+    # RVC voice models → ./worker/rvc/models/
     if [ -d "$MODELS_DIR/rvc_models" ]; then
-        cp -a "$MODELS_DIR/rvc_models" "$SCRIPT_DIR/rvc_models"
+        cp -a "$MODELS_DIR/rvc_models" "$SCRIPT_DIR/worker/rvc/models"
         echo -e "  ${GREEN}✓${NC} RVC models restored"
     fi
 
-    # HeartMuLa checkpoints → ./music_models/ckpt/
+    # HeartMuLa checkpoints → ./worker/music/models/ckpt/
     if [ -d "$MODELS_DIR/music_models" ]; then
-        mkdir -p "$SCRIPT_DIR/music_models"
-        cp -a "$MODELS_DIR/music_models/." "$SCRIPT_DIR/music_models/"
+        mkdir -p "$SCRIPT_DIR/worker/music/models"
+        cp -a "$MODELS_DIR/music_models/." "$SCRIPT_DIR/worker/music/models/"
         echo -e "  ${GREEN}✓${NC} HeartMuLa models restored"
     fi
 
-    # ACE-Step checkpoints → ./ace_worker/ACE-Step-1.5/checkpoints/
+    # ACE-Step checkpoints → ./worker/ace/ACE-Step-1.5/checkpoints/
     if [ -d "$MODELS_DIR/ace_checkpoints" ]; then
-        mkdir -p "$SCRIPT_DIR/ace_worker/ACE-Step-1.5/checkpoints"
-        cp -a "$MODELS_DIR/ace_checkpoints/." "$SCRIPT_DIR/ace_worker/ACE-Step-1.5/checkpoints/"
+        mkdir -p "$SCRIPT_DIR/worker/ace/ACE-Step-1.5/checkpoints"
+        cp -a "$MODELS_DIR/ace_checkpoints/." "$SCRIPT_DIR/worker/ace/ACE-Step-1.5/checkpoints/"
         echo -e "  ${GREEN}✓${NC} ACE-Step checkpoints restored"
     fi
 
@@ -249,7 +248,7 @@ else
     echo ""
 
     # ── HeartMuLa checkpoints ────────────────────────────────────────────
-    CKPT_DIR="$SCRIPT_DIR/music_models/ckpt"
+    CKPT_DIR="$SCRIPT_DIR/worker/music/models/ckpt"
     mkdir -p "$CKPT_DIR"
 
     echo "── HeartMuLa checkpoints ──"
@@ -283,7 +282,7 @@ print('  OK')
     echo -e "${GREEN}✓${NC} HeartMuLa checkpoints downloaded"
 
     # ── ACE-Step DiT models ──────────────────────────────────────────────
-    ACESTEP_DIR="$SCRIPT_DIR/ace_worker/ACE-Step-1.5"
+    ACESTEP_DIR="$SCRIPT_DIR/worker/ace/ACE-Step-1.5"
     UV_BIN="${UV_PATH:-$(command -v uv)}"
 
     echo ""

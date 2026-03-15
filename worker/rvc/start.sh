@@ -7,9 +7,10 @@
 CONDA_BIN="/opt/miniconda3/bin/conda"
 ENV_NAME="rvc"
 PORT="${1:-5100}"
+MODELS_DIR="$(cd "$(dirname "$0")" && pwd)/models"
 
 if ! "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} "; then
-    echo "ERROR: '$ENV_NAME' env not found. Run: ./rvc_worker/install.sh"
+    echo "ERROR: '$ENV_NAME' env not found. Run: ./worker/rvc/install.sh"
     exit 1
 fi
 
@@ -28,6 +29,6 @@ import torch
 torch.backends.mps.is_available = lambda: False
 from rvc_python.__main__ import main
 import sys
-sys.argv = ['rvc_python', 'api', '-p', '$PORT']
+sys.argv = ['rvc_python', 'api', '-p', '$PORT', '-md', '$MODELS_DIR']
 main()
 "

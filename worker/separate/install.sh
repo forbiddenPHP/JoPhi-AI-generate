@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+# set -e  # removed: let setup continue on errors
 
 # ── Separate Worker Installer ────────────────────────────────────────────────
 # Creates a dedicated conda env for demucs (Meta/Facebook) audio source
@@ -24,14 +24,15 @@ echo ""
 if [ ! -f "$CONDA_BIN" ]; then
     echo -e "${RED}ERROR: conda not found at $CONDA_BIN${NC}"
     echo "  Install miniconda: brew install --cask miniconda"
-    exit 1
+    # exit 1  # warn only, do not abort setup
 fi
 
 # ── Create env ───────────────────────────────────────────────────────────────
 
-if "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} "; then
+if "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} " || [ -d "/opt/miniconda3/envs/$ENV_NAME" ]; then
     echo "  Removing old '$ENV_NAME' env ..."
     "$CONDA_BIN" env remove -y -n "$ENV_NAME" > /dev/null 2>&1
+    rm -rf "/opt/miniconda3/envs/$ENV_NAME" 2>/dev/null || true
 fi
 
 echo "  Creating env: $ENV_NAME (Python 3.10) ..."
@@ -88,11 +89,10 @@ print('  OK demucs imported')
 " 2>/dev/null; then
     echo -e "${GREEN}✓${NC} demucs installed"
 else
-    echo -e "${RED}ERROR: demucs installation failed${NC}"
+    echo -e "${RED}WARNING: demucs installation failed${NC}"
     echo "  Try manually:"
     echo "    conda activate separate"
     echo "    pip install demucs"
-    exit 1
 fi
 
 "$CONDA_BIN" run -n "$ENV_NAME" python -c "

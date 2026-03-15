@@ -7,4 +7,4 @@
 
 ## Notes
 
-No modifications to the upstream package. Our changes are only in `langdetect_worker/detect.py` (our own wrapper script).
+No modifications to the upstream package. Our changes are only in `worker/langdetect/detect.py` (our own wrapper script).

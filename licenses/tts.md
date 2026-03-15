@@ -17,4 +17,4 @@
 
 ## Notes
 
-No modifications to the upstream package. Our changes are only in `tts_worker/generate_speech.py` (our own wrapper script).
+No modifications to the upstream package. Our changes are only in `worker/tts/generate_speech.py` (our own wrapper script).

@@ -154,7 +154,7 @@ def verify_transcription(speaker_segments: dict[str, list[tuple[float, float]]],
     """
     print("\n  ── Verify: Transcribing segments ──")
 
-    transcribe_script = PROJECT_DIR / "whisper_worker" / "transcribe.py"
+    transcribe_script = PROJECT_DIR / "worker" / "whisper" / "transcribe.py"
     total_samples = len(data)
     is_stereo = data.ndim == 2
     verify_results = []

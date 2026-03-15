@@ -9,7 +9,7 @@
       "Bash(python3 -c \"from demucs.apply import apply_model; import inspect; print\\(inspect.getsource\\(apply_model\\)\\)\")",
       "Bash(grep -r tqdm /Users/jophi/tts-mist/ --include=*.py)",
       "Read(//opt/miniconda3/bin/**)",
-      "Bash(/Users/jophi/tts-mist/ace_worker/ACE-Step-1.5/.venv/bin/pip freeze:*)"
+      "Bash(/Users/jophi/tts-mist/worker/ace/ACE-Step-1.5/.venv/bin/pip freeze:*)"
     ]
   }
 }

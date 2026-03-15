@@ -280,7 +280,7 @@ python generate.py voice --engine rvc --model my-voice input.wav --decoder crepe
 
 When neither `--pitch` nor `--target-hz` is set:
 1. Detects input file's fundamental frequency (F0) using `pyworld.harvest()`
-2. Reads model's `target_f0` from `rvc_models/<model>/revoicer.json`
+2. Reads model's `target_f0` from `worker/rvc/models/<model>/revoicer.json`
 3. Computes pitch shift: `semitones = 12 * log2(target_f0 / input_f0)`
 4. Applies the shift via RVC's `f0up_key` parameter
 
@@ -565,7 +565,7 @@ python generate.py models set-pitch my-model 280   # child ~280 Hz
 - Female voices: 220 Hz
 - Male voices: 120 Hz
 
-**Model config:** `rvc_models/<model>/revoicer.json` with `target_f0` and optional `hf_repo_id`.
+**Model config:** `worker/rvc/models/<model>/revoicer.json` with `target_f0` and optional `hf_repo_id`.
 
 </details>
 
@@ -613,7 +613,7 @@ Shows installed models, target pitch settings, server status, and supported form
 | `separate` | 3.10 | conda | Audio source separation (demucs) |
 | `ai-tts` | 3.11 | conda | Qwen3-TTS neural speech (mlx-audio) |
 | `lang-detect` | 3.11 | conda | Language detection (langdetect) |
-| `ace_worker` | 3.11+ | uv | ACE-Step 1.5 music generation |
+| `ace` (uv) | 3.11+ | uv | ACE-Step 1.5 music generation |
 
 </details>
 
@@ -657,16 +657,17 @@ tts-mist/
 ├── setup.sh                # Master installer (all envs + models)
 ├── backup-models.sh        # Model checkpoint backup
 ├── requirements.txt        # Main env dependencies (pinned)
-├── rvc_worker/             # RVC voice conversion worker
-├── enhance_worker/         # resemble-enhance worker
-├── music_worker/           # HeartMuLa worker
-├── ace_worker/             # ACE-Step 1.5 worker (uv project)
-├── whisper_worker/         # mlx-whisper worker
-├── diarize_worker/         # pyannote diarization worker
-├── separate_worker/        # demucs separation worker
-├── tts_worker/             # Qwen3-TTS worker (mlx-audio)
-├── langdetect_worker/      # Language detection worker
-├── rvc_models/             # Installed RVC voice models
+├── worker/
+│   ├── ace/                # ACE-Step 1.5 worker (uv project)
+│   ├── diarize/            # pyannote diarization worker
+│   ├── enhance/            # resemble-enhance worker
+│   ├── langdetect/         # Language detection worker
+│   ├── music/              # HeartMuLa worker
+│   ├── rvc/                # RVC voice conversion worker
+│   ├── separate/           # demucs separation worker
+│   ├── tts/                # Qwen3-TTS worker (mlx-audio)
+│   └── whisper/            # mlx-whisper worker
+│   └── rvc/                # RVC worker + installed voice models
 ├── models/                 # All model checkpoints (gitignored)
 ├── tests/                  # Test scripts
 ├── demos/                  # Demo output files

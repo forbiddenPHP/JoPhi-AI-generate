@@ -116,8 +116,8 @@ def generate():
     lyrics_file.write_text(lyrics, encoding="utf-8")
 
     cmd = [
-        sys.executable, str(PROJECT / "revoicer.py"), "music",
-        "--engine", ENGINE,
+        sys.executable, str(PROJECT / "generate.py"), "audio",
+        "--engine", "ace-step",
         "-f", str(lyrics_file),
         "-t", CAPTION,
         "--seed", str(SEED),
@@ -141,7 +141,8 @@ def transcribe():
     TRANSCRIPT_DIR.mkdir(parents=True, exist_ok=True)
 
     cmd = [
-        sys.executable, str(PROJECT / "revoicer.py"), "transcribe",
+        sys.executable, str(PROJECT / "generate.py"), "text",
+        "--engine", "whisper",
         str(WAV_OUT),
         "--input-language", "en",
         "--word-timestamps",

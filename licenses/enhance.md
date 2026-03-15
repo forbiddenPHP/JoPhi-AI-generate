@@ -4,7 +4,7 @@
 - **License:** MIT License
 - **Copyright:** 2023 Resemble AI
 - **Source:** https://github.com/resemble-ai/resemble-enhance
-- **Wheel:** `enhance_worker/wheels/resemble_enhance-0.0.1-py3-none-any.whl`
+- **Wheel:** `worker/enhance/wheels/resemble_enhance-0.0.1-py3-none-any.whl`
 
 ## Modifications
 

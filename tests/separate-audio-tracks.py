@@ -145,7 +145,7 @@ def main():
         print(f"  (Delete {output_dir} to force re-separation.)")
     else:
         # ── Run separation ────────────────────────────────────────────────
-        separate_script = PROJECT_DIR / "separate_worker" / "separate.py"
+        separate_script = PROJECT_DIR / "worker/separate" / "separate.py"
 
         separate_cmd = [
             CONDA_BIN, "run", "-n", "separate",

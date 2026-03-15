@@ -1,4 +1,4 @@
 langdetect==1.0.9
-packaging @ file:///opt/miniconda3/conda-bld/packaging_1761049079066/work
+packaging==24.2
 six==1.17.0
 

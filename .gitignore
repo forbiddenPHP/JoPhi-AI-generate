@@ -1,15 +1,16 @@
 # Model weights & checkpoints (multi-GB)
-music_models/ckpt/
+worker/music/models/
+worker/rvc/models/
 rvc_models/
-enhance_worker/resemble-enhance/
+worker/enhance/resemble-enhance/
 
 # Model backup (offline restore)
 models/
 models.zip
 
 # ACE-Step: uv venv + HuggingFace model cache (code IS committed)
-ace_worker/ACE-Step-1.5/.venv/
-ace_worker/ACE-Step-1.5/checkpoints/
+worker/ace/ACE-Step-1.5/.venv/
+worker/ace/ACE-Step-1.5/checkpoints/
 
 # Generated audio
 demos/
@@ -45,6 +46,7 @@ Thumbs.db
 *.swp
 *.swo
 dev/
+todos/
 
 # Server PID
 .server.pid

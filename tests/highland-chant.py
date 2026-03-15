@@ -90,8 +90,8 @@ lyrics_file.write_text(lyrics, encoding="utf-8")
 
 # ── Generate ─────────────────────────────────────────────────────
 cmd = [
-    sys.executable, str(Path(__file__).parent.parent / "revoicer.py"), "music",
-    "--engine", ENGINE,
+    sys.executable, str(Path(__file__).parent.parent / "generate.py"), "audio",
+    "--engine", "ace-step",
     "-f", str(lyrics_file),
     "-t", CAPTION,
     "--seed", str(SEED),

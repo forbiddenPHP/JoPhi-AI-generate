@@ -2,7 +2,7 @@
 # ── ACE-Step 1.5 Setup ─────────────────────────────────────────────────────
 # Clones ACE-Step repo, removes .git (code committed to project), runs uv sync.
 # Models are downloaded automatically on first generation (from HuggingFace).
-set -euo pipefail
+# set -euo pipefail  # removed: let setup continue on errors
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ACESTEP_DIR="$SCRIPT_DIR/ACE-Step-1.5"

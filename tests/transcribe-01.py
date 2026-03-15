@@ -33,10 +33,10 @@ def run():
     output_dir = DEMOS / demo_file.stem
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Run transcription via revoicer.py
+    # Run transcription via generate.py
     cmd = [
-        sys.executable, str(PROJECT / "revoicer.py"),
-        "transcribe",
+        sys.executable, str(PROJECT / "generate.py"),
+        "text", "--engine", "whisper",
         str(demo_file),
         "--input-language", "en",
         "--word-timestamps",

@@ -83,27 +83,27 @@ def _emit(message: str, type: str = "log"):
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 RVC_API_URL = os.environ.get("RVC_API_URL", "http://127.0.0.1:5100")
-RVC_WORKER_DIR = SCRIPT_DIR / "rvc_worker"
-RVC_MODELS_DIR = SCRIPT_DIR / "rvc_models"
-ENHANCE_WORKER_DIR = SCRIPT_DIR / "enhance_worker"
-MUSIC_WORKER_DIR = SCRIPT_DIR / "music_worker"
-MUSIC_MODELS_DIR = SCRIPT_DIR / "music_models"
+RVC_WORKER_DIR = SCRIPT_DIR / "worker" / "rvc"
+RVC_MODELS_DIR = SCRIPT_DIR / "worker" / "rvc" / "models"
+ENHANCE_WORKER_DIR = SCRIPT_DIR / "worker" / "enhance"
+MUSIC_WORKER_DIR = SCRIPT_DIR / "worker" / "music"
+MUSIC_MODELS_DIR = SCRIPT_DIR / "worker" / "music" / "models"
 CONDA_BIN = Path(os.environ.get("CONDA_BIN", "/opt/miniconda3/bin/conda"))
 RVC_ENV = "rvc"
 ENHANCE_ENV = "enhance"
 HEARTMULA_ENV = "heartmula"
-ACESTEP_DIR = SCRIPT_DIR / "ace_worker" / "ACE-Step-1.5"
-ACESTEP_WORKER = SCRIPT_DIR / "ace_worker" / "generate.py"
-WHISPER_WORKER_DIR = SCRIPT_DIR / "whisper_worker"
+ACESTEP_DIR = SCRIPT_DIR / "worker" / "ace" / "ACE-Step-1.5"
+ACESTEP_WORKER = SCRIPT_DIR / "worker" / "ace" / "generate.py"
+WHISPER_WORKER_DIR = SCRIPT_DIR / "worker" / "whisper"
 WHISPER_ENV = "whisper"
-DIARIZE_WORKER_DIR = SCRIPT_DIR / "diarize_worker"
+DIARIZE_WORKER_DIR = SCRIPT_DIR / "worker" / "diarize"
 DIARIZE_ENV = "diarize"
-SEPARATE_WORKER_DIR = SCRIPT_DIR / "separate_worker"
+SEPARATE_WORKER_DIR = SCRIPT_DIR / "worker" / "separate"
 SEPARATE_ENV = "separate"
 TTS_ENV = "ai-tts"
-TTS_WORKER_DIR = SCRIPT_DIR / "tts_worker"
+TTS_WORKER_DIR = SCRIPT_DIR / "worker" / "tts"
 LANGDETECT_ENV = "lang-detect"
-LANGDETECT_WORKER = SCRIPT_DIR / "langdetect_worker" / "detect.py"
+LANGDETECT_WORKER = SCRIPT_DIR / "worker" / "langdetect" / "detect.py"
 
 
 def _find_uv() -> Path:
@@ -146,7 +146,7 @@ def detect_input_f0(wav_path: str | Path) -> float | None:
 
 
 def load_model_config(model_name: str) -> dict:
-    """Load per-model config from rvc_models/<model>/revoicer.json."""
+    """Load per-model config from worker/rvc/models/<model>/revoicer.json."""
     config_path = RVC_MODELS_DIR / model_name / "revoicer.json"
     if config_path.exists():
         return json.loads(config_path.read_text())
@@ -154,7 +154,7 @@ def load_model_config(model_name: str) -> dict:
 
 
 def save_model_config(model_name: str, config: dict):
-    """Save per-model config to rvc_models/<model>/revoicer.json."""
+    """Save per-model config to worker/rvc/models/<model>/revoicer.json."""
     config_dir = RVC_MODELS_DIR / model_name
     config_dir.mkdir(parents=True, exist_ok=True)
     config_path = config_dir / "revoicer.json"
@@ -739,7 +739,7 @@ def cmd_models_set_f0(args):
     save_model_config(model_name, config)
 
     _emit(f"Target F0 for '{model_name}': {target_f0} Hz")
-    _emit(f"Saved to: rvc_models/{model_name}/revoicer.json")
+    _emit(f"Saved to: worker/rvc/models/{model_name}/revoicer.json")
 
 
 def cmd_models_remove(args):
@@ -911,9 +911,9 @@ _AI_TTS_VOICES = [
 
 
 def _detect_language(text: str) -> str:
-    """Detect language of text via langdetect_worker. Returns ISO code (de, en, ...)."""
+    """Detect language of text via worker/langdetect. Returns ISO code (de, en, ...)."""
     if not LANGDETECT_WORKER.exists():
-        _emit("WARNING: langdetect_worker not found, defaulting to en", "warning")
+        _emit("WARNING: worker/langdetect not found, defaulting to en", "warning")
         return "en"
 
     result = run_worker([
@@ -989,8 +989,8 @@ def _voice_ai_tts(args):
     # Worker script
     generate_script = TTS_WORKER_DIR / "generate_speech.py"
     if not generate_script.exists():
-        _emit("ERROR: tts_worker/generate_speech.py not found", "error")
-        _emit("  Run: bash tts_worker/install.sh", "error")
+        _emit("ERROR: worker/tts/generate_speech.py not found", "error")
+        _emit("  Run: bash worker/tts/install.sh", "error")
         sys.exit(1)
 
     cmd = [
@@ -1070,8 +1070,8 @@ def _audio_enhance(args):
 
     enhance_script = ENHANCE_WORKER_DIR / "enhance.py"
     if not enhance_script.exists():
-        _emit("ERROR: enhance_worker/enhance.py not found", "error")
-        _emit("  Run: bash enhance_worker/install.sh", "error")
+        _emit("ERROR: worker/enhance/enhance.py not found", "error")
+        _emit("  Run: bash worker/enhance/install.sh", "error")
         sys.exit(1)
 
     cmd = [
@@ -1113,8 +1113,8 @@ def _audio_demucs(args):
 
     separate_script = SEPARATE_WORKER_DIR / "separate.py"
     if not separate_script.exists():
-        _emit("ERROR: separate_worker/separate.py not found", "error")
-        _emit("  Run: bash separate_worker/install.sh", "error")
+        _emit("ERROR: worker/separate/separate.py not found", "error")
+        _emit("  Run: bash worker/separate/install.sh", "error")
         sys.exit(1)
 
     for p in input_paths:
@@ -1186,8 +1186,8 @@ def _audio_ace(args):
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     if not ACESTEP_WORKER.exists():
-        _emit("ERROR: ace_worker/generate.py not found", "error")
-        _emit("  Run: bash ace_worker/install.sh", "error")
+        _emit("ERROR: worker/ace/generate.py not found", "error")
+        _emit("  Run: bash worker/ace/install.sh", "error")
         sys.exit(1)
 
     if not ACESTEP_DIR.exists():
@@ -1292,8 +1292,8 @@ def _audio_heartmula(args):
 
     generate_script = MUSIC_WORKER_DIR / "generate.py"
     if not generate_script.exists():
-        _emit("ERROR: music_worker/generate.py not found", "error")
-        _emit("  Run: bash music_worker/install.sh", "error")
+        _emit("ERROR: worker/music/generate.py not found", "error")
+        _emit("  Run: bash worker/music/install.sh", "error")
         sys.exit(1)
 
     ckpt_dir = MUSIC_MODELS_DIR / "ckpt"
@@ -1363,8 +1363,8 @@ def _audio_diarize(args):
 
     diarize_script = DIARIZE_WORKER_DIR / "diarize.py"
     if not diarize_script.exists():
-        _emit("ERROR: diarize_worker/diarize.py not found", "error")
-        _emit("  Run: bash diarize_worker/install.sh", "error")
+        _emit("ERROR: worker/diarize/diarize.py not found", "error")
+        _emit("  Run: bash worker/diarize/install.sh", "error")
         sys.exit(1)
 
     for p in input_paths:
@@ -1416,8 +1416,8 @@ def _text_whisper(args):
     """Transcribe audio using mlx-whisper."""
     transcribe_script = WHISPER_WORKER_DIR / "transcribe.py"
     if not transcribe_script.exists():
-        _emit("ERROR: whisper_worker/transcribe.py not found", "error")
-        _emit("  Run: bash whisper_worker/install.sh", "error")
+        _emit("ERROR: worker/whisper/transcribe.py not found", "error")
+        _emit("  Run: bash worker/whisper/install.sh", "error")
         sys.exit(1)
 
     input_files = []
@@ -1470,7 +1470,7 @@ def _text_heartmula_transcribe(args):
     """Transcribe lyrics from audio using HeartTranscriptor."""
     transcribe_script = MUSIC_WORKER_DIR / "transcribe.py"
     if not transcribe_script.exists():
-        _emit("ERROR: music_worker/transcribe.py not found", "error")
+        _emit("ERROR: worker/music/transcribe.py not found", "error")
         sys.exit(1)
 
     # heartmula-transcribe expects single file as first positional arg

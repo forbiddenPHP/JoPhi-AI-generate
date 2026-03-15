@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+# set -e  # removed: let setup continue on errors
 
 # ── RVC Worker Installer ─────────────────────────────────────────────────────
 # Creates a dedicated conda env for RVC with Python 3.10 and pip <= 23.3.
@@ -25,14 +25,15 @@ echo ""
 if [ ! -f "$CONDA_BIN" ]; then
     echo -e "${RED}ERROR: conda not found at $CONDA_BIN${NC}"
     echo "  Install miniconda: brew install --cask miniconda"
-    exit 1
+    # exit 1  # warn only, do not abort setup
 fi
 
 # ── Create env ───────────────────────────────────────────────────────────────
 
-if "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} "; then
+if "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} " || [ -d "/opt/miniconda3/envs/$ENV_NAME" ]; then
     echo "  Removing old '$ENV_NAME' env ..."
     "$CONDA_BIN" env remove -y -n "$ENV_NAME" > /dev/null 2>&1
+    rm -rf "/opt/miniconda3/envs/$ENV_NAME" 2>/dev/null || true
 fi
 
 echo "  Creating env: $ENV_NAME (Python 3.10, pip <= 23.3) ..."
@@ -71,9 +72,8 @@ fi
 if "$CONDA_BIN" run -n "$ENV_NAME" python -c "from rvc_python.infer import RVCInference" 2>/dev/null; then
     echo -e "${GREEN}✓${NC} rvc-python installed"
 else
-    echo -e "${RED}ERROR: rvc-python installation failed${NC}"
+    echo -e "${RED}WARNING: rvc-python installation failed${NC}"
     echo "  Check: conda activate rvc && pip install rvc-python"
-    exit 1
 fi
 
 # ── Verify ───────────────────────────────────────────────────────────────────
@@ -119,5 +119,5 @@ if not all_ok:
 
 echo ""
 echo -e "${GREEN}✓${NC} RVC Worker ready"
-echo "  Start with: ./rvc_worker/start.sh"
+echo "  Start with: ./worker/rvc/start.sh"
 echo ""

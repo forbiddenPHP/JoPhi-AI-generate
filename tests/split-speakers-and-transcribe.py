@@ -154,7 +154,7 @@ def verify_transcribe(output_dir: Path, stem: str,
 
     print(f"\n  Verifying {len(compact_wavs)} speakers via transcription ...\n")
 
-    transcribe_script = PROJECT_DIR / "whisper_worker" / "transcribe.py"
+    transcribe_script = PROJECT_DIR / "worker/whisper" / "transcribe.py"
 
     for i, compact_path in enumerate(compact_wavs, 1):
         speaker_name = compact_path.stem.replace(f"{stem}_", "").replace("_compact", "")
@@ -265,7 +265,7 @@ def main():
         print(f"\n  Diarize output exists, skipping diarization.")
         print(f"  (Delete {output_dir} to force re-diarization.)")
     else:
-        diarize_script = PROJECT_DIR / "diarize_worker" / "diarize.py"
+        diarize_script = PROJECT_DIR / "worker/diarize" / "diarize.py"
 
         diarize_cmd = [
             CONDA_BIN, "run", "-n", "diarize",
@@ -284,7 +284,7 @@ def main():
 
     # ── Verify stats (on existing data → verify_ prefix) ────────────────
     if args.verify and existing:
-        diarize_script = PROJECT_DIR / "diarize_worker" / "diarize.py"
+        diarize_script = PROJECT_DIR / "worker/diarize" / "diarize.py"
         verify_cmd = [
             CONDA_BIN, "run", "-n", "diarize",
             "python", str(diarize_script),

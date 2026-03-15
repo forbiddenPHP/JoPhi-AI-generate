@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+# set -e  # removed: let setup continue on errors
 
 # ── Enhance Worker Installer ────────────────────────────────────────────────
 # Creates a dedicated conda env for resemble-enhance (audio denoising +
@@ -29,7 +29,7 @@ echo ""
 if [ ! -f "$CONDA_BIN" ]; then
     echo -e "${RED}ERROR: conda not found at $CONDA_BIN${NC}"
     echo "  Install miniconda: brew install --cask miniconda"
-    exit 1
+    # exit 1  # warn only, do not abort setup
 fi
 
 # ── Check git-lfs (needed to download models from HuggingFace) ──────────────
@@ -40,7 +40,7 @@ if ! git lfs version > /dev/null 2>&1; then
         HOMEBREW_NO_AUTO_UPDATE=1 brew install git-lfs > /dev/null 2>&1
     else
         echo -e "${RED}ERROR: git-lfs not found. Install with: brew install git-lfs${NC}"
-        exit 1
+        # exit 1  # warn only, do not abort setup
     fi
     git lfs install > /dev/null 2>&1
     echo -e "${GREEN}✓${NC} git-lfs installed"
@@ -48,9 +48,10 @@ fi
 
 # ── Create env ───────────────────────────────────────────────────────────────
 
-if "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} "; then
+if "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} " || [ -d "/opt/miniconda3/envs/$ENV_NAME" ]; then
     echo "  Removing old '$ENV_NAME' env ..."
     "$CONDA_BIN" env remove -y -n "$ENV_NAME" > /dev/null 2>&1
+    rm -rf "/opt/miniconda3/envs/$ENV_NAME" 2>/dev/null || true
 fi
 
 echo "  Creating env: $ENV_NAME (Python 3.12) ..."
@@ -130,11 +131,10 @@ print('  OK resemble-enhance inference ready')
 " 2>/dev/null; then
     echo -e "${GREEN}✓${NC} resemble-enhance installed"
 else
-    echo -e "${RED}ERROR: resemble-enhance installation failed${NC}"
+    echo -e "${RED}WARNING: resemble-enhance installation failed${NC}"
     echo "  Try manually:"
     echo "    conda activate enhance"
     echo "    pip install resemble-enhance"
-    exit 1
 fi
 
 "$CONDA_BIN" run -n "$ENV_NAME" python -c "

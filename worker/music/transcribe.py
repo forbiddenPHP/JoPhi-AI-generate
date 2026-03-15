@@ -109,7 +109,7 @@ def main():
     ckpt_dir = Path(args.ckpt_dir)
     if not ckpt_dir.exists():
         print(f"ERROR: Checkpoint directory not found: {ckpt_dir}", file=sys.stderr)
-        print("  Run: bash music_worker/install.sh", file=sys.stderr)
+        print("  Run: bash worker/music/install.sh", file=sys.stderr)
         sys.exit(1)
 
     try:

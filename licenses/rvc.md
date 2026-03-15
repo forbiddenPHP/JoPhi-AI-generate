@@ -4,7 +4,7 @@
 - **License:** MIT License
 - **Copyright:** 2023 Danil Boldyrev
 - **Source:** https://github.com/daswer123/rvc-python
-- **Wheel:** `rvc_worker/wheels/rvc_python-0.1.5-py3-none-any.whl`
+- **Wheel:** `worker/rvc/wheels/rvc_python-0.1.5-py3-none-any.whl`
 
 ## Modifications
 

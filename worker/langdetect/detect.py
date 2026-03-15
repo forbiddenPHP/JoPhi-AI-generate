@@ -3,7 +3,7 @@
 Language detection worker — detects text language, outputs ISO code.
 
 Usage:
-  python langdetect_worker/detect.py --text "Der Fuchs springt"
+  python worker/langdetect/detect.py --text "Der Fuchs springt"
   → de
 """
 

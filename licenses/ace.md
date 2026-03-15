@@ -4,16 +4,16 @@
 - **License:** MIT License
 - **Copyright:** 2026 ACEStep
 - **Source:** https://github.com/ace-step/ace-step
-- **License file:** `ace_worker/ACE-Step-1.5/LICENSE`
+- **License file:** `worker/ace/ACE-Step-1.5/LICENSE`
 
 ## Bundled Components
 
 ### nano-vllm
 - **License:** MIT License
 - **Copyright:** 2025 Xingkai Yu
-- **Location:** `ace_worker/ACE-Step-1.5/acestep/third_parts/nano-vllm/`
-- **License file:** `ace_worker/ACE-Step-1.5/acestep/third_parts/nano-vllm/LICENSE`
+- **Location:** `worker/ace/ACE-Step-1.5/acestep/third_parts/nano-vllm/`
+- **License file:** `worker/ace/ACE-Step-1.5/acestep/third_parts/nano-vllm/LICENSE`
 
 ## License Text
 
-See `ace_worker/ACE-Step-1.5/LICENSE` for the full MIT license.
+See `worker/ace/ACE-Step-1.5/LICENSE` for the full MIT license.

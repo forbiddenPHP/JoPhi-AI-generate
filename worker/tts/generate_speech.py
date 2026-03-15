@@ -3,7 +3,7 @@
 AI-TTS Worker — Qwen3-TTS speech generation via mlx-audio.
 
 Called by generate.py via:
-  conda run -n ai-tts python tts_worker/generate_speech.py --text "..." --voice Aiden ...
+  conda run -n ai-tts python worker/tts/generate_speech.py --text "..." --voice Aiden ...
 
 Outputs JSON on stdout: {"output": "/path/to.wav", "sample_rate": 48000}
 Progress on stderr:     [1/3] Generating segment ...
@@ -62,58 +62,117 @@ def detect_model_lang(text: str, fallback_iso: str = "en") -> str:
     return _ISO_TO_MODEL.get(fallback_iso, "auto")
 
 
-def iso_to_model_lang(iso: str) -> str:
-    """Convert ISO code (de, en) to model lang_code (german, english)."""
-    return _ISO_TO_MODEL.get(iso.lower(), "auto")
+_MODEL_LANGS = set(_ISO_TO_MODEL.values())  # {"german", "english", ...}
+
+
+def iso_to_model_lang(code: str) -> str:
+    """Convert ISO code (de, en) or model lang name (german, english) to model lang_code."""
+    lower = code.lower()
+    if lower in _MODEL_LANGS:
+        return lower
+    return _ISO_TO_MODEL.get(lower, "auto")
 
 
 # ── Voice/segment parsing ────────────────────────────────────────────────────
 
-_VOICE_MARKER_RE = re.compile(r"\[(\w+)(?::\s*([^\]]*))?\]\s*")
+_BRACKET_RE = re.compile(r"\[([^\]]+)\]\s*")
 
 VALID_VOICES = {
     "Aiden", "Dylan", "Eric", "Ryan", "Uncle_Fu",
     "Vivian", "Serena", "Ono_Anna", "Sohee",
 }
+_VOICES_LOWER = {v.lower(): v for v in VALID_VOICES}
+_ALL_LANGS = _MODEL_LANGS | set(_ISO_TO_MODEL.keys())
 
 
-def parse_dialog(text: str, default_voice: str | None) -> list[tuple[str, str | None, str]]:
-    """Parse text with [Voice] or [Voice: instruct] markers into segments.
+def _classify_bracket(content: str) -> tuple[str | None, str | None, str | None]:
+    """Classify bracket content into (voice, instruct, language).
 
-    Returns list of (voice_name, instruct_or_None, text_segment) tuples.
-    If no markers found, returns single segment with default_voice.
+    Splits on : / - separators, then classifies each field:
+    - Known voice name (lowercase match) → voice
+    - Known language (ISO or model name, lowercase) → language
+    - Everything else → instruct (joined with ", ")
     """
-    segments = []
-    parts = _VOICE_MARKER_RE.split(text)
+    fields = re.split(r'\s*[:\-/]\s*', content)
+    voice = None
+    lang = None
+    instruct_parts = []
 
-    # No markers found — single segment
-    # parts has only 1 element when no match
-    if len(parts) == 1:
+    for field in fields:
+        field = field.strip()
+        if not field:
+            continue
+        lower = field.lower()
+        if voice is None and lower in _VOICES_LOWER:
+            voice = _VOICES_LOWER[lower]
+        elif lang is None and lower in _ALL_LANGS:
+            lang = field
+        else:
+            instruct_parts.append(field)
+
+    instruct = ", ".join(instruct_parts) if instruct_parts else None
+    return voice, instruct, lang
+
+
+def parse_dialog(text: str, default_voice: str | None) -> list[tuple[str, str | None, str | None, str]]:
+    """Parse text with [...] markers into dialog segments.
+
+    Bracket content is split on : / - separators and classified by type:
+    - Known voice name → voice (case-insensitive)
+    - Known language → language (case-insensitive)
+    - Anything else → instruct (style instructions)
+
+    Order inside brackets doesn't matter:
+      [Dylan:excited:english] = [english:Dylan:excited] = [excited - english - dylan]
+
+    Returns list of (voice_name, instruct_or_None, language_or_None, text_segment) tuples.
+    """
+    # Find all bracket markers and their positions
+    markers = list(_BRACKET_RE.finditer(text))
+
+    if not markers:
         if not default_voice:
             print("ERROR: No voice specified. Use -v or [Voice] markers in text.",
                   file=sys.stderr)
             sys.exit(1)
-        return [(default_voice, None, text.strip())]
+        return [(default_voice, None, None, text.strip())]
 
-    # parts = [before, voice1, instruct1, text1, voice2, instruct2, text2, ...]
-    # With 2 capture groups, stride is 3
-    if parts[0].strip():
+    segments = []
+
+    # Text before first marker
+    before = text[:markers[0].start()].strip()
+    if before:
         if not default_voice:
-            print("ERROR: Text before first [Voice] marker but no -v default set.",
+            print("ERROR: Text before first [...] marker but no -v default set.",
                   file=sys.stderr)
             sys.exit(1)
-        segments.append((default_voice, None, parts[0].strip()))
+        segments.append((default_voice, None, None, before))
 
-    for i in range(1, len(parts), 3):
-        voice = parts[i]
-        instruct = parts[i + 1].strip() if i + 1 < len(parts) and parts[i + 1] else None
-        text_part = parts[i + 2].strip() if i + 2 < len(parts) else ""
+    # Process each marker + text after it
+    last_voice = default_voice
+    for idx, match in enumerate(markers):
+        voice, instruct, lang = _classify_bracket(match.group(1))
+
+        # Use last known voice if bracket had no voice
+        if voice is None:
+            voice = last_voice
+        else:
+            last_voice = voice
+
+        if voice is None:
+            print(f"WARNING: No voice in [{match.group(1)}] and no default set.",
+                  file=sys.stderr)
+            continue
+
+        # Text after this marker until next marker (or end)
+        text_start = match.end()
+        text_end = markers[idx + 1].start() if idx + 1 < len(markers) else len(text)
+        text_part = text[text_start:text_end].strip()
+
         if not text_part:
             continue
-        if voice not in VALID_VOICES:
-            print(f"WARNING: Unknown voice '{voice}', using anyway.",
-                  file=sys.stderr)
-        segments.append((voice, instruct, text_part))
+
+        segments.append((voice, instruct, lang, text_part))
 
     return segments
 
@@ -147,7 +206,7 @@ def main():
     if args.language:
         model_lang = iso_to_model_lang(args.language)
     else:
-        plain_text = _VOICE_MARKER_RE.sub("", args.text)
+        plain_text = _BRACKET_RE.sub("", args.text)
         model_lang = detect_model_lang(plain_text)
         print(f"Detected language: {model_lang}", file=sys.stderr)
 
@@ -155,17 +214,19 @@ def main():
     native_sr = None
     audio_parts = []
 
-    for i, (voice, seg_instruct, text) in enumerate(segments, 1):
+    for i, (voice, seg_instruct, seg_lang, text) in enumerate(segments, 1):
         # Per-segment instruct overrides global --instruct
         instruct = seg_instruct or args.instruct
+        # Per-segment language overrides global model_lang
+        lang = iso_to_model_lang(seg_lang) if seg_lang else model_lang
         tag_info = f" [{seg_instruct}]" if seg_instruct else ""
-        print(f"[{i}/{total}] {voice}{tag_info} ({model_lang}): {text[:60]}{'...' if len(text) > 60 else ''}",
+        print(f"[{i}/{total}] {voice}{tag_info} ({lang}): {text[:60]}{'...' if len(text) > 60 else ''}",
               file=sys.stderr)
 
         gen_kwargs = {
             "text": text,
             "voice": voice,
-            "lang_code": model_lang,
+            "lang_code": lang,
         }
         if instruct:
             gen_kwargs["instruct"] = instruct
