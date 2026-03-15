@@ -32,6 +32,9 @@ dist/
 .venv/
 venv/
 
+# Environment
+.env
+
 # OS
 .DS_Store
 Thumbs.db
@@ -41,6 +44,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+dev/
 
 # Server PID
 .server.pid
