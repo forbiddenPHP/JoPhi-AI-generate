@@ -54,6 +54,7 @@ def generate(
     bpm: int | None = None,
     keyscale: str | None = None,
     timesignature: str | None = None,
+    vocal_language: str = "unknown",
     task_type: str = "text2music",
     src_audio: str | None = None,
     repainting_start: float = 0.0,
@@ -109,6 +110,7 @@ def generate(
         lyrics=lyrics,
         instrumental=instrumental,
         duration=duration_s,
+        vocal_language=vocal_language,
         seed=seed,
         guidance_scale=guidance_scale,
         inference_steps=inference_steps,
@@ -241,6 +243,8 @@ def main():
                         help="Number of parallel samples (default: 1)")
     parser.add_argument("--instrumental", action="store_true",
                         help="Force instrumental output (no vocals)")
+    parser.add_argument("--language", type=str, default="unknown",
+                        help="Vocal language code, e.g. 'en', 'zh', 'ja' (default: unknown)")
     parser.add_argument("--bpm", type=int, default=None,
                         help="Beats per minute (default: auto)")
     parser.add_argument("--keyscale", type=str, default=None,
@@ -316,6 +320,7 @@ def main():
             infer_method=args.infer_method,
             batch_size=args.batch_size,
             instrumental=args.instrumental,
+            vocal_language=args.language,
             bpm=args.bpm,
             keyscale=args.keyscale,
             timesignature=args.timesignature,

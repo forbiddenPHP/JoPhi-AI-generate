@@ -29,6 +29,8 @@ Usage:
   python generate.py audio --engine diarize interview.wav              Split dialogue by speaker
   python generate.py audio --engine diarize interview.wav --speakers 3
   python generate.py audio --engine diarize interview.wav --verify
+  python generate.py audio --engine sfx --text "a dog barking" -o sfx.wav      Sound effect generation
+  python generate.py audio --engine sfx --text "thunder and rain" -s 10 -o weather.wav
   python generate.py text --engine whisper audio.wav                   Transcribe audio
   python generate.py text --engine whisper audio.wav --model large-v3 --format srt
   python generate.py text --engine whisper audio.wav --input-language de
@@ -104,6 +106,8 @@ TTS_ENV = "ai-tts"
 TTS_WORKER_DIR = SCRIPT_DIR / "worker" / "tts"
 LANGDETECT_ENV = "lang-detect"
 LANGDETECT_WORKER = SCRIPT_DIR / "worker" / "langdetect" / "detect.py"
+SFX_WORKER_DIR = SCRIPT_DIR / "worker" / "sfx"
+SFX_ENV = "ezaudio"
 
 
 def _find_uv() -> Path:
@@ -1243,6 +1247,8 @@ def _audio_ace(args):
             cmd.extend(["--batch-size", str(args.batch_size)])
         if getattr(args, "instrumental", False):
             cmd.append("--instrumental")
+        if getattr(args, "language", None):
+            cmd.extend(["--language", args.language])
         cmd.extend(["--config-path", ace_config])
         if getattr(args, "bpm", None) is not None:
             cmd.extend(["--bpm", str(args.bpm)])
@@ -1395,6 +1401,143 @@ def _audio_diarize(args):
             print(result.stdout.strip())
 
 
+def _audio_sfx(args):
+    """Generate sound effects using EzAudio."""
+
+    if not args.text and not getattr(args, "text_file", None):
+        _emit("ERROR: --text or --text-file required for sfx engine.", "error")
+        sys.exit(1)
+
+    text = args.text
+    if not text and args.text_file:
+        text = Path(args.text_file).read_text(encoding="utf-8").strip()
+
+    # Output path
+    if args.output:
+        out_path = Path(args.output)
+        if out_path.is_dir() or str(out_path).endswith("/"):
+            out_path = Path(args.output) / f"sfx_{int(time.time())}.wav"
+    else:
+        out_path = Path(f"sfx_{int(time.time())}.wav")
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    sfx_script = SFX_WORKER_DIR / "generate.py"
+    if not sfx_script.exists():
+        _emit("ERROR: worker/sfx/generate.py not found", "error")
+        _emit("  Run: bash worker/sfx/install.sh", "error")
+        sys.exit(1)
+
+    cmd = [
+        str(CONDA_BIN), "run", "--no-capture-output", "-n", SFX_ENV,
+        "python", str(sfx_script),
+        "--text", text,
+        "-o", str(out_path),
+    ]
+
+    duration_s = args.duration // 1000 if args.duration else args.seconds
+    cmd.extend(["--seconds", str(duration_s)])
+
+    if args.seed is not None:
+        cmd.extend(["--seed", str(args.seed)])
+    if getattr(args, "steps", None) is not None:
+        cmd.extend(["--steps", str(args.steps)])
+    if args.cfg_scale is not None:
+        cmd.extend(["--cfg-scale", str(args.cfg_scale)])
+    if args.model:
+        cmd.extend(["--model", args.model])
+
+    _emit("Generating SFX (EzAudio) …", "stage")
+    _emit(f"  Prompt:   {text}")
+    _emit(f"  Duration: {duration_s}s")
+    _emit(f"  Output:   {out_path}")
+
+    result = run_worker(cmd, on_event=_event_handler)
+    finish_progress()
+    if result.returncode != 0:
+        _emit("ERROR: SFX generation failed.", "error")
+        sys.exit(1)
+    if result.stdout.strip():
+        print(result.stdout.strip())
+
+
+def _audio_voice_removal(args):
+    """Remove vocals from audio (demucs → remix non-vocal stems)."""
+    input_paths = [Path(p) for p in args.input]
+    for p in input_paths:
+        if not p.exists():
+            _emit(f"ERROR: File not found: {p}", "error")
+            sys.exit(1)
+
+    output_dir = Path(args.output) if args.output else input_paths[0].parent
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    separate_script = SEPARATE_WORKER_DIR / "separate.py"
+    if not separate_script.exists():
+        _emit("ERROR: worker/separate/separate.py not found", "error")
+        _emit("  Run: bash worker/separate/install.sh", "error")
+        sys.exit(1)
+
+    outputs = []
+
+    for p in input_paths:
+        # 1. Separate into stems (tempdir)
+        tmp_base = Path(args.tmp_dir) if getattr(args, "tmp_dir", None) else Path(tempfile.gettempdir())
+        tmpdir = tmp_base / f"voice_removal_{p.stem}_{os.getpid()}"
+        tmpdir.mkdir(parents=True, exist_ok=True)
+
+        cmd = [
+            str(CONDA_BIN), "run", "--no-capture-output", "-n", SEPARATE_ENV,
+            "python", str(separate_script),
+            str(p), "-o", str(tmpdir),
+        ]
+        if args.model:
+            cmd.extend(["--model", args.model])
+
+        _emit(f"Separating {p.name} …", "stage")
+        result = run_worker(cmd, on_event=_event_handler)
+        finish_progress()
+        if result.returncode != 0:
+            _emit("ERROR: Separation failed.", "error")
+            shutil.rmtree(tmpdir, ignore_errors=True)
+            sys.exit(1)
+
+        # 2. Mix non-vocal stems (drums + bass + other)
+        stem_name = p.stem
+        non_vocal = ["drums", "bass", "other"]
+        stem_files = [tmpdir / f"{stem_name}_{s}.wav" for s in non_vocal]
+        missing = [str(f) for f in stem_files if not f.exists()]
+        if missing:
+            _emit(f"ERROR: Missing stems: {missing}", "error")
+            shutil.rmtree(tmpdir, ignore_errors=True)
+            sys.exit(1)
+
+        out_path = output_dir / f"{stem_name}_no_vocals.wav"
+
+        _emit(f"Mixing {len(non_vocal)} stems → {out_path.name}", "stage")
+
+        mix_cmd = ["ffmpeg", "-y"]
+        for sf in stem_files:
+            mix_cmd += ["-i", str(sf)]
+        n = len(stem_files)
+        mix_inputs = "".join(f"[{i}:a]" for i in range(n))
+        filter_str = f"{mix_inputs}amix=inputs={n}:normalize=0[mix];[mix]alimiter=limit=0.95[out]"
+        mix_cmd += ["-filter_complex", filter_str, "-map", "[out]", str(out_path)]
+
+        mix_result = subprocess.run(mix_cmd, capture_output=True, text=True)
+        if mix_result.returncode != 0:
+            _emit(f"ERROR: ffmpeg mix failed:\n{mix_result.stderr[-500:]}", "error")
+            shutil.rmtree(tmpdir, ignore_errors=True)
+            sys.exit(1)
+
+        # 3. Cleanup
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        _emit(f"Output: {out_path}")
+        outputs.append(str(out_path))
+
+    print(json.dumps(outputs))
+
+
 def cmd_audio(args):
     """Audio processing — dispatch by engine."""
     engine = args.engine
@@ -1408,6 +1551,10 @@ def cmd_audio(args):
         _audio_heartmula(args)
     elif engine == "diarize":
         _audio_diarize(args)
+    elif engine == "sfx":
+        _audio_sfx(args)
+    elif engine == "voice-removal":
+        _audio_voice_removal(args)
     else:
         _emit(f"ERROR: Unknown audio engine: {engine}", "error")
         sys.exit(1)
@@ -1910,7 +2057,7 @@ def build_parser():
                              help="Audio processing and generation")
     p_audio.add_argument("input", nargs="*", help="Input audio file(s)")
     p_audio.add_argument("--engine", required=True,
-                         choices=["enhance", "demucs", "ace-step", "heartmula", "diarize"],
+                         choices=["enhance", "demucs", "ace-step", "heartmula", "diarize", "sfx", "voice-removal"],
                          help="Audio engine")
     p_audio.add_argument("--model", default=None,
                          help="Model variant: [demucs] htdemucs/htdemucs_ft, "
@@ -1958,6 +2105,8 @@ def build_parser():
                          help="[ace-step] Parallel samples")
     p_audio.add_argument("--instrumental", action="store_true",
                          help="[ace-step] Force instrumental output")
+    p_audio.add_argument("--language", type=str, default=None,
+                         help="[ace-step] Vocal language code (e.g. 'en', 'zh', 'ja', 'de')")
     p_audio.add_argument("--bpm", type=int, default=None,
                          help="[ace-step/heartmula] Beats per minute")
     p_audio.add_argument("--keyscale", type=str, default=None,
@@ -1971,6 +2120,9 @@ def build_parser():
                          help="[diarize] HuggingFace token (or HF_TOKEN env var)")
     p_audio.add_argument("--verify", action="store_true",
                          help="[diarize] Verify diarization quality via transcription")
+    # voice-removal
+    p_audio.add_argument("--tmp-dir", type=str, default=None,
+                         help="[voice-removal] Directory for temp stems (default: /tmp)")
     p_audio.set_defaults(func=cmd_audio)
 
     # ── text ──────────────────────────────────────────────────────────────

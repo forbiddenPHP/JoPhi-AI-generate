@@ -66,6 +66,17 @@ else
     echo "  ── ACE-Step checkpoints: not found, skipping"
 fi
 
+# ── EzAudio checkpoints ──────────────────────────────────────────────────────
+
+SFX_CKPT="$SCRIPT_DIR/worker/sfx/ckpts"
+if [ -d "$SFX_CKPT" ] && [ "$(find "$SFX_CKPT" -name '*.pt' 2>/dev/null | head -1)" ]; then
+    echo "  Backing up EzAudio checkpoints ..."
+    cp -a "$SFX_CKPT" "$MODELS_DIR/sfx_ckpts"
+    echo -e "  ${GREEN}✓${NC} EzAudio checkpoints ($(du -sh "$MODELS_DIR/sfx_ckpts" | cut -f1))"
+else
+    echo "  ── EzAudio checkpoints: not found, skipping"
+fi
+
 # ── resemble-enhance model_repo ──────────────────────────────────────────────
 
 ENHANCE_SITE=$("$CONDA_BIN" run -n enhance python -c "import resemble_enhance; print(resemble_enhance.__path__[0])" 2>/dev/null || true)
@@ -78,13 +89,13 @@ else
     echo "  ── Enhance models: not found, skipping"
 fi
 
-# ── HuggingFace models (pyannote, whisper, Qwen3-TTS) ─────────────────────────
+# ── HuggingFace models (pyannote, whisper, Qwen3-TTS, flan-t5-xl) ────────────
 
 HF_CACHE="${HF_HOME:-$HOME/.cache/huggingface}/hub"
 HF_BACKED=0
 mkdir -p "$MODELS_DIR/huggingface"
 
-for pattern in "models--pyannote--*" "models--mlx-community--whisper-*" "models--mlx-community--Qwen3-TTS-*"; do
+for pattern in "models--pyannote--*" "models--mlx-community--whisper-*" "models--mlx-community--Qwen3-TTS-*" "models--google--flan-t5-xl"; do
     for model_dir in "$HF_CACHE"/$pattern; do
         [ -d "$model_dir" ] || continue
         model_name=$(basename "$model_dir")

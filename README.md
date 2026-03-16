@@ -1,13 +1,13 @@
 # generate — Unified Media Generation Toolkit
 
-CLI for voice synthesis, voice conversion, audio enhancement, AI music generation, lyrics transcription, speaker diarization, and audio source separation. macOS Apple Silicon only.
+CLI for voice synthesis, voice conversion, audio enhancement, AI music generation, sound effects, lyrics transcription, speaker diarization, and audio source separation. macOS Apple Silicon only.
 
 **Entry point:** `generate.py`
 
 ## Quick Setup
 
 ```bash
-# 1. Install all environments (9 conda envs + 1 uv project)
+# 1. Install all environments (10 conda envs + 1 uv project)
 bash setup.sh
 
 # 2. Activate main env
@@ -32,7 +32,7 @@ python generate.py voice --engine rvc --model my-voice input.wav
 - ffmpeg (`brew install ffmpeg`)
 - git-lfs (`brew install git-lfs`)
 - Xcode CLI tools with accepted license (`sudo xcodebuild -license accept`)
-- ~20 GB disk for model checkpoints
+- ~25 GB disk for model checkpoints
 
 ---
 
@@ -51,6 +51,8 @@ generate.py <medium> --engine <backend> [--model <variant>] [input] [options]
 | `audio` | `demucs` | Source separation (stems) |
 | `audio` | `ace-step` | AI music generation |
 | `audio` | `heartmula` | AI music generation (alt engine) |
+| `audio` | `sfx` | Sound effects generation (EzAudio) |
+| `audio` | `voice-removal` | Remove vocals (demucs → remix) |
 | `audio` | `diarize` | Speaker diarization |
 | `text` | `whisper` | Audio transcription |
 | `text` | `heartmula-transcribe` | Lyrics extraction |
@@ -338,6 +340,28 @@ Output: `song_vocals.wav`, `song_drums.wav`, `song_bass.wav`, `song_other.wav`
 
 ---
 
+### Voice Removal (`audio --engine voice-removal`)
+
+Remove vocals from audio — keeps drums, bass, and other instruments. Uses AI-based stem separation (demucs) instead of old-school frequency filtering, producing clean karaoke tracks with minimal artifacts.
+
+```bash
+python generate.py audio --engine voice-removal song.mp3 -o ./karaoke/
+python generate.py audio --engine voice-removal song.mp3 -o ./karaoke/ --model htdemucs_ft
+```
+
+Output: `song_no_vocals.wav`
+
+<details>
+<summary>Options</summary>
+
+- `-o, --output` — Output directory
+- `--model` — Demucs model (default: `htdemucs`, alt: `htdemucs_ft`)
+- `--tmp-dir` — Directory for temporary stems (default: `/tmp`)
+
+</details>
+
+---
+
 ### Music Generation (`audio --engine ace-step` / `audio --engine heartmula`)
 
 Generate music from lyrics and style tags.
@@ -350,6 +374,11 @@ python generate.py audio --engine ace-step \
 # ACE-Step SFT (50 steps)
 python generate.py audio --engine ace-step --model sft \
   -f lyrics.txt -t "cinematic orchestral" -s 60
+
+# ACE-Step with language hint (improves vocal pronunciation)
+python generate.py audio --engine ace-step \
+  -l "[Verse] Die Sonne geht auf" -t "german pop, female vocal" \
+  --language de -s 60 -o deutsch.mp3
 
 # HeartMuLa
 python generate.py audio --engine heartmula \
@@ -385,6 +414,7 @@ ACE-Step `--model` variants: `turbo` (default if omitted, 8 steps), `sft` (50 st
 - `--top-p` — Nucleus sampling (default: 0.9)
 - `--batch-size` — Parallel samples (default: 1)
 - `--instrumental` — Force instrumental output
+- `--language` — Vocal language code (e.g. `en`, `de`, `zh`, `ja`, `ko`)
 - `--bpm` — Beats per minute
 - `--keyscale` — Musical key (e.g. `"C Major"`, `"Am"`)
 - `--timesignature` — Time signature: `2`=2/4, `3`=3/4, `4`=4/4, `6`=6/8
@@ -394,6 +424,44 @@ ACE-Step `--model` variants: `turbo` (default if omitted, 8 steps), `sft` (50 st
 **Lyrics format:** Use section tags like `[Verse]`, `[Chorus]`, `[Bridge]`, `[Intro]`, `[Outro]`.
 
 **Prompt guides:** See [prompt-guides/ACE-Step.md](prompt-guides/ACE-Step.md) and [prompt-guides/HeartMuLa.md](prompt-guides/HeartMuLa.md).
+
+---
+
+### Sound Effects (`audio --engine sfx`)
+
+Generate sound effects from text descriptions using EzAudio (diffusion-based text-to-audio).
+
+```bash
+# Basic sound effect
+python generate.py audio --engine sfx --text "a dog barking in the distance" -o sfx.wav
+
+# Layered scene, 8 seconds
+python generate.py audio --engine sfx --text "rain falling on leaves as thunder rumbles" -s 8 -o rain.wav
+
+# With custom steps and guidance
+python generate.py audio --engine sfx --text "a car horn honking" --steps 50 --cfg-scale 3.0 -o horn.wav
+
+# Reproducible output
+python generate.py audio --engine sfx --text "waves crashing on a rocky shore" --seed 42 -o waves.wav
+```
+
+<details>
+<summary>Options</summary>
+
+- `--text`, `-l` — Text prompt describing the sound
+- `--text-file`, `-f` — Read prompt from file
+- `-o, --output` — Output WAV path
+- `-s, --seconds` — Duration in seconds (1–10, default: 10)
+- `--steps` — DDIM inference steps (default: 100, lower = faster)
+- `--cfg-scale` — Guidance scale (default: 5.0)
+- `--seed` — Random seed for reproducibility
+- `--model` — Model variant: `s3_xl` (default), `s3_l`
+
+**Output:** 24 kHz mono WAV.
+
+</details>
+
+**Prompt guide:** See [prompt-guides/sfx.md](prompt-guides/sfx.md).
 
 ---
 
@@ -600,7 +668,7 @@ Shows installed models, target pitch settings, server status, and supported form
 <details>
 <summary><strong>Environments</strong></summary>
 
-`setup.sh` creates 9 isolated conda environments + 1 uv project:
+`setup.sh` creates 10 isolated conda environments + 1 uv project:
 
 | Env | Python | Manager | Purpose |
 |-----|--------|---------|---------|
@@ -613,6 +681,7 @@ Shows installed models, target pitch settings, server status, and supported form
 | `separate` | 3.10 | conda | Audio source separation (demucs) |
 | `ai-tts` | 3.11 | conda | Qwen3-TTS neural speech (mlx-audio) |
 | `lang-detect` | 3.11 | conda | Language detection (langdetect) |
+| `ezaudio` | 3.10 | conda | Sound effects generation (EzAudio) |
 | `ace` (uv) | 3.11+ | uv | ACE-Step 1.5 music generation |
 
 </details>
@@ -666,12 +735,12 @@ tts-mist/
 │   ├── rvc/                # RVC voice conversion worker
 │   ├── separate/           # demucs separation worker
 │   ├── tts/                # Qwen3-TTS worker (mlx-audio)
+│   ├── sfx/                # EzAudio sound effects worker
 │   └── whisper/            # mlx-whisper worker
-│   └── rvc/                # RVC worker + installed voice models
 ├── models/                 # All model checkpoints (gitignored)
 ├── tests/                  # Test scripts
 ├── demos/                  # Demo output files
-└── prompt-guides/          # ACE-Step + HeartMuLa prompt guides
+└── prompt-guides/          # ACE-Step, HeartMuLa & SFX prompt guides
 ```
 
 </details>

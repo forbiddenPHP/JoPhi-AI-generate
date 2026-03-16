@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ── Revoicer — Master Installer ─────────────────────────────────────────────
-# Creates nine conda environments + one uv project:
+# Creates ten conda environments + one uv project:
 #   1. rvc        — Python 3.10 + pip<=23.3 for RVC voice conversion worker
 #   2. enhance    — Python 3.12 for resemble-enhance (audio post-processing, MPS)
 #   3. heartmula  — Python 3.10 for HeartMuLa music generation
@@ -10,7 +10,8 @@
 #   7. separate   — Python 3.10 for audio source separation (demucs)
 #   8. ai-tts     — Python 3.11 for Qwen3-TTS (mlx-audio, Apple Silicon)
 #   9. lang-detect — Python 3.11 for language detection (langdetect)
-#  10. tts-mist   — Python 3.11 for CLI + Web-App
+#  10. ezaudio    — Python 3.10 for EzAudio SFX generation (text-to-audio)
+#  11. tts-mist   — Python 3.11 for CLI + Web-App
 #
 # Why separate envs?
 #   RVC depends on omegaconf 2.0.6 and fairseq 0.12.2 (broken metadata,
@@ -107,61 +108,67 @@ echo -e "${GREEN}✓${NC} Prerequisites OK"
 # ── Step 1: RVC Worker Env ───────────────────────────────────────────────────
 
 echo ""
-echo "── Step 1/10: RVC Worker ──"
+echo "── Step 1/11: RVC Worker ──"
 bash "$SCRIPT_DIR/worker/rvc/install.sh"
 
 # ── Step 2: Enhance Worker Env ───────────────────────────────────────────────
 
 echo ""
-echo "── Step 2/10: Enhance Worker ──"
+echo "── Step 2/11: Enhance Worker ──"
 bash "$SCRIPT_DIR/worker/enhance/install.sh"
 
 # ── Step 3: HeartMuLa Music Worker Env ───────────────────────────────────────
 
 echo ""
-echo "── Step 3/10: HeartMuLa Music Worker ──"
+echo "── Step 3/11: HeartMuLa Music Worker ──"
 bash "$SCRIPT_DIR/worker/music/install.sh"
 
 # ── Step 4: ACE-Step Music Worker (uv) ───────────────────────────────────────
 
 echo ""
-echo "── Step 4/10: ACE-Step Music Worker ──"
+echo "── Step 4/11: ACE-Step Music Worker ──"
 bash "$SCRIPT_DIR/worker/ace/install.sh"
 
 # ── Step 5: Whisper Worker Env ────────────────────────────────────────────────
 
 echo ""
-echo "── Step 5/10: Whisper Worker ──"
+echo "── Step 5/11: Whisper Worker ──"
 bash "$SCRIPT_DIR/worker/whisper/install.sh"
 
 # ── Step 6: Diarize Worker Env ───────────────────────────────────────────────
 
 echo ""
-echo "── Step 6/10: Diarize Worker ──"
+echo "── Step 6/11: Diarize Worker ──"
 bash "$SCRIPT_DIR/worker/diarize/install.sh"
 
 # ── Step 7: Separate Worker Env ──────────────────────────────────────────────
 
 echo ""
-echo "── Step 7/10: Separate Worker ──"
+echo "── Step 7/11: Separate Worker ──"
 bash "$SCRIPT_DIR/worker/separate/install.sh"
 
 # ── Step 8: AI-TTS Worker Env ────────────────────────────────────────────────
 
 echo ""
-echo "── Step 8/10: AI-TTS Worker ──"
+echo "── Step 8/11: AI-TTS Worker ──"
 bash "$SCRIPT_DIR/worker/tts/install.sh"
 
 # ── Step 9: Language Detect Worker Env ───────────────────────────────────────
 
 echo ""
-echo "── Step 9/10: Language Detect Worker ──"
+echo "── Step 9/11: Language Detect Worker ──"
 bash "$SCRIPT_DIR/worker/langdetect/install.sh"
 
-# ── Step 10: Main App Env ────────────────────────────────────────────────────
+# ── Step 10: SFX Worker Env ─────────────────────────────────────────────────
 
 echo ""
-echo "── Step 10/10: Main App (tts-mist) ──"
+echo "── Step 10/11: SFX Worker (EzAudio) ──"
+bash "$SCRIPT_DIR/worker/sfx/install.sh"
+
+# ── Step 11: Main App Env ────────────────────────────────────────────────────
+
+echo ""
+echo "── Step 11/11: Main App (tts-mist) ──"
 
 ENV_NAME="tts-mist"
 
@@ -236,6 +243,13 @@ if [ -d "$MODELS_DIR" ]; then
         mkdir -p "$HOME/.cache/torch/hub/checkpoints"
         cp -a "$MODELS_DIR/torch_hub/." "$HOME/.cache/torch/hub/checkpoints/"
         echo -e "  ${GREEN}✓${NC} Demucs models restored"
+    fi
+
+    # EzAudio checkpoints → worker/sfx/ckpts/
+    if [ -d "$MODELS_DIR/sfx_ckpts" ]; then
+        mkdir -p "$SCRIPT_DIR/worker/sfx/ckpts"
+        cp -a "$MODELS_DIR/sfx_ckpts/." "$SCRIPT_DIR/worker/sfx/ckpts/"
+        echo -e "  ${GREEN}✓${NC} EzAudio checkpoints restored"
     fi
 
     echo -e "  ${GREEN}✓${NC} Model restore complete"
@@ -327,6 +341,34 @@ path = snapshot_download('mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit')
 print(f'  0.6B cached at: {path}')
 "
     echo -e "${GREEN}✓${NC} Qwen3-TTS models downloaded"
+
+    # ── EzAudio checkpoints ───────────────────────────────────────────
+    SFX_CKPT_DIR="$SCRIPT_DIR/worker/sfx/ckpts"
+    echo ""
+    echo "── EzAudio checkpoints ──"
+    mkdir -p "$SFX_CKPT_DIR/s3" "$SFX_CKPT_DIR/vae"
+
+    for CKPT_FILE in "s3/ezaudio_s3_xl.pt" "vae/1m.pt"; do
+        LOCAL="$SFX_CKPT_DIR/$CKPT_FILE"
+        if [ -f "$LOCAL" ]; then
+            echo "  $CKPT_FILE already present — skipping"
+        else
+            echo "  Downloading $CKPT_FILE ..."
+            curl -L -o "$LOCAL" "https://huggingface.co/OpenSound/EzAudio/resolve/main/ckpts/$CKPT_FILE"
+        fi
+    done
+    echo -e "${GREEN}✓${NC} EzAudio checkpoints downloaded"
+
+    # ── EzAudio text encoder (flan-t5-xl) ─────────────────────────────
+    echo ""
+    echo "── EzAudio text encoder (flan-t5-xl) ──"
+    "$CONDA_BIN" run -n ezaudio python -c "
+from transformers import T5Tokenizer, T5EncoderModel
+T5Tokenizer.from_pretrained('google/flan-t5-xl')
+T5EncoderModel.from_pretrained('google/flan-t5-xl')
+print('  flan-t5-xl cached')
+"
+    echo -e "${GREEN}✓${NC} EzAudio text encoder downloaded"
 
     echo ""
     echo -e "${GREEN}✓${NC} All model downloads complete"
