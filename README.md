@@ -47,6 +47,7 @@ generate.py <medium> --engine <backend> [--model <variant>] [input] [options]
 | `voice` | `ai-tts` | Neural TTS via Qwen3-TTS (text → audio) |
 | `voice` | `say` | macOS native TTS (text → audio) |
 | `voice` | `rvc` | RVC voice conversion (audio → audio) |
+| `voice` | `clone-tts` | Zero-shot voice cloning via Qwen3-TTS Base (reference + text → cloned voice) |
 | `audio` | `enhance` | Denoise + super-resolution |
 | `audio` | `demucs` | Source separation (stems) |
 | `audio` | `ace-step` | AI music generation |
@@ -292,6 +293,38 @@ If the model has no `target_f0`, run `models set-pitch` first.
 - Non-WAV files are auto-converted to WAV (44.1 kHz) via ffmpeg
 - Output format is always WAV
 - All output paths are printed as JSON array to stdout
+
+</details>
+
+---
+
+### Voice Cloning (`voice --engine clone-tts`)
+
+Zero-shot voice cloning via Qwen3-TTS Base. Provide a 3–10 second reference audio sample and text to synthesize in that voice. Falls back to `voice/default-reference.m4a` if no `--reference` given.
+
+```bash
+# Basic voice cloning (uses default reference)
+python generate.py voice --engine clone-tts --text "Hello world" -o output.wav
+
+# With explicit reference audio
+python generate.py voice --engine clone-tts --reference ref.wav --text "Hello world" -o output.wav
+
+# German with explicit reference text (auto-transcribed if omitted)
+python generate.py voice --engine clone-tts --reference ref.wav --language de --text "Guten Tag" -o output.wav
+```
+
+<details>
+<summary>Options</summary>
+
+- `--reference` — Reference audio (3–10s of the voice to clone; falls back to `voice/default-reference.m4a`)
+- `--text` / `-l` — Text to synthesize in the cloned voice
+- `--ref-text` — Text spoken in the reference audio (auto-transcribed via Whisper if omitted)
+- `--language` — Language code: de, en, fr, ja, zh, it, es, pt, hi, ko, ru (autodetect if omitted)
+- `-o, --output` — Output WAV path or directory
+
+**Reference audio tips:**
+- 3–10 seconds, clean speech, minimal background noise
+- Auto-trimmed at sentence boundaries if too long (via Whisper timestamps)
 
 </details>
 

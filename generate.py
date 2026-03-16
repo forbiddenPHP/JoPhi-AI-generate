@@ -108,6 +108,7 @@ LANGDETECT_ENV = "lang-detect"
 LANGDETECT_WORKER = SCRIPT_DIR / "worker" / "langdetect" / "detect.py"
 SFX_WORKER_DIR = SCRIPT_DIR / "worker" / "sfx"
 SFX_ENV = "ezaudio"
+# Voice cloning uses Qwen3-TTS Base via TTS_WORKER_DIR / TTS_ENV
 
 
 def _find_uv() -> Path:
@@ -1047,6 +1048,136 @@ def _voice_ai_tts(args):
     _emit(f"  Prompt:   {prompt_path}", "info")
 
 
+def _voice_clone_tts(args):
+    """Zero-shot voice cloning via Qwen3-TTS Base."""
+    text = _require_text(args, "text")
+
+    # Reference audio — --reference flag(s), fallback to default
+    DEFAULT_REF = SCRIPT_DIR / "voice" / "default-reference.m4a"
+    ref_flags = getattr(args, "reference", None) or []
+    ref_paths = [Path(p) for p in ref_flags]
+    if not ref_paths:
+        if DEFAULT_REF.exists():
+            ref_paths = [DEFAULT_REF]
+            _emit(f"  Using default reference: {DEFAULT_REF.name}")
+        else:
+            _emit("ERROR: No --reference given and no default reference found", "error")
+            _emit(f"  Place a reference audio at: {DEFAULT_REF}", "error")
+            sys.exit(1)
+    for rp in ref_paths:
+        if not rp.exists():
+            _emit(f"ERROR: Reference audio not found: {rp}", "error")
+            sys.exit(1)
+    # For now: use first reference (multi-reference is future work)
+    ref_path = ref_paths[0]
+
+    # Transcribe reference audio with Whisper → get ref_text + trim to sentence boundary
+    ref_text = getattr(args, "ref_text", None) or ""
+    if not ref_text:
+        transcribe_script = WHISPER_WORKER_DIR / "transcribe.py"
+        if transcribe_script.exists():
+            _emit("Transcribing reference audio …", "stage")
+            whisper_cmd = [
+                str(CONDA_BIN), "run", "--no-capture-output", "-n", WHISPER_ENV,
+                "python", str(transcribe_script),
+                str(ref_path), "--model", "large-v3-turbo",
+            ]
+            whisper_result = run_worker(whisper_cmd, on_event=_event_handler)
+            finish_progress()
+            if whisper_result.returncode == 0 and whisper_result.stdout.strip():
+                try:
+                    whisper_data = json.loads(whisper_result.stdout.strip())
+                    if isinstance(whisper_data, list) and whisper_data:
+                        whisper_data = whisper_data[0]
+                    segments = whisper_data.get("segments", [])
+
+                    # Find last segment that ends within MAX_REF_SECONDS
+                    MAX_REF_SECONDS = 5.0
+                    usable_segments = [s for s in segments if s["end"] <= MAX_REF_SECONDS]
+
+                    if usable_segments:
+                        # Use all segments up to the cutoff
+                        cut_time = usable_segments[-1]["end"]
+                        ref_text = " ".join(s["text"].strip() for s in usable_segments).strip()
+                    elif segments:
+                        # First segment exceeds 5s — use it anyway but trim at its end
+                        cut_time = segments[0]["end"]
+                        ref_text = segments[0]["text"].strip()
+                    else:
+                        cut_time = None
+                        ref_text = whisper_data.get("text", "").strip()
+
+                    # Trim reference audio at sentence boundary
+                    if cut_time is not None and cut_time > 0:
+                        trimmed_ref = Path(tempfile.mktemp(suffix="_ref_trimmed.wav"))
+                        trim_cmd = [
+                            "ffmpeg", "-y", "-i", str(ref_path),
+                            "-ac", "1", "-ar", "24000", "-sample_fmt", "s16",
+                            "-t", f"{cut_time:.2f}",
+                            str(trimmed_ref),
+                        ]
+                        trim_r = subprocess.run(trim_cmd, capture_output=True, text=True)
+                        if trim_r.returncode == 0:
+                            ref_path = trimmed_ref
+
+                    if ref_text:
+                        _emit(f"  Reference text: {ref_text[:80]}{'…' if len(ref_text) > 80 else ''}")
+                except (json.JSONDecodeError, KeyError, IndexError):
+                    pass
+        if not ref_text:
+            _emit("  WARNING: Could not transcribe reference — quality may suffer", "warning")
+
+    # Output — file path or directory
+    out = Path(args.output) if args.output else Path(".")
+    if out.suffix in (".wav", ".WAV"):
+        wav_path = out
+        wav_path.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        out.mkdir(parents=True, exist_ok=True)
+        slug = "_".join(text.split()[:5]).lower()
+        slug = "".join(c for c in slug if c.isalnum() or c == "_")[:40]
+        wav_path = out / f"clone_tts_{slug}.wav"
+
+    # Voice cloning via Qwen3-TTS Base model (ref_audio + ref_text → ICL)
+    tts_script = TTS_WORKER_DIR / "generate_speech.py"
+    if not tts_script.exists():
+        _emit("ERROR: ai-tts worker not found — needed for voice cloning", "error")
+        _emit("  Run: bash worker/tts/install.sh", "error")
+        sys.exit(1)
+
+    language = getattr(args, "language", None)
+
+    _emit(f"Cloning voice → {wav_path.name}", "stage")
+    _emit(f"  Reference: {ref_path.name}")
+    _emit(f"  Output:    {wav_path}")
+
+    cmd = [
+        str(CONDA_BIN), "run", "--no-capture-output", "-n", TTS_ENV,
+        "python", str(tts_script),
+        "--text", text,
+        "--model", "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit",
+        "--ref-audio", str(ref_path),
+        "--output", str(wav_path),
+    ]
+    if ref_text:
+        cmd.extend(["--ref-text", ref_text])
+    if language:
+        cmd.extend(["--language", language])
+
+    result = run_worker(cmd, on_event=_event_handler)
+    finish_progress()
+
+    if result.returncode != 0:
+        _emit("ERROR: Voice cloning failed.", "error")
+        sys.exit(1)
+
+    # Print JSON result
+    for line in result.stdout.strip().splitlines():
+        line = line.strip()
+        if line.startswith("{") or line.startswith("["):
+            print(line)
+
+
 def cmd_voice(args):
     """Voice conversion — dispatch by engine."""
     engine = args.engine
@@ -1056,6 +1187,8 @@ def cmd_voice(args):
         _voice_say(args)
     elif engine == "ai-tts":
         _voice_ai_tts(args)
+    elif engine == "clone-tts":
+        _voice_clone_tts(args)
     else:
         _emit(f"ERROR: Unknown voice engine: {engine}", "error")
         sys.exit(1)
@@ -2015,7 +2148,7 @@ def build_parser():
     # ── voice ─────────────────────────────────────────────────────────────
     p_voice = sub.add_parser("voice", help="Voice conversion and TTS")
     p_voice.add_argument("input", nargs="*", help="[rvc] Input audio file(s)")
-    p_voice.add_argument("--engine", default="rvc", choices=["rvc", "say", "ai-tts"],
+    p_voice.add_argument("--engine", default="rvc", choices=["rvc", "say", "ai-tts", "clone-tts"],
                        help="Voice engine (default: rvc)")
     p_voice.add_argument("--model", dest="voice", help="[rvc] Voice/RVC model name")
     p_voice.add_argument("-o", "--output", help="Output directory")
@@ -2040,7 +2173,7 @@ def build_parser():
                        choices=["large", "small"],
                        help="[ai-tts] Model size (default: large = 1.7B)")
     p_voice.add_argument("--language", dest="language", default=None,
-                       help="[ai-tts] ISO code: de, en, fr, ja, ko, zh, ru, pt, es, it (auto-detected if omitted)")
+                       help="[ai-tts/clone-tts] ISO code: de, en, fr, ja, … (auto-detected if omitted)")
     p_voice.add_argument("--list-voices", action="store_true",
                        help="[ai-tts] Show available voices")
     # rvc-specific
@@ -2050,6 +2183,11 @@ def build_parser():
                        help="[rvc] Manual pitch shift in semitones (disables auto-pitch)")
     p_voice.add_argument("--target-hz", type=float,
                        help="[rvc] Target voice pitch in Hz (overrides model config)")
+    # clone-tts specific
+    p_voice.add_argument("--reference", type=str, action="append", default=None,
+                       help="[clone-tts] Reference audio (3-10s WAV of voice to clone, repeatable)")
+    p_voice.add_argument("--ref-text", type=str, default=None,
+                       help="[clone-tts] Text spoken in reference audio (auto-transcribed if omitted)")
     p_voice.set_defaults(func=cmd_voice)
 
     # ── audio ─────────────────────────────────────────────────────────────

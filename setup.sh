@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ── Revoicer — Master Installer ─────────────────────────────────────────────
-# Creates ten conda environments + one uv project:
+# Creates eleven conda environments + one uv project:
 #   1. rvc        — Python 3.10 + pip<=23.3 for RVC voice conversion worker
 #   2. enhance    — Python 3.12 for resemble-enhance (audio post-processing, MPS)
 #   3. heartmula  — Python 3.10 for HeartMuLa music generation
@@ -339,6 +339,8 @@ path = snapshot_download('mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit')
 print(f'  1.7B cached at: {path}')
 path = snapshot_download('mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit')
 print(f'  0.6B cached at: {path}')
+path = snapshot_download('mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit')
+print(f'  1.7B Base (voice cloning) cached at: {path}')
 "
     echo -e "${GREEN}✓${NC} Qwen3-TTS models downloaded"
 

@@ -188,14 +188,12 @@ def main():
     parser.add_argument("--model", required=True, help="HuggingFace model ID")
     parser.add_argument("--output", required=True, help="Output WAV path")
     parser.add_argument("--language", default="", help="ISO lang code (de, en, fr, ...). Empty = autodetect.")
+    parser.add_argument("--ref-audio", default=None, help="Reference audio for voice cloning (Base model only)")
+    parser.add_argument("--ref-text", default=None, help="Text spoken in reference audio (required with --ref-audio)")
     args = parser.parse_args()
 
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Parse dialog segments
-    segments = parse_dialog(args.text, args.voice)
-    total = len(segments)
 
     # Load model
     print("Loading model …", file=sys.stderr)
@@ -210,48 +208,70 @@ def main():
         model_lang = detect_model_lang(plain_text)
         print(f"Detected language: {model_lang}", file=sys.stderr)
 
-    # Silence gap between dialog segments (0.4s at native rate, resampled later)
     native_sr = None
     audio_parts = []
 
-    for i, (voice, seg_instruct, seg_lang, text) in enumerate(segments, 1):
-        # Per-segment instruct overrides global --instruct
-        instruct = seg_instruct or args.instruct
-        # Per-segment language overrides global model_lang
-        lang = iso_to_model_lang(seg_lang) if seg_lang else model_lang
-        tag_info = f" [{seg_instruct}]" if seg_instruct else ""
-        print(f"[{i}/{total}] {voice}{tag_info} ({lang}): {text[:60]}{'...' if len(text) > 60 else ''}",
+    if args.ref_audio:
+        # Voice cloning mode (Base model): single segment, no dialog parsing
+        print(f"[1/1] Voice clone ({model_lang}): {args.text[:60]}{'...' if len(args.text) > 60 else ''}",
               file=sys.stderr)
-
         gen_kwargs = {
-            "text": text,
-            "voice": voice,
-            "lang_code": lang,
+            "text": args.text,
+            "lang_code": model_lang,
+            "ref_audio": args.ref_audio,
+            "ref_text": args.ref_text or "",
         }
-        if instruct:
-            gen_kwargs["instruct"] = instruct
-
         results = list(model.generate(**gen_kwargs))
-
         if not results:
-            print(f"ERROR: No audio generated for segment {i}", file=sys.stderr)
+            print("ERROR: No audio generated", file=sys.stderr)
             sys.exit(1)
-
         audio_data = results[0].audio
         if hasattr(audio_data, 'tolist'):
             audio_data = np.array(audio_data, dtype=np.float32)
         else:
             audio_data = np.asarray(audio_data, dtype=np.float32)
-
-        if native_sr is None:
-            native_sr = results[0].sample_rate
-
-        # Add silence gap before this segment (except the first)
-        if audio_parts:
-            gap = np.zeros(int(native_sr * 0.4), dtype=np.float32)
-            audio_parts.append(gap)
-
+        native_sr = results[0].sample_rate
         audio_parts.append(audio_data)
+    else:
+        # Standard TTS mode: parse dialog segments
+        segments = parse_dialog(args.text, args.voice)
+        total = len(segments)
+
+        for i, (voice, seg_instruct, seg_lang, text) in enumerate(segments, 1):
+            instruct = seg_instruct or args.instruct
+            lang = iso_to_model_lang(seg_lang) if seg_lang else model_lang
+            tag_info = f" [{seg_instruct}]" if seg_instruct else ""
+            print(f"[{i}/{total}] {voice}{tag_info} ({lang}): {text[:60]}{'...' if len(text) > 60 else ''}",
+                  file=sys.stderr)
+
+            gen_kwargs = {
+                "text": text,
+                "voice": voice,
+                "lang_code": lang,
+            }
+            if instruct:
+                gen_kwargs["instruct"] = instruct
+
+            results = list(model.generate(**gen_kwargs))
+
+            if not results:
+                print(f"ERROR: No audio generated for segment {i}", file=sys.stderr)
+                sys.exit(1)
+
+            audio_data = results[0].audio
+            if hasattr(audio_data, 'tolist'):
+                audio_data = np.array(audio_data, dtype=np.float32)
+            else:
+                audio_data = np.asarray(audio_data, dtype=np.float32)
+
+            if native_sr is None:
+                native_sr = results[0].sample_rate
+
+            if audio_parts:
+                gap = np.zeros(int(native_sr * 0.4), dtype=np.float32)
+                audio_parts.append(gap)
+
+            audio_parts.append(audio_data)
 
     # Concatenate all segments
     final_audio = np.concatenate(audio_parts) if len(audio_parts) > 1 else audio_parts[0]
