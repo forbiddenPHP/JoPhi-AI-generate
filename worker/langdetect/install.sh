@@ -30,12 +30,12 @@ fi
 # ── Create env ───────────────────────────────────────────────────────────────
 
 if "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} " || [ -d "/opt/miniconda3/envs/$ENV_NAME" ]; then
-    echo "  Removing old '$ENV_NAME' env ..."
+    echo "  Removing old '$ENV_NAME' env …"
     "$CONDA_BIN" env remove -y -n "$ENV_NAME" > /dev/null 2>&1
     rm -rf "/opt/miniconda3/envs/$ENV_NAME" 2>/dev/null || true
 fi
 
-echo "  Creating env: $ENV_NAME (Python 3.11) ..."
+echo "  Creating env: $ENV_NAME (Python 3.11) …"
 "$CONDA_BIN" create -y -q -n "$ENV_NAME" python=3.11 > /dev/null 2>&1
 echo -e "${GREEN}✓${NC} Env created"
 
@@ -45,20 +45,20 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOCKFILE="$SCRIPT_DIR/requirements.lock"
 WHEELS_DIR="$SCRIPT_DIR/wheels"
 
-echo "  Installing langdetect ..."
+echo "  Installing langdetect …"
 if [ -d "$WHEELS_DIR" ] && [ "$(ls -A "$WHEELS_DIR"/*.whl 2>/dev/null)" ]; then
-    echo "  Using cached wheels (offline) ..."
+    echo "  Using cached wheels (offline) …"
     "$CONDA_BIN" run -n "$ENV_NAME" pip install --no-index --find-links="$WHEELS_DIR" -r "$LOCKFILE" 2>&1 | \
         grep -E "^(Successfully|Installing|ERROR)" | head -5
 elif [ -f "$LOCKFILE" ]; then
-    echo "  Using pinned versions from requirements.lock ..."
+    echo "  Using pinned versions from requirements.lock …"
     "$CONDA_BIN" run -n "$ENV_NAME" pip install -r "$LOCKFILE" 2>&1 | \
         grep -E "^(Successfully|Installing|Downloading|ERROR)" | head -5
 else
     "$CONDA_BIN" run -n "$ENV_NAME" pip install langdetect 2>&1 | \
         grep -E "^(Successfully|Installing|Downloading|ERROR)" | head -5
 
-    echo "  Generating requirements.lock ..."
+    echo "  Generating requirements.lock …"
     "$CONDA_BIN" run -n "$ENV_NAME" pip freeze > "$LOCKFILE" 2>/dev/null
     echo -e "${GREEN}✓${NC} Lockfile saved"
 fi

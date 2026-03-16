@@ -82,7 +82,7 @@ def safe_path(user_path: str, *, base: Optional[str] = None) -> str:
         normalised = _resolve(os.path.join(root, user_path))
 
     # ── CodeQL-recognised sanitiser barrier ──
-    # ``normpath(…).startswith(safe_prefix)`` is the pattern that
+    # ``normpath(...).startswith(safe_prefix)`` is the pattern that
     # CodeQL's ``py/path-injection`` query treats as a sanitiser.
     if not normalised.startswith(root + os.sep) and normalised != root:
         raise ValueError(

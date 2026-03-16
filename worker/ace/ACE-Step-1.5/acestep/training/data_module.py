@@ -99,7 +99,7 @@ class PreprocessedTensorDataset(Dataset):
         paths relative to the tensor directory).  If the resulting path does
         not exist on disk, falls back to resolving against the global safe
         root (backward compat for legacy manifests that stored CWD-relative
-        paths like ``./datasets/…/foo.pt``).
+        paths like ``./datasets/.../foo.pt``).
 
         Returns:
             Validated absolute path, or ``None`` if the path cannot be

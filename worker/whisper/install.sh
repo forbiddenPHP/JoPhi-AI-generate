@@ -32,7 +32,7 @@ fi
 # ── Check ffmpeg (required by whisper) ───────────────────────────────────────
 
 if ! command -v ffmpeg &> /dev/null; then
-    echo "  Installing ffmpeg ..."
+    echo "  Installing ffmpeg …"
     if command -v brew &> /dev/null; then
         HOMEBREW_NO_AUTO_UPDATE=1 brew install ffmpeg > /dev/null 2>&1
     else
@@ -45,12 +45,12 @@ fi
 # ── Create env ───────────────────────────────────────────────────────────────
 
 if "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} " || [ -d "/opt/miniconda3/envs/$ENV_NAME" ]; then
-    echo "  Removing old '$ENV_NAME' env ..."
+    echo "  Removing old '$ENV_NAME' env …"
     "$CONDA_BIN" env remove -y -n "$ENV_NAME" > /dev/null 2>&1
     rm -rf "/opt/miniconda3/envs/$ENV_NAME" 2>/dev/null || true
 fi
 
-echo "  Creating env: $ENV_NAME (Python 3.12) ..."
+echo "  Creating env: $ENV_NAME (Python 3.12) …"
 "$CONDA_BIN" create -y -q -n "$ENV_NAME" python=3.12 > /dev/null 2>&1
 echo -e "${GREEN}✓${NC} Env created"
 
@@ -59,10 +59,10 @@ echo -e "${GREEN}✓${NC} Env created"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOCKFILE="$SCRIPT_DIR/requirements.lock"
 
-echo "  Installing mlx-whisper ..."
+echo "  Installing mlx-whisper …"
 
 if [ -f "$LOCKFILE" ]; then
-    echo "  Using pinned versions from requirements.lock ..."
+    echo "  Using pinned versions from requirements.lock …"
     "$CONDA_BIN" run -n "$ENV_NAME" pip install -r "$LOCKFILE" 2>&1 | \
         grep -E "^(Successfully|Installing|Downloading|ERROR)" | head -5
 else
@@ -70,7 +70,7 @@ else
         grep -E "^(Successfully|Installing|Downloading|ERROR)" | head -5
 
     # Generate lockfile for future installs
-    echo "  Generating requirements.lock ..."
+    echo "  Generating requirements.lock …"
     "$CONDA_BIN" run -n "$ENV_NAME" pip freeze > "$LOCKFILE" 2>/dev/null
     echo -e "${GREEN}✓${NC} Lockfile saved"
 fi

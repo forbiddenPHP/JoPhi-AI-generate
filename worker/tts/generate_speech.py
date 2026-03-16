@@ -198,7 +198,7 @@ def main():
     total = len(segments)
 
     # Load model
-    print("Loading model ...", file=sys.stderr)
+    print("Loading model …", file=sys.stderr)
     from mlx_audio.tts.utils import load_model
     model = load_model(args.model)
 

@@ -39,7 +39,7 @@ fi
 # ── Check git-lfs (needed to download models from HuggingFace) ──────────
 
 if ! git lfs version > /dev/null 2>&1; then
-    echo "  Installing git-lfs ..."
+    echo "  Installing git-lfs …"
     if command -v brew &> /dev/null; then
         HOMEBREW_NO_AUTO_UPDATE=1 brew install git-lfs > /dev/null 2>&1
     else
@@ -62,12 +62,12 @@ fi
 # ── Create env ──────────────────────────────────────────────────────────
 
 if "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} " || [ -d "/opt/miniconda3/envs/$ENV_NAME" ]; then
-    echo "  Removing old '$ENV_NAME' env ..."
+    echo "  Removing old '$ENV_NAME' env …"
     "$CONDA_BIN" env remove -y -n "$ENV_NAME" > /dev/null 2>&1
     rm -rf "/opt/miniconda3/envs/$ENV_NAME" 2>/dev/null || true
 fi
 
-echo "  Creating env: $ENV_NAME (Python 3.10) ..."
+echo "  Creating env: $ENV_NAME (Python 3.10) …"
 "$CONDA_BIN" create -y -q -n "$ENV_NAME" python=3.10 > /dev/null 2>&1
 echo -e "${GREEN}✓${NC} Env created"
 
@@ -78,7 +78,7 @@ LOCKFILE="$SCRIPT_DIR/requirements.lock"
 WHEELS_DIR="$SCRIPT_DIR/wheels"
 
 if [ ! -d "$HEARTLIB_DIR" ]; then
-    echo "  Cloning heartlib ..."
+    echo "  Cloning heartlib …"
     git clone https://github.com/HeartMuLa/heartlib.git "$HEARTLIB_DIR"
     # Remove .git to avoid nested repos
     rm -rf "$HEARTLIB_DIR/.git"
@@ -86,11 +86,11 @@ fi
 
 # ── Install dependencies ──────────────────────────────────────────────
 
-echo "  Installing heartlib (this may take several minutes) ..."
+echo "  Installing heartlib (this may take several minutes) …"
 
 if [ -d "$WHEELS_DIR" ] && [ "$(ls -A "$WHEELS_DIR"/*.whl 2>/dev/null)" ]; then
     # Offline install from cached wheels — works even if PyPI is gone
-    echo "  Using cached wheels (offline) ..."
+    echo "  Using cached wheels (offline) …"
     "$CONDA_BIN" run -n "$ENV_NAME" pip install --no-index --find-links="$WHEELS_DIR" -r "$LOCKFILE" 2>&1 | \
         grep -E "^(Successfully|Installing|ERROR)" | head -5
     # heartlib itself (editable, from local copy)
@@ -98,14 +98,14 @@ if [ -d "$WHEELS_DIR" ] && [ "$(ls -A "$WHEELS_DIR"/*.whl 2>/dev/null)" ]; then
         grep -E "^(Successfully|ERROR)" | head -3
 elif [ -f "$LOCKFILE" ]; then
     # Online install with pinned versions
-    echo "  Using pinned versions from requirements.lock ..."
+    echo "  Using pinned versions from requirements.lock …"
     "$CONDA_BIN" run -n "$ENV_NAME" pip install -r "$LOCKFILE" 2>&1 | \
         grep -E "^(Successfully|Installing|Downloading|ERROR)" | head -5
     "$CONDA_BIN" run -n "$ENV_NAME" pip install --no-deps -e "$HEARTLIB_DIR" 2>&1 | \
         grep -E "^(Successfully|ERROR)" | head -3
 else
     # Fallback: install from PyPI
-    echo "  No lockfile or wheels found, installing from PyPI ..."
+    echo "  No lockfile or wheels found, installing from PyPI …"
 
     if "$CONDA_BIN" run -n "$ENV_NAME" pip install -e "$HEARTLIB_DIR" 2>&1 | \
         grep -E "^(Successfully|ERROR|error:)" | head -5; then
@@ -116,7 +116,7 @@ else
         "$CONDA_BIN" run -n "$ENV_NAME" pip install --no-deps -e "$HEARTLIB_DIR" 2>&1 | \
             grep -E "^(Successfully|ERROR)" | head -3
 
-        echo "  Installing inference dependencies ..."
+        echo "  Installing inference dependencies …"
         "$CONDA_BIN" run -n "$ENV_NAME" pip install \
             "torch>=2.4" \
             "torchaudio>=2.4" \
@@ -134,7 +134,7 @@ else
     fi
 
     # Generate lockfile for future installs
-    echo "  Generating requirements.lock ..."
+    echo "  Generating requirements.lock …"
     "$CONDA_BIN" run -n "$ENV_NAME" pip freeze > "$LOCKFILE" 2>/dev/null
     echo -e "${GREEN}✓${NC} Lockfile saved"
 fi

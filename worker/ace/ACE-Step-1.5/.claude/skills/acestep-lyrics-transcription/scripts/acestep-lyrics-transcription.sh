@@ -544,7 +544,7 @@ cmd_config() {
             echo "Examples:"
             echo "  config --set provider elevenlabs"
             echo "  config --set openai.api_key sk-..."
-            echo "  config --set elevenlabs.api_key ..."
+            echo "  config --set elevenlabs.api_key …"
             echo "  config --set output_format srt"
             ;;
     esac

@@ -21,7 +21,7 @@ for _candidate in "$HOME/.local/bin/uv" "$(command -v uv 2>/dev/null)"; do
     fi
 done
 if [ -z "$UV_BIN" ]; then
-    echo "uv >= $UV_MIN_VERSION not found. Installing ..."
+    echo "uv >= $UV_MIN_VERSION not found. Installing …"
     curl -LsSf https://astral.sh/uv/install.sh | sh 2>/dev/null
     UV_BIN="$HOME/.local/bin/uv"
 fi
@@ -31,20 +31,20 @@ echo "uv: $("$UV_BIN" --version)"
 if [ -d "$ACESTEP_DIR" ]; then
     echo "ACE-Step already present at $ACESTEP_DIR"
 else
-    echo "Cloning ACE-Step 1.5 ..."
+    echo "Cloning ACE-Step 1.5 …"
     git clone "$REPO_URL" "$ACESTEP_DIR"
     rm -rf "$ACESTEP_DIR/.git"
     echo "Removed .git — code will be committed to project."
 fi
 
 # ── Install dependencies ────────────────────────────────────────────────────
-echo "Running uv sync ..."
+echo "Running uv sync …"
 cd "$ACESTEP_DIR"
 "$UV_BIN" sync
 
 # ── Verify ──────────────────────────────────────────────────────────────────
 echo ""
-echo "Verifying ACE-Step installation ..."
+echo "Verifying ACE-Step installation …"
 "$UV_BIN" run python -c "from acestep.inference import generate_music; print('ACE-Step OK')"
 
 echo ""

@@ -218,7 +218,7 @@ def cmd_server_start(args):
         _emit(f"ERROR: conda not found at {CONDA_BIN}", "error")
         sys.exit(1)
 
-    _emit("Starting RVC worker ...", "stage")
+    _emit("Starting RVC worker …", "stage")
     port = args.port if hasattr(args, "port") else 5100
     start_sh = RVC_WORKER_DIR / "start.sh"
 
@@ -252,7 +252,7 @@ def cmd_server_stop(args):
             _emit("RVC worker was not running.")
         PID_FILE.unlink(missing_ok=True)
     else:
-        _emit("No PID file found. Checking if server is running ...")
+        _emit("No PID file found. Checking if server is running …")
         if check_server():
             _emit("Server is running but PID unknown. Kill manually or use:")
             _emit("  lsof -ti:5100 | xargs kill")
@@ -468,14 +468,14 @@ def _download_url(url: str, dest_dir: Path) -> Path:
 def _install_from_archive(archive_path: Path, name: str) -> tuple[Path, Path | None]:
     """Extract archive, find .pth + .index."""
     tmp_dir = Path(tempfile.mkdtemp(prefix="generate_"))
-    _emit(f"Extracting {archive_path.name} ...", "stage")
+    _emit(f"Extracting {archive_path.name} …", "stage")
     try:
         extracted = _extract_archive(archive_path, tmp_dir)
     except FileNotFoundError:
         if subprocess.run(["which", "brew"], capture_output=True).returncode != 0:
             _emit("'unar' not found and brew is not installed.", "error")
             sys.exit(1)
-        _emit("Installing unar via brew ...", "stage")
+        _emit("Installing unar via brew …", "stage")
         r = subprocess.run(["brew", "install", "unar"],
                            capture_output=True, text=True,
                            env={**os.environ, "HOMEBREW_NO_AUTO_UPDATE": "1"})
@@ -590,7 +590,7 @@ def cmd_models_install(args):
 
     if is_url:
         tmp_dir = Path(tempfile.mkdtemp(prefix="generate_"))
-        _emit("Downloading from URL ...", "stage")
+        _emit("Downloading from URL …", "stage")
         local_file = _download_url(model_id, tmp_dir)
         _emit(f"Downloaded: {local_file.name}")
 
@@ -641,19 +641,19 @@ def cmd_models_install(args):
                     sys.exit(1)
 
             name = args.name or _sanitize_model_name(Path(target_file).stem)
-            _emit(f"Installing '{name}' from {target_file} ...", "stage")
+            _emit(f"Installing '{name}' from {target_file} …", "stage")
 
             if target_file.lower().endswith((".zip", ".rar", ".7z")):
-                _emit(f"Downloading {target_file} ...", "stage")
+                _emit(f"Downloading {target_file} …", "stage")
                 local_archive = Path(hf_hub_download(model_id, target_file))
                 pth_path, idx_path = _install_from_archive(local_archive, name)
             elif target_file.endswith(".pth"):
-                _emit(f"Downloading {target_file} ...", "stage")
+                _emit(f"Downloading {target_file} …", "stage")
                 pth_path = Path(hf_hub_download(model_id, target_file))
                 base = Path(target_file).stem
                 matching_idx = [f for f in idx_files if base in f]
                 if matching_idx:
-                    _emit(f"Downloading {matching_idx[0]} ...", "stage")
+                    _emit(f"Downloading {matching_idx[0]} …", "stage")
                     idx_path = Path(hf_hub_download(model_id, matching_idx[0]))
             else:
                 _emit("File must be .pth, .zip, .rar, or .7z", "error")
@@ -661,11 +661,11 @@ def cmd_models_install(args):
 
         elif len(model_files) > 1:
             total = len(model_files)
-            _emit(f"Repo '{model_id}' contains {total} models — installing all ...", "stage")
+            _emit(f"Repo '{model_id}' contains {total} models — installing all …", "stage")
             installed = []
             for j, mf in enumerate(sorted(model_files), 1):
                 mf_name = _sanitize_model_name(Path(mf).stem)
-                _emit(f"[{j}/{total}] Installing '{mf_name}' from {mf} ...", "stage")
+                _emit(f"[{j}/{total}] Installing '{mf_name}' from {mf} …", "stage")
                 try:
                     if mf.lower().endswith((".zip", ".rar", ".7z")):
                         local_archive = Path(hf_hub_download(model_id, mf))
@@ -691,18 +691,18 @@ def cmd_models_install(args):
         elif pth_files:
             pth_file = pth_files[0]
             name = args.name or _sanitize_model_name(Path(pth_file).stem)
-            _emit(f"Installing '{name}' ...", "stage")
-            _emit(f"Downloading {pth_file} ...", "stage")
+            _emit(f"Installing '{name}' …", "stage")
+            _emit(f"Downloading {pth_file} …", "stage")
             pth_path = Path(hf_hub_download(model_id, pth_file))
             if idx_files:
-                _emit(f"Downloading {idx_files[0]} ...", "stage")
+                _emit(f"Downloading {idx_files[0]} …", "stage")
                 idx_path = Path(hf_hub_download(model_id, idx_files[0]))
 
         elif archive_files:
             archive = archive_files[0]
             name = args.name or _sanitize_model_name(Path(archive).stem)
-            _emit(f"Installing '{name}' ...", "stage")
-            _emit(f"Downloading {archive} ...", "stage")
+            _emit(f"Installing '{name}' …", "stage")
+            _emit(f"Downloading {archive} …", "stage")
             local_archive = Path(hf_hub_download(model_id, archive))
             pth_path, idx_path = _install_from_archive(local_archive, name)
 
@@ -711,7 +711,7 @@ def cmd_models_install(args):
             _emit(f"Files in repo: {', '.join(files[:10])}", "error")
             sys.exit(1)
 
-    _emit("Uploading to RVC worker ...", "stage")
+    _emit("Uploading to RVC worker …", "stage")
     _upload_model(name, pth_path, idx_path)
     _emit(f"Uploaded {name}.zip")
 
@@ -743,7 +743,7 @@ def cmd_models_set_f0(args):
 
 
 def cmd_models_remove(args):
-    _emit(f"Removing model '{args.name}' ...", "stage")
+    _emit(f"Removing model '{args.name}' …", "stage")
     try:
         r = requests.delete(f"{RVC_API_URL}/models/{args.name}", timeout=10)
         if r.ok:
@@ -785,7 +785,7 @@ def _tts_rvc(args):
             config = load_model_config(model_name)
             target_f0 = config.get("target_f0")
             if target_f0 is None:
-                _emit("No target F0 for this model — calibrating automatically ...", "stage")
+                _emit("No target F0 for this model — calibrating automatically …", "stage")
                 target_f0 = calibrate_model(model_name)
                 if target_f0 is None:
                     _emit("  Calibration failed. Using pitch=0.", "warning")
@@ -1008,7 +1008,7 @@ def _voice_ai_tts(args):
     if tags:
         cmd.extend(["--instruct", tags])
 
-    _emit(f"Generating speech (Qwen3-TTS {tts_model}) ...", "stage")
+    _emit(f"Generating speech (Qwen3-TTS {tts_model}) …", "stage")
     if voice:
         _emit(f"  Voice:    {voice}")
     if language:
@@ -1022,8 +1022,11 @@ def _voice_ai_tts(args):
     if result.returncode != 0:
         _emit("ERROR: AI-TTS generation failed.", "error")
         sys.exit(1)
-    if result.stdout.strip():
-        print(result.stdout.strip())
+    # Print JSON result (filter out non-JSON noise from stdout)
+    for line in result.stdout.strip().splitlines():
+        line = line.strip()
+        if line.startswith("{") or line.startswith("["):
+            print(line)
 
     # Save prompt sidecar (.txt with all generation parameters)
     prompt_path = wav_path.with_suffix(".txt")
@@ -1037,7 +1040,7 @@ def _voice_ai_tts(args):
     prompt_lines.append(f"---")
     prompt_lines.append(text)
     prompt_path.write_text("\n".join(prompt_lines), encoding="utf-8")
-    _emit(f"  Prompt:   {prompt_path}")
+    _emit(f"  Prompt:   {prompt_path}", "info")
 
 
 def cmd_voice(args):
@@ -1088,7 +1091,7 @@ def _audio_enhance(args):
         cmd.append("--enhance-only")
 
     mode = "denoise" if args.denoise_only else "enhance-only" if args.enhance_only else "enhance"
-    _emit(f"Enhancing {len(input_paths)} file(s) ({mode}) ...", "stage")
+    _emit(f"Enhancing {len(input_paths)} file(s) ({mode}) …", "stage")
 
     result = run_worker(cmd, on_event=_event_handler)
     finish_progress()
@@ -1127,7 +1130,7 @@ def _audio_demucs(args):
         if args.model:
             cmd.extend(["--model", args.model])
 
-        _emit(f"Separating {p.name} ...", "stage")
+        _emit(f"Separating {p.name} …", "stage")
 
         result = run_worker(cmd, on_event=_event_handler)
         finish_progress()
@@ -1260,7 +1263,7 @@ def _audio_ace(args):
     duration_ms = args.duration if args.duration else args.seconds * 1000
     duration_s = duration_ms / 1000
 
-    _emit("Generating music (ACE-Step) ...", "stage")
+    _emit("Generating music (ACE-Step) …", "stage")
     _emit(f"  Model:    {ace_model} ({ace_config})")
     _emit(f"  Caption:  {args.tags}")
     _emit(f"  Duration: {duration_s:.0f}s")
@@ -1335,7 +1338,7 @@ def _audio_heartmula(args):
         cmd.extend(["--seed", str(args.seed)])
 
     duration_s = duration_ms / 1000
-    _emit("Generating music (HeartMuLa) ...", "stage")
+    _emit("Generating music (HeartMuLa) …", "stage")
     _emit(f"  Tags:     {args.tags}")
     _emit(f"  Duration: {duration_s:.0f}s")
     _emit(f"  Output:   {out_path}")
@@ -1381,7 +1384,7 @@ def _audio_diarize(args):
         if args.verify:
             cmd.append("--verify")
 
-        _emit(f"Diarizing {p.name} ...", "stage")
+        _emit(f"Diarizing {p.name} …", "stage")
 
         result = run_worker(cmd, on_event=_event_handler)
         finish_progress()
@@ -1451,7 +1454,7 @@ def _text_whisper(args):
         cmd.extend(["-o", str(out_path)])
 
     n_files = len(input_files)
-    _emit(f"Transcribing {n_files} file{'s' if n_files > 1 else ''} ...", "stage")
+    _emit(f"Transcribing {n_files} file{'s' if n_files > 1 else ''} …", "stage")
     _emit(f"  Model: {model}")
     if getattr(args, "input_language", None):
         _emit(f"  Language: {args.input_language}")
@@ -1496,7 +1499,7 @@ def _text_heartmula_transcribe(args):
         out_path = Path(args.output).resolve()
         cmd.extend(["-o", str(out_path)])
 
-    _emit("Transcribing lyrics ...", "stage")
+    _emit("Transcribing lyrics …", "stage")
     _emit(f"  Input: {audio_path}")
 
     result = run_worker(cmd, on_event=_event_handler)

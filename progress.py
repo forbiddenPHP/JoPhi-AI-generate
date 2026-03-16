@@ -5,12 +5,18 @@ Replaces subprocess.run(capture_output=True) with streaming Popen that
 reads stderr in real-time, parses progress events, and collects stdout
 for JSON results.
 
-Usage in revoicer.py:
-    from progress import run_worker
+Event types:
+    stage    — Phase label ("Loading model ...", "Generating ...")
+    progress — Progress bar / counter with percent
+    info     — Relevant status info ("Device: mps", "Saved: output.wav")
+    warning  — Warnings (library or worker)
+    error    — Errors and tracebacks
+    noise    — Library chatter (tokenizer info, torch compat notices)
+    log      — Everything else
 
-    result = run_worker(cmd, timeout=600, on_event=print_event)
-    if result.returncode != 0:
-        print(f"ERROR: {result.stderr_tail}", file=sys.stderr)
+Usage:
+    from progress import run_worker, print_event_tui
+    result = run_worker(cmd, on_event=print_event_tui)
 """
 
 from __future__ import annotations
@@ -31,10 +37,13 @@ from typing import Callable, Optional
 @dataclass
 class ProgressEvent:
     """Structured event emitted by a worker parser."""
-    type: str               # "progress" | "stage" | "log" | "error" | "warning"
+    type: str               # "progress" | "stage" | "info" | "warning" | "error" | "noise" | "log"
     message: str            # raw line or parsed message
     percent: float | None = None
+    current: int | None = None    # counter: current step
+    total: int | None = None      # counter: total steps
     stage: str | None = None
+    chunk: int | None = None      # chunk index (1-based), set when progress resets
     ts: float = 0.0
 
     def __post_init__(self):
@@ -45,8 +54,14 @@ class ProgressEvent:
         d = {"type": self.type, "message": self.message, "ts": self.ts}
         if self.percent is not None:
             d["percent"] = round(self.percent, 1)
+        if self.current is not None:
+            d["current"] = self.current
+        if self.total is not None:
+            d["total"] = self.total
         if self.stage is not None:
             d["stage"] = self.stage
+        if self.chunk is not None:
+            d["chunk"] = self.chunk
         return json.dumps(d, ensure_ascii=False)
 
 
@@ -56,7 +71,7 @@ class ProgressEvent:
 _TQDM_RE = re.compile(
     r"(\d+)%\|"           # percent
     r"[^|]*\|\s*"         # bar
-    r"(\d+)/(\d+)"        # current/total
+    r"([\d.]+)/([\d.]+)"  # current/total
 )
 
 # Simpler tqdm: "100%|██████████| 5/5"
@@ -69,39 +84,140 @@ _FFMPEG_TIME_RE = re.compile(r"time=(\d+):(\d+):(\d+(?:\.\d+)?)")
 _COUNTER_RE = re.compile(r"\[(\d+)/(\d+)\]")
 
 
+# ── Noise patterns ───────────────────────────────────────────────────────────
+
+_NOISE_PATTERNS = (
+    # Conda/torch environment noise
+    "FutureWarning",
+    "UserWarning",
+    "pynvml",
+    "import pynvml",
+    "ds_accelerator",
+    "bitsandbytes",
+    # Torch/MPS compat
+    "Skipping import of cpp extensions",
+    "NOTE: Redirects are currently not supported",
+    # HuggingFace cache checks
+    "Fetching",
+    # AI-TTS / mlx-audio internals
+    "Initialized encoder codebooks",
+    "Loaded speech tokenizer from",
+    "You are using a model of type",
+    "The tokenizer you are loading",
+    "fix_mistral_regex",
+    # ACE-Step logger noise
+    "| INFO     |",
+    "| DEBUG    |",
+    # torch autocast
+    "MPS Autocast only supports",
+    "with torch.autocast(",
+)
+
+_NOISE_REGEXES = (
+    # W0315 20:35:03... torch distributed warnings
+    re.compile(r"^W\d{4}\s"),
+)
+
+
+def is_noise(line: str) -> bool:
+    """Check if a line is known library noise."""
+    if any(p in line for p in _NOISE_PATTERNS):
+        return True
+    if any(r.search(line) for r in _NOISE_REGEXES):
+        return True
+    return False
+
+
+# ── Warning patterns ─────────────────────────────────────────────────────────
+
+_WARNING_PATTERNS = (
+    "WARNING:",
+    "WARNING ",
+    "[WARN]",
+    "Calibration failed",
+    "Could not determine target F0",
+)
+
+
+def _is_warning(line: str) -> bool:
+    """Check if a line is a warning (regardless of position)."""
+    return any(p in line for p in _WARNING_PATTERNS)
+
+
+# ── Info patterns ─────────────────────────────────────────────────────────────
+
+_INFO_PATTERNS = (
+    "Device:",
+    "Saved:",
+    "Generated in",
+    "Transcribed in",
+    "Done —",
+    "Done -",
+    "Seed:",
+    "Dtype:",
+)
+
+_INFO_PREFIX_RE = re.compile(r"^\s*(Voice|Language|Output|Model|Caption|Duration|Tags|Task|Input|Format):\s")
+
+
+def _is_info(line: str) -> bool:
+    """Check if a line is an info/status line."""
+    stripped = line.strip()
+    if any(p in stripped for p in _INFO_PATTERNS):
+        return True
+    if _INFO_PREFIX_RE.match(stripped):
+        return True
+    if stripped.startswith("✓ ") or "✓ " in stripped:
+        return True
+    return False
+
+
 def parse_stderr_line(line: str, duration_s: float = 0.0) -> ProgressEvent:
     """Parse a single stderr line into a ProgressEvent.
 
-    This is a universal parser that detects the format automatically:
-    - tqdm progress bars → progress event with percent
-    - [i/n] counter lines → progress event with percent
-    - ffmpeg time= lines → progress event with percent (needs duration_s)
-    - Everything else → log event
+    Classification priority:
+    1. tqdm progress bars → progress
+    2. [i/n] counter lines → progress
+    3. ffmpeg time= lines → progress
+    4. Noise (library chatter) → noise
+    5. Errors/tracebacks → error
+    6. Warnings → warning
+    7. Stage labels ("Loading model ...") → stage
+    8. Info lines (Device:, Saved:, etc.) → info
+    9. Everything else → log
     """
     stripped = line.strip()
     if not stripped:
         return ProgressEvent(type="log", message="")
 
-    # Check for tqdm-style progress
+    # 1. Check for tqdm-style progress
     m = _TQDM_RE.search(stripped)
     if m:
         pct = float(m.group(1))
-        return ProgressEvent(type="progress", message=stripped, percent=pct)
+        cur = int(float(m.group(2)))
+        tot = int(float(m.group(3)))
+        # Extract tqdm description (text before "XX%|")
+        desc = stripped[:m.start()].strip().rstrip(":").strip() or None
+        return ProgressEvent(type="progress", message=stripped, percent=pct,
+                             current=cur, total=tot, stage=desc)
 
     m = _TQDM_SIMPLE_RE.search(stripped)
     if m:
         pct = float(m.group(1))
-        return ProgressEvent(type="progress", message=stripped, percent=pct)
+        desc = stripped[:m.start()].strip().rstrip(":").strip() or None
+        return ProgressEvent(type="progress", message=stripped, percent=pct,
+                             stage=desc)
 
-    # Check for [i/n] counter
+    # 2. Check for [i/n] counter
     m = _COUNTER_RE.search(stripped)
     if m:
         current = int(m.group(1))
         total = int(m.group(2))
         pct = (current / total) * 100 if total > 0 else 0
-        return ProgressEvent(type="progress", message=stripped, percent=pct)
+        return ProgressEvent(type="progress", message=stripped, percent=pct,
+                             current=current, total=total)
 
-    # Check for ffmpeg time=
+    # 3. Check for ffmpeg time=
     if duration_s > 0:
         m = _FFMPEG_TIME_RE.search(stripped)
         if m:
@@ -109,36 +225,28 @@ def parse_stderr_line(line: str, duration_s: float = 0.0) -> ProgressEvent:
             pct = min(100.0, (t / duration_s) * 100)
             return ProgressEvent(type="progress", message=stripped, percent=pct)
 
-    # Check for explicit error markers (only real errors, not warnings containing "exception")
+    # 4. Noise — library chatter
+    if is_noise(stripped):
+        return ProgressEvent(type="noise", message=stripped)
+
+    # 5. Errors
     if stripped.startswith("ERROR:") or stripped.startswith("ERROR ") or stripped.startswith("Traceback"):
         return ProgressEvent(type="error", message=stripped)
 
-    # Check for warnings
-    if stripped.startswith("WARNING:") or stripped.startswith("WARNING "):
+    # 6. Warnings
+    if _is_warning(stripped):
         return ProgressEvent(type="warning", message=stripped)
 
-    # Stage-like messages (e.g., "Loading model ...", "Separating stems ...")
-    if stripped.endswith("...") or stripped.endswith("…"):
-        return ProgressEvent(type="stage", message=stripped, stage=stripped.rstrip(".… "))
+    # 7. Stage labels — only Unicode ellipsis (…), never ASCII "..."
+    if stripped.endswith("…"):
+        return ProgressEvent(type="stage", message=stripped, stage=stripped.rstrip("… "))
 
-    # Default: log — everything else is informational
+    # 8. Info lines
+    if _is_info(stripped):
+        return ProgressEvent(type="info", message=stripped)
+
+    # 9. Default: log
     return ProgressEvent(type="log", message=stripped)
-
-
-# Known noise patterns to skip (warnings from conda envs)
-_NOISE_PATTERNS = (
-    "FutureWarning",
-    "UserWarning",
-    "pynvml",
-    "import pynvml",
-    "ds_accelerator",
-    "bitsandbytes",
-)
-
-
-def is_noise(line: str) -> bool:
-    """Check if a stderr line is a known noisy warning."""
-    return any(p in line for p in _NOISE_PATTERNS)
 
 
 # ── Stderr reader ────────────────────────────────────────────────────────────
@@ -267,10 +375,6 @@ def run_worker(
         for line in _iter_stderr_lines(proc):
             stderr_lines.append(line)
 
-            # Skip noise but still collect it in stderr_lines
-            if is_noise(line):
-                continue
-
             event = parse_stderr_line(line, duration_s=duration_s)
             events.append(event)
 
@@ -301,54 +405,107 @@ def run_worker(
 # ── CLI display ───────────────────────────────────────────────────────────────
 
 _last_was_progress = False
-_CLEAR_LINE = "\033[2K"  # ANSI: erase entire line
+_current_stage = ""          # last stage label, used as progress bar prefix
+_CLEAR_LINE = "\033[2K"      # ANSI: erase entire line
+
+# Visual markers
+_MARKER_STAGE   = "●"
+_MARKER_INFO    = "·"
+_MARKER_WARNING = "⚠"
+_MARKER_ERROR   = "✗"
+_MARKER_DONE    = "✓"
+
+
+def _format_bar(percent: float, current: int | None = None,
+                total: int | None = None, label: str = "") -> str:
+    """Build a unified progress bar line: Label  x/n  ██████  %"""
+    bar_width = 30
+    filled = int(bar_width * percent / 100)
+    bar = "█" * filled + "░" * (bar_width - filled)
+
+    parts = []
+    if label:
+        parts.append(label)
+    if current is not None and total is not None:
+        parts.append(f"{current}/{total}")
+    parts.append(bar)
+    parts.append(f"{percent:5.1f}%")
+
+    return "  " + "  ".join(parts)
 
 
 def print_event_tui(event: ProgressEvent):
     """Print a progress event to stderr in TUI format (human-readable).
 
-    While a progress bar is active, log lines are suppressed to keep
-    the bar overwriting on a single line.  Stage/error/warning always
-    break through (they mark a new phase).
+    Progress bars use unified format: Label  x/n  ██████  %
+    Stage/error/warning always break through the progress bar.
+    Noise is suppressed.
     """
-    global _last_was_progress
+    global _last_was_progress, _current_stage
 
     if event.type == "progress" and event.percent is not None:
-        # Counter lines like [1/10] — show step + bar on two lines, update in-place
-        if _COUNTER_RE.search(event.message or ""):
-            if _last_was_progress:
-                # Move up one line (bar) to overwrite previous step+bar
-                print(f"\033[A{_CLEAR_LINE}\r{_CLEAR_LINE}", end="", file=sys.stderr)
-            # Step info line
-            print(f"\r{_CLEAR_LINE}  {event.message}", file=sys.stderr, flush=True)
-        bar_width = 30
-        filled = int(bar_width * event.percent / 100)
-        bar = "█" * filled + "░" * (bar_width - filled)
-        print(f"\r{_CLEAR_LINE}  {bar} {event.percent:5.1f}%",
+        # Counter lines like [1/10] — extract info text above the bar
+        msg = event.message or ""
+        counter_match = _COUNTER_RE.search(msg)
+        label = _current_stage
+        if counter_match:
+            # Extract the description after [i/n]
+            after_counter = msg[counter_match.end():].strip()
+            if after_counter:
+                if _last_was_progress:
+                    # Move up to overwrite previous info+bar
+                    print(f"\033[A{_CLEAR_LINE}\r{_CLEAR_LINE}", end="", file=sys.stderr)
+                # Info line above bar
+                print(f"\r{_CLEAR_LINE}  {_MARKER_INFO} {after_counter}", file=sys.stderr, flush=True)
+            # Don't carry over stale stage label to counter-based progress
+            label = ""
+
+        # Use tqdm description as label if available
+        if event.stage:
+            label = event.stage
+
+        bar_line = _format_bar(
+            event.percent,
+            current=event.current,
+            total=event.total,
+            label=label,
+        )
+        print(f"\r{_CLEAR_LINE}{bar_line}",
               end="", file=sys.stderr, flush=True)
         _last_was_progress = True
 
     elif event.type == "stage":
         if _last_was_progress:
             print("", file=sys.stderr)
-        print(f"\n  {event.message}", file=sys.stderr, flush=True)
+        _current_stage = event.stage or ""
+        print(f"\n  {_MARKER_STAGE} {event.message}", file=sys.stderr, flush=True)
         _last_was_progress = False
 
     elif event.type == "error":
         if _last_was_progress:
             print("", file=sys.stderr)
-        print(f"\n  ERROR: {event.message}", file=sys.stderr, flush=True)
+        print(f"  {_MARKER_ERROR} {event.message}", file=sys.stderr, flush=True)
         _last_was_progress = False
 
     elif event.type == "warning":
-        # suppress warnings while progress bar is active
-        if not _last_was_progress:
-            print(f"  {event.message}", file=sys.stderr, flush=True)
+        if _last_was_progress:
+            print("", file=sys.stderr)
+            _last_was_progress = False
+        print(f"  {_MARKER_WARNING} {event.message}", file=sys.stderr, flush=True)
+
+    elif event.type == "info":
+        # Show info lines only when no progress bar is active
+        if not _last_was_progress and event.message:
+            print(f"  {_MARKER_INFO} {event.message}", file=sys.stderr, flush=True)
+
+    elif event.type == "noise":
+        # Noise is suppressed in TUI
+        pass
 
     else:
         # log — suppress while progress bar is active
         if not _last_was_progress and event.message:
-            print(f"  {event.message}", file=sys.stderr, flush=True)
+            print(f"    {event.message}", file=sys.stderr, flush=True)
 
 
 def print_event_json(event: ProgressEvent):
@@ -362,4 +519,8 @@ print_event = print_event_tui
 
 def finish_progress():
     """Print newline after progress bar output to clean up terminal."""
-    print("", file=sys.stderr)
+    global _last_was_progress, _current_stage
+    if _last_was_progress:
+        print("", file=sys.stderr)
+    _last_was_progress = False
+    _current_stage = ""

@@ -14,7 +14,7 @@ if ! "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} "; then
     exit 1
 fi
 
-echo "Starting RVC API server on port $PORT ..."
+echo "Starting RVC API server on port $PORT …"
 echo "  Stop with Ctrl+C"
 echo ""
 

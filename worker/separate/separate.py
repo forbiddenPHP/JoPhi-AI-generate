@@ -29,9 +29,10 @@ def separate(input_path: Path, output_dir: Path, model_name: str = "htdemucs"):
     """Run demucs stem separation."""
 
     device = get_device()
-    print(f"  Device: {device}")
-    print(f"  Model: {model_name}")
-    print(f"  Input: {input_path}")
+    print(f"Loading separation model …", file=sys.stderr)
+    print(f"Device: {device}", file=sys.stderr)
+    print(f"Model: {model_name}", file=sys.stderr)
+    print(f"Input: {input_path}", file=sys.stderr)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = input_path.stem
@@ -41,12 +42,11 @@ def separate(input_path: Path, output_dir: Path, model_name: str = "htdemucs"):
     from demucs.apply import apply_model
     from demucs.audio import AudioFile
 
-    print("  Loading model ...")
     model = get_model(model_name)
     model.to(device)
 
     # ── Load audio ───────────────────────────────────────────────────────
-    print("  Loading audio ...")
+    print("Loading audio …", file=sys.stderr)
     wav = AudioFile(input_path).read(streams=0, samplerate=model.samplerate,
                                       channels=model.audio_channels)
     ref = wav.mean(0)
@@ -54,18 +54,19 @@ def separate(input_path: Path, output_dir: Path, model_name: str = "htdemucs"):
     wav /= ref.std() + 1e-8
 
     # ── Separate ─────────────────────────────────────────────────────────
-    print("  Separating stems ...")
+    print("Separating stems …", file=sys.stderr)
     sources = apply_model(model, wav[None], device=device, progress=True)[0]
     sources *= ref.std() + 1e-8
     sources += ref.mean()
 
     # ── Write output stems ───────────────────────────────────────────────
+    print("Writing stems …", file=sys.stderr)
     for i, source_name in enumerate(model.sources):
         out_path = output_dir / f"{stem}_{source_name}.wav"
         sf.write(str(out_path), sources[i].cpu().numpy().T, model.samplerate)
-        print(f"  ✓ {out_path.name}")
+        print(f"✓ {out_path.name}", file=sys.stderr)
 
-    print(f"\n  Done — {len(model.sources)} stems written to {output_dir}")
+    print(f"Done — {len(model.sources)} stems written to {output_dir}", file=sys.stderr)
 
 
 def main():
@@ -78,7 +79,7 @@ def main():
     args = parser.parse_args()
 
     if not args.input.exists():
-        print(f"  ERROR: File not found: {args.input}")
+        print(f"ERROR: File not found: {args.input}", file=sys.stderr)
         sys.exit(1)
 
     separate(args.input, args.output, model_name=args.model)

@@ -97,7 +97,12 @@ class HeartCodec(PreTrainedModel):
         latent_length = int(duration * 25)
         latent_list = []
 
-        for sinx in range(0, codes.shape[-1] - hop_samples + 1, hop_samples):
+        # Calculate total number of codec chunks for progress reporting
+        chunk_offsets = list(range(0, codes.shape[-1] - hop_samples + 1, hop_samples))
+        total_chunks = len(chunk_offsets)
+
+        for chunk_idx, sinx in enumerate(chunk_offsets, 1):
+            chunk_desc = f"Decoding chunk {chunk_idx}/{total_chunks}"
             codes_input = []
             codes_input.append(codes[:, :, sinx : sinx + min_samples])
             if sinx == 0 or ovlp_frames == 0:
@@ -111,6 +116,7 @@ class HeartCodec(PreTrainedModel):
                     num_steps=num_steps,
                     disable_progress=disable_progress,
                     scenario="other_seg",
+                    desc=chunk_desc,
                 )
                 latent_list.append(latents)
             else:
@@ -138,6 +144,7 @@ class HeartCodec(PreTrainedModel):
                     num_steps=num_steps,
                     disable_progress=disable_progress,
                     scenario="other_seg",
+                    desc=chunk_desc,
                 )
                 latent_list.append(latents)
 

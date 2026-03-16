@@ -198,7 +198,7 @@ def _run_preprocess(args) -> int:
         print(f"     Failed:    {result['failed']}")
     print(f"     Output:    {result['output_dir']}")
     print(f"\n[INFO] You can now train with:")
-    print(f"       python train.py fixed --dataset-dir {result['output_dir']} ...")
+    print(f"       python train.py fixed --dataset-dir {result['output_dir']} …")
     return 0
 
 
@@ -220,7 +220,7 @@ def _run_estimate(args) -> int:
     print(f"  Top-K:         {getattr(args, 'top_k', 16)}")
     print(f"  Granularity:   {getattr(args, 'granularity', 'module')}")
     print("=" * 60)
-    print(f"[INFO] Running gradient estimation ({num_batches} batches) ...")
+    print(f"[INFO] Running gradient estimation ({num_batches} batches) …")
     try:
         results = run_estimation(
             checkpoint_dir=args.checkpoint_dir,

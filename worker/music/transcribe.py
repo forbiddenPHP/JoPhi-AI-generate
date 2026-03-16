@@ -51,8 +51,9 @@ def transcribe(
     device = get_device()
     dtype = get_dtype()
 
-    print(f"Loading HeartTranscriptor from {ckpt_dir} ...", file=sys.stderr)
-    print(f"  Device: {device}, Dtype: {dtype}", file=sys.stderr)
+    print(f"Loading HeartTranscriptor …", file=sys.stderr)
+    print(f"Device: {device}", file=sys.stderr)
+    print(f"Dtype: {dtype}", file=sys.stderr)
 
     pipe = HeartTranscriptorPipeline.from_pretrained(
         str(ckpt_dir),
@@ -60,7 +61,8 @@ def transcribe(
         dtype=dtype,
     )
 
-    print(f"Transcribing: {audio_path} ...", file=sys.stderr)
+    print(f"Transcribing …", file=sys.stderr)
+    print(f"Input: {audio_path.name}", file=sys.stderr)
     sys.stderr.flush()
     start = time.time()
 

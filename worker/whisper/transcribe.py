@@ -49,6 +49,7 @@ def transcribe_file(
     word_timestamps: bool = False,
 ):
     """Transcribe a single audio file."""
+    print("Loading whisper model …", file=sys.stderr)
     import mlx_whisper
 
     kwargs = {
@@ -189,7 +190,9 @@ def main():
             print(f"ERROR: File not found: {input_path}", file=sys.stderr)
             sys.exit(1)
 
-        print(f"Transcribing: {input_path.name} (model: {args.model})", file=sys.stderr)
+        print(f"Transcribing …", file=sys.stderr)
+        print(f"Input: {input_path.name}", file=sys.stderr)
+        print(f"Model: {args.model}", file=sys.stderr)
         sys.stderr.flush()
 
         try:

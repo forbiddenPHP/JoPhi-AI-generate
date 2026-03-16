@@ -74,7 +74,7 @@ def generate(
     project_root = str(Path(__file__).parent / "ACE-Step-1.5")
 
     print(f"Device: {device}, LM backend: {lm_backend}", file=sys.stderr)
-    print(f"Loading ACE-Step model ({config_path}) ...", file=sys.stderr)
+    print(f"Loading ACE-Step model ({config_path}) …", file=sys.stderr)
     sys.stderr.flush()
 
     # ── Ensure model checkpoint is downloaded ──────────────────────────────
@@ -140,7 +140,7 @@ def generate(
     )
 
     # ── Generate ──────────────────────────────────────────────────────────
-    print(f"Generating music (max {duration_s:.0f}s) ...", file=sys.stderr)
+    print(f"Generating music (max {duration_s:.0f}s) …", file=sys.stderr)
     print(f"  Task: {task_type}", file=sys.stderr)
     if reference_audio:
         print(f"  Reference: {reference_audio}", file=sys.stderr)

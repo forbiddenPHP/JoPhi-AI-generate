@@ -313,7 +313,7 @@ class HeartMuLaGenPipeline:
 
         max_audio_frames = max_audio_length_ms // 80
 
-        for i in tqdm(range(max_audio_frames)):
+        for i in tqdm(range(max_audio_frames), desc="Generating frames"):
             curr_token, curr_token_mask = _pad_audio_token(curr_token)
             with torch.autocast(
                 device_type=self.mula_device.type, dtype=self.mula_dtype

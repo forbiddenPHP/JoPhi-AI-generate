@@ -48,7 +48,7 @@ def run_edit_task(
         st.error("DiT model not loaded.")
         return
 
-    with st.spinner(f"Running {task_type}…"):
+    with st.spinner(f"Running {task_type}..."):
         try:
             result = _generate(
                 task_type=task_type,

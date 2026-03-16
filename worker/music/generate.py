@@ -72,9 +72,9 @@ def generate(
     device = get_device()
     dtype = get_dtype()
 
-    print(f"Loading HeartMuLa model from {ckpt_dir} ...", file=sys.stderr)
-    print(f"  Device: mula={device['mula']}, codec={device['codec']}", file=sys.stderr)
-    print(f"  Dtype:  mula={dtype['mula']}, codec={dtype['codec']}", file=sys.stderr)
+    print("Loading HeartMuLa model …", file=sys.stderr)
+    print(f"Device: mula={device['mula']}, codec={device['codec']}", file=sys.stderr)
+    print(f"Dtype: mula={dtype['mula']}, codec={dtype['codec']}", file=sys.stderr)
 
     # lazy_load only works reliably with CUDA + bitsandbytes
     use_lazy = torch.cuda.is_available()
@@ -94,7 +94,7 @@ def generate(
     lyrics_file.write_text(lyrics, encoding="utf-8")
     tags_file.write_text(tags, encoding="utf-8")
 
-    print(f"Generating music (max {duration_ms / 1000:.0f}s) ...", file=sys.stderr)
+    print(f"Generating music (max {duration_ms / 1000:.0f}s) …", file=sys.stderr)
     sys.stderr.flush()
     start = time.time()
 

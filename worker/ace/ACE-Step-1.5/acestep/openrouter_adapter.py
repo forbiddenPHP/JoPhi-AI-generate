@@ -332,7 +332,7 @@ def _to_generate_music_request(
 
     Audio routing depends on task_type:
       text2music:           audio[0] → reference_audio
-      cover/repaint/lego/…: audio[0] → src_audio, audio[1] → reference_audio
+      cover/repaint/lego/...: audio[0] → src_audio, audio[1] → reference_audio
 
     Uses late import to avoid circular dependency with api_server.
     """

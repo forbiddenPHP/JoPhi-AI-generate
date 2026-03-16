@@ -136,6 +136,8 @@ def main():
     args = parser.parse_args()
 
     device = get_device()
+    mode = "denoise" if args.denoise_only else "enhance-only" if args.enhance_only else "enhance"
+    print(f"Loading enhance model …", file=sys.stderr)
     print(f"Device: {device}", file=sys.stderr)
 
     output_dir = Path(args.output)
@@ -151,7 +153,7 @@ def main():
             sys.exit(1)
 
         out_path = output_dir / input_path.name
-        mode = "denoise" if args.denoise_only else "enhance-only" if args.enhance_only else "enhance"
+        print(f"Enhancing audio …", file=sys.stderr) if total == 1 else None
         print(f"[{i}/{total}] {mode}: {input_path.name}", file=sys.stderr)
 
         try:

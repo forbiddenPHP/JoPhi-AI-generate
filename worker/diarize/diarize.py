@@ -230,15 +230,16 @@ def diarize(input_path: Path, output_dir: Path,
     """Run pyannote diarization, then split audio into speaker tracks."""
 
     device = get_device()
-    print(f"  Device: {device}")
-    print(f"  Input: {input_path}")
+    print(f"Diarizing audio …", file=sys.stderr)
+    print(f"Device: {device}", file=sys.stderr)
+    print(f"Input: {input_path}", file=sys.stderr)
 
     # ── Convert to WAV if needed (pyannote has issues with MP3 sample counts)
     tmp_wav = None
     if input_path.suffix.lower() != ".wav":
         tmp_wav = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
         tmp_wav.close()
-        print(f"  Converting to WAV ...")
+        print(f"Converting to WAV …", file=sys.stderr)
         subprocess.run(
             ["ffmpeg", "-y", "-i", str(input_path), "-ar", "16000", "-ac", "1", tmp_wav.name],
             capture_output=True, check=True,
@@ -255,13 +256,13 @@ def diarize(input_path: Path, output_dir: Path,
         if token_path.exists():
             token = token_path.read_text().strip()
     if not token:
-        print("  ERROR: No HuggingFace token found.")
-        print("  Run: huggingface-cli login")
-        print("  Or set HF_TOKEN env var")
+        print("ERROR: No HuggingFace token found.", file=sys.stderr)
+        print("Run: huggingface-cli login", file=sys.stderr)
+        print("Or set HF_TOKEN env var", file=sys.stderr)
         sys.exit(1)
 
     # ── Load pipeline ─────────────────────────────────────────────────────
-    print("  Loading pyannote pipeline ...")
+    print("Loading pyannote pipeline …", file=sys.stderr)
     os.environ["HF_TOKEN"] = token
     pipeline = Pipeline.from_pretrained(
         "pyannote/speaker-diarization-3.1",
@@ -269,7 +270,7 @@ def diarize(input_path: Path, output_dir: Path,
     pipeline.to(device)
 
     # ── Run diarization ───────────────────────────────────────────────────
-    print("  Diarizing ...")
+    print("Running diarization …", file=sys.stderr)
     diarize_kwargs = {}
     if num_speakers is not None:
         diarize_kwargs["num_speakers"] = num_speakers
@@ -300,13 +301,14 @@ def diarize(input_path: Path, output_dir: Path,
         speaker_segments[speaker].append((turn.start, turn.end))
 
     if not speaker_segments:
-        print("  WARNING: No speakers detected.")
+        print("WARNING: No speakers detected.", file=sys.stderr)
         sys.exit(1)
 
     speakers = sorted(speaker_segments.keys())
-    print(f"  Speakers found: {len(speakers)} ({', '.join(speakers)})")
+    print(f"Speakers found: {len(speakers)} ({', '.join(speakers)})", file=sys.stderr)
 
     # ── Create speaker tracks ─────────────────────────────────────────────
+    print("Writing speaker tracks …", file=sys.stderr)
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = input_path.stem
 
@@ -323,7 +325,7 @@ def diarize(input_path: Path, output_dir: Path,
 
         out_path = output_dir / f"{stem}_{speaker}.wav"
         sf.write(str(out_path), track, sr)
-        print(f"  ✓ {out_path.name}")
+        print(f"✓ {out_path.name}", file=sys.stderr)
 
     # ── Save diarization JSON ─────────────────────────────────────────────
     segments_json = []
@@ -339,7 +341,7 @@ def diarize(input_path: Path, output_dir: Path,
         json.dumps(segments_json, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
-    print(f"  ✓ {json_path.name}")
+    print(f"✓ {json_path.name}", file=sys.stderr)
 
     # ── Verify stats ──────────────────────────────────────────────────────
     if verify:
@@ -347,7 +349,7 @@ def diarize(input_path: Path, output_dir: Path,
         verify_transcription(speaker_segments, speakers, data, sr,
                              output_dir, stem)
 
-    print(f"\n  Done — {len(speakers)} speaker tracks written to {output_dir}")
+    print(f"Done — {len(speakers)} speaker tracks written to {output_dir}", file=sys.stderr)
 
 
 def main():
@@ -371,7 +373,7 @@ def main():
         # Run stats on existing JSON without loading pyannote
         diarize_json = args.output / f"{args.input.stem}_diarize.json"
         if not diarize_json.exists():
-            print(f"  ERROR: {diarize_json} not found.")
+            print(f"ERROR: {diarize_json} not found.", file=sys.stderr)
             sys.exit(1)
         segments = json.loads(diarize_json.read_text(encoding="utf-8"))
         total_duration = max(s["end"] for s in segments)
@@ -380,7 +382,7 @@ def main():
         return
 
     if not args.input.exists():
-        print(f"  ERROR: File not found: {args.input}")
+        print(f"ERROR: File not found: {args.input}", file=sys.stderr)
         sys.exit(1)
 
     diarize(args.input, args.output,

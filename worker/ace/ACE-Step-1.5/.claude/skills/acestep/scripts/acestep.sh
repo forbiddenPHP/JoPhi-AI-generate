@@ -1203,7 +1203,7 @@ show_help() {
     echo ""
     echo "Output:"
     echo "  Results saved to: $OUTPUT_DIR/<job_id>.json"
-    echo "  Audio files: $OUTPUT_DIR/<job_id>_1.mp3, ..."
+    echo "  Audio files: $OUTPUT_DIR/<job_id>_1.mp3, …"
     echo ""
     echo "Generate Options:"
     echo "  -c, --caption       Music style/genre description (caption mode)"

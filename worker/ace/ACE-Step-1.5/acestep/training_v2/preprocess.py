@@ -9,7 +9,7 @@ loads models **sequentially** to minimise peak VRAM:
     Pass 2 (Heavy ~6 GB):  DIT encoder          -> final ``.pt``
 
 Input modes:
-    * With ``--dataset-json``: rich per-sample metadata (lyrics, genre, BPM, …)
+    * With ``--dataset-json``: rich per-sample metadata (lyrics, genre, BPM, ...)
     * Without JSON: scan directory, default to ``[Instrumental]``, filename caption
 """
 
