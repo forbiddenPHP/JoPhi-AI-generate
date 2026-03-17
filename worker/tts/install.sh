@@ -91,6 +91,13 @@ else
     echo "    pip install mlx-audio soundfile"
 fi
 
+# Patch: lower ICL repetition penalty for voice cloning (1.5 is too aggressive, cuts off text)
+QWEN_TTS_PY=$("$CONDA_BIN" run -n "$ENV_NAME" python -c "import mlx_audio; from pathlib import Path; print(Path(mlx_audio.__file__).parent / 'tts/models/qwen3_tts/qwen3_tts.py')" 2>/dev/null)
+if [ -f "$QWEN_TTS_PY" ] && grep -q "max(repetition_penalty, 1.5)" "$QWEN_TTS_PY"; then
+    sed -i '' 's/max(repetition_penalty, 1.5)/max(repetition_penalty, 1.2)/' "$QWEN_TTS_PY"
+    echo "  Patched: ICL rep_penalty 1.5 → 1.2"
+fi
+
 echo ""
 echo -e "${GREEN}✓${NC} AI-TTS Worker ready"
 echo ""

@@ -139,7 +139,7 @@ def verify_stats(segments_json: list[dict], total_duration: float,
 
 CONDA_BIN = "/opt/miniconda3/bin/conda"
 SCRIPT_DIR = Path(__file__).resolve().parent
-PROJECT_DIR = SCRIPT_DIR.parent
+PROJECT_DIR = SCRIPT_DIR.parent.parent
 
 
 def verify_transcription(speaker_segments: dict[str, list[tuple[float, float]]],

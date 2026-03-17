@@ -7,7 +7,7 @@ CLI for voice synthesis, voice conversion, audio enhancement, AI music generatio
 ## Quick Setup
 
 ```bash
-# 1. Install all environments (10 conda envs + 1 uv project)
+# 1. Install all environments (11 conda envs + 1 uv project)
 bash setup.sh
 
 # 2. Activate main env
@@ -17,8 +17,8 @@ conda activate tts-mist
 python generate.py server start
 
 # 4. Install a voice model
-python generate.py models search "neutral male"
-python generate.py models install User/ModelName
+python generate.py models --engine rvc search "neutral male"
+python generate.py models --engine rvc install User/ModelName
 
 # 5. Ready!
 python generate.py voice --engine rvc --model my-voice input.wav
@@ -57,11 +57,12 @@ generate.py <medium> --engine <backend> [--model <variant>] [input] [options]
 | `audio` | `diarize` | Speaker diarization |
 | `text` | `whisper` | Audio transcription |
 | `text` | `heartmula-transcribe` | Lyrics extraction |
+| `text` | `ollama` | LLM inference via Ollama |
 | `output` | `audio-concatenate` | Concatenate audio files (with per-clip trim, fades, volume, crossfade) |
 | `output` | `audio-mucs` | Mix/overlay audio files in parallel (with per-clip trim, fades, volume, pan) |
 | `server` | — | RVC worker management |
-| `models` | — | Model install/search/remove |
-| `ps` | — | System status |
+| `models` | `rvc`, `ollama`, `huggingface` | Model management (per engine) |
+| `ps` | — | Active models across all engines |
 
 Future mediums (stubs): `image`, `video`, `vision`, `translation`, `comparison`
 
@@ -287,7 +288,7 @@ When neither `--pitch` nor `--target-hz` is set:
 3. Computes pitch shift: `semitones = 12 * log2(target_f0 / input_f0)`
 4. Applies the shift via RVC's `f0up_key` parameter
 
-If the model has no `target_f0`, run `models set-pitch` first.
+If the model has no `target_f0`, run `models --engine rvc set-pitch` first.
 
 **Implicit behaviors:**
 - Non-WAV files are auto-converted to WAV (44.1 kHz) via ffmpeg
@@ -558,6 +559,88 @@ python generate.py text --engine heartmula-transcribe song.mp3 -o lyrics.txt
 
 ---
 
+### LLM Inference (`text --engine ollama`)
+
+Unified interface for local LLM inference via Ollama.
+
+```bash
+# Chat (messages as JSON string or file)
+python generate.py text --engine ollama --model qwen3.5:latest --endpoint chat \
+  --messages '[{"role":"user","content":"Hello!"}]'
+python generate.py text --engine ollama --model qwen3.5:latest --endpoint chat \
+  --messages chat.json --stream
+
+# Generate (prompt + optional system)
+python generate.py text --engine ollama --model qwen3.5:latest --endpoint generate \
+  --prompt "Explain quantum computing" --system "You are a physicist"
+
+# Thinking (enable reasoning for supported models)
+python generate.py text --engine ollama --model qwen3.5:latest --endpoint chat \
+  --messages '[{"role":"user","content":"What is 15*17?"}]' --thinking True --stream
+
+# Vision (attach local images)
+python generate.py text --engine ollama --model qwen3.5:latest --endpoint chat \
+  --messages '[{"role":"user","content":"What do you see?"}]' --images photo.jpg
+
+# Vision (image URLs in prompt — auto-downloaded)
+python generate.py text --engine ollama --model qwen3.5:latest --endpoint chat \
+  --messages '[{"role":"user","content":"Describe this. https://example.com/photo.jpg"}]'
+
+# Config management (persistent default overrides)
+python generate.py text --engine ollama --model qwen3.5:latest --endpoint set \
+  --context-length 256000 --temperature 0.7
+python generate.py text --engine ollama --model qwen3.5:latest --endpoint show
+python generate.py text --engine ollama --model qwen3.5:latest --endpoint reset
+
+# Load/unload models
+python generate.py text --engine ollama --model qwen3.5:latest --endpoint load
+python generate.py text --engine ollama --model qwen3.5:latest --endpoint unload
+```
+
+Supported params: `--context-length`, `--max-tokens`, `--temperature`, `--top-p`, `--top-k`, `--repeat-penalty`, `--seed`, `--stop`, `--stream`, `--thinking`, `--images`.
+
+---
+
+### Model Management (`models`)
+
+Per-engine model management. `--engine` required for all subcommands except `list`.
+
+```bash
+# List all engines
+python generate.py models list
+
+# Ollama
+python generate.py models --engine ollama list
+python generate.py models --engine ollama pull qwen3.5:latest
+python generate.py models --engine ollama show qwen3.5:latest
+python generate.py models --engine ollama remove qwen3.5:latest
+python generate.py models --engine ollama unload qwen3.5:latest
+
+# HuggingFace
+python generate.py models --engine huggingface list
+python generate.py models --engine huggingface search "qwen vision"
+python generate.py models --engine huggingface pull Qwen/Qwen2.5-VL-7B
+```
+
+---
+
+### Process Status (`ps`)
+
+Shows active/loaded models across all engines.
+
+```bash
+python generate.py ps
+python generate.py ps --screen-log-format json
+```
+
+```
+MODEL                          ENGINE        STATUS     VRAM        CTX        EXTRA
+gerhard-v2                     rvc           loaded     -           -          target: 120 Hz
+qwen3.5:latest                 ollama        running    13.2 GB     131072     qwen35 Q4_K_M
+```
+
+---
+
 ### Audio Concatenation (`output --engine audio-concatenate`)
 
 Concatenate multiple audio files into one. Supports per-clip trim, volume, fades, and crossfade via `--clip`.
@@ -639,18 +722,19 @@ All inputs are normalized to 44100 Hz stereo. Output is passed through `alimiter
 ### Model Management (`models`)
 
 ```bash
-python generate.py models list
-python generate.py models search "female singer"
-python generate.py models search "anime" --limit 50
-python generate.py models install User/ModelRepo
-python generate.py models install User/MultiModelRepo --file "specific_voice"
-python generate.py models install User/Repo --name "my-custom-name"
-python generate.py models install "https://example.com/model.zip"
-python generate.py models remove my-model
-python generate.py models calibrate my-model        # guess target F0 from model name (heuristic)
-python generate.py models set-pitch my-model 120   # male ~120 Hz
-python generate.py models set-pitch my-model 220   # female ~220 Hz
-python generate.py models set-pitch my-model 280   # child ~280 Hz
+python generate.py models list                                          # all engines
+python generate.py models --engine rvc list                             # RVC only
+python generate.py models --engine rvc search "female singer"
+python generate.py models --engine rvc search "anime" --limit 50
+python generate.py models --engine rvc install User/ModelRepo
+python generate.py models --engine rvc install User/MultiModelRepo --file "specific_voice"
+python generate.py models --engine rvc install User/Repo --name "my-custom-name"
+python generate.py models --engine rvc install "https://example.com/model.zip"
+python generate.py models --engine rvc remove my-model
+python generate.py models --engine rvc calibrate my-model        # guess target F0 from model name (heuristic)
+python generate.py models --engine rvc set-pitch my-model 120   # male ~120 Hz
+python generate.py models --engine rvc set-pitch my-model 220   # female ~220 Hz
+python generate.py models --engine rvc set-pitch my-model 280   # child ~280 Hz
 ```
 
 <details>
@@ -701,7 +785,7 @@ Shows installed models, target pitch settings, server status, and supported form
 <details>
 <summary><strong>Environments</strong></summary>
 
-`setup.sh` creates 10 isolated conda environments + 1 uv project:
+`setup.sh` creates 11 isolated conda environments + 1 uv project:
 
 | Env | Python | Manager | Purpose |
 |-----|--------|---------|---------|
@@ -715,6 +799,7 @@ Shows installed models, target pitch settings, server status, and supported form
 | `ai-tts` | 3.11 | conda | Qwen3-TTS neural speech (mlx-audio) |
 | `lang-detect` | 3.11 | conda | Language detection (langdetect) |
 | `ezaudio` | 3.10 | conda | Sound effects generation (EzAudio) |
+| `text` | 3.11 | conda | LLM inference (ollama, Pillow, requests) — auto-updates |
 | `ace` (uv) | 3.11+ | uv | ACE-Step 1.5 music generation |
 
 </details>
@@ -726,6 +811,8 @@ Each worker has a local `wheels/` directory with cached `.whl` files and `requir
 1. `wheels/` present → Offline install from local wheels
 2. `requirements.lock` → Online install with pinned versions
 3. Neither → Fallback to PyPI, then generate lockfile
+
+**Exception:** The **text** worker has no pinned wheels. It installs `ollama` directly from PyPI and auto-updates the package once per day on first use.
 
 </details>
 

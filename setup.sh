@@ -108,67 +108,73 @@ echo -e "${GREEN}✓${NC} Prerequisites OK"
 # ── Step 1: RVC Worker Env ───────────────────────────────────────────────────
 
 echo ""
-echo "── Step 1/11: RVC Worker ──"
+echo "── Step 1/12: RVC Worker ──"
 bash "$SCRIPT_DIR/worker/rvc/install.sh"
 
 # ── Step 2: Enhance Worker Env ───────────────────────────────────────────────
 
 echo ""
-echo "── Step 2/11: Enhance Worker ──"
+echo "── Step 2/12: Enhance Worker ──"
 bash "$SCRIPT_DIR/worker/enhance/install.sh"
 
 # ── Step 3: HeartMuLa Music Worker Env ───────────────────────────────────────
 
 echo ""
-echo "── Step 3/11: HeartMuLa Music Worker ──"
+echo "── Step 3/12: HeartMuLa Music Worker ──"
 bash "$SCRIPT_DIR/worker/music/install.sh"
 
 # ── Step 4: ACE-Step Music Worker (uv) ───────────────────────────────────────
 
 echo ""
-echo "── Step 4/11: ACE-Step Music Worker ──"
+echo "── Step 4/12: ACE-Step Music Worker ──"
 bash "$SCRIPT_DIR/worker/ace/install.sh"
 
 # ── Step 5: Whisper Worker Env ────────────────────────────────────────────────
 
 echo ""
-echo "── Step 5/11: Whisper Worker ──"
+echo "── Step 5/12: Whisper Worker ──"
 bash "$SCRIPT_DIR/worker/whisper/install.sh"
 
 # ── Step 6: Diarize Worker Env ───────────────────────────────────────────────
 
 echo ""
-echo "── Step 6/11: Diarize Worker ──"
+echo "── Step 6/12: Diarize Worker ──"
 bash "$SCRIPT_DIR/worker/diarize/install.sh"
 
 # ── Step 7: Separate Worker Env ──────────────────────────────────────────────
 
 echo ""
-echo "── Step 7/11: Separate Worker ──"
+echo "── Step 7/12: Separate Worker ──"
 bash "$SCRIPT_DIR/worker/separate/install.sh"
 
 # ── Step 8: AI-TTS Worker Env ────────────────────────────────────────────────
 
 echo ""
-echo "── Step 8/11: AI-TTS Worker ──"
+echo "── Step 8/12: AI-TTS Worker ──"
 bash "$SCRIPT_DIR/worker/tts/install.sh"
 
 # ── Step 9: Language Detect Worker Env ───────────────────────────────────────
 
 echo ""
-echo "── Step 9/11: Language Detect Worker ──"
+echo "── Step 9/12: Language Detect Worker ──"
 bash "$SCRIPT_DIR/worker/langdetect/install.sh"
 
 # ── Step 10: SFX Worker Env ─────────────────────────────────────────────────
 
 echo ""
-echo "── Step 10/11: SFX Worker (EzAudio) ──"
+echo "── Step 10/12: SFX Worker (EzAudio) ──"
 bash "$SCRIPT_DIR/worker/sfx/install.sh"
 
-# ── Step 11: Main App Env ────────────────────────────────────────────────────
+# ── Step 11: Text Worker Env ─────────────────────────────────────────────────
 
 echo ""
-echo "── Step 11/11: Main App (tts-mist) ──"
+echo "── Step 11/12: Text Worker ──"
+bash "$SCRIPT_DIR/worker/text/install.sh"
+
+# ── Step 12: Main App Env ────────────────────────────────────────────────────
+
+echo ""
+echo "── Step 12/12: Main App (tts-mist) ──"
 
 ENV_NAME="tts-mist"
 
@@ -250,6 +256,13 @@ if [ -d "$MODELS_DIR" ]; then
         mkdir -p "$SCRIPT_DIR/worker/sfx/ckpts"
         cp -a "$MODELS_DIR/sfx_ckpts/." "$SCRIPT_DIR/worker/sfx/ckpts/"
         echo -e "  ${GREEN}✓${NC} EzAudio checkpoints restored"
+    fi
+
+    # Text worker configs (LLM default overrides) → worker/text/models/
+    if [ -d "$MODELS_DIR/text_configs" ]; then
+        mkdir -p "$SCRIPT_DIR/worker/text/models"
+        cp -a "$MODELS_DIR/text_configs/." "$SCRIPT_DIR/worker/text/models/"
+        echo -e "  ${GREEN}✓${NC} Text worker configs restored"
     fi
 
     echo -e "  ${GREEN}✓${NC} Model restore complete"
@@ -397,8 +410,8 @@ echo "    # Show available models"
 echo "    python generate.py ps"
 echo ""
 echo "    # Install a voice model"
-echo "    python generate.py models search \"neutral male\""
-echo "    python generate.py models install <model-id>"
+echo "    python generate.py models --engine rvc search \"neutral male\""
+echo "    python generate.py models --engine rvc install <model-id>"
 echo ""
 echo "    # Voice conversion"
 echo "    python generate.py voice --engine rvc --model my-voice input.wav -o output/"

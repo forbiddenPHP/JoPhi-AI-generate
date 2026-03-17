@@ -38,12 +38,15 @@ from typing import Callable, Optional
 class ProgressEvent:
     """Structured event emitted by a worker parser."""
     type: str               # "progress" | "stage" | "info" | "warning" | "error" | "noise" | "log"
+                            # | "env_update" | "env_update_done"
+                            # | "inference_gotcha" | "inference_mode" | "inference_token" | "inference_result"
     message: str            # raw line or parsed message
     percent: float | None = None
     current: int | None = None    # counter: current step
     total: int | None = None      # counter: total steps
     stage: str | None = None
     chunk: int | None = None      # chunk index (1-based), set when progress resets
+    data: dict | None = None      # structured payload for @inference: events
     ts: float = 0.0
 
     def __post_init__(self):
@@ -51,6 +54,13 @@ class ProgressEvent:
             self.ts = time.time()
 
     def to_json(self) -> str:
+        # Inference events: merge data fields up, drop raw message + redundant event key
+        if self.data is not None:
+            d = {"type": self.type, "ts": self.ts}
+            for k, v in self.data.items():
+                if k != "event":  # type already carries this
+                    d[k] = v
+            return json.dumps(d, ensure_ascii=False)
         d = {"type": self.type, "message": self.message, "ts": self.ts}
         if self.percent is not None:
             d["percent"] = round(self.percent, 1)
@@ -189,6 +199,18 @@ def parse_stderr_line(line: str, duration_s: float = 0.0) -> ProgressEvent:
     stripped = line.strip()
     if not stripped:
         return ProgressEvent(type="log", message="")
+
+    # 0. Check for @inference: structured events (from text worker)
+    if stripped.startswith("@inference:"):
+        try:
+            payload = json.loads(stripped[11:])
+            return ProgressEvent(
+                type=payload.get("event", "log"),
+                message=stripped,
+                data=payload,
+            )
+        except json.JSONDecodeError:
+            pass  # fall through to normal parsing
 
     # 1. Check for tqdm-style progress
     m = _TQDM_RE.search(stripped)
@@ -373,6 +395,10 @@ def run_worker(
     # Stream stderr — runs until process exits and stderr is drained
     try:
         for line in _iter_stderr_lines(proc):
+            # Filter CUDA-only triton noise (irrelevant on macOS/Apple Silicon)
+            if "triton" in line.lower():
+                continue
+
             stderr_lines.append(line)
 
             event = parse_stderr_line(line, duration_s=duration_s)
@@ -389,6 +415,11 @@ def run_worker(
     stdout_thread.join(timeout=10)
 
     stdout_text = b"".join(stdout_chunks).decode("utf-8", errors="replace")
+
+    # Filter triton noise from stdout (CUDA-only, irrelevant on macOS)
+    stdout_text = "\n".join(
+        l for l in stdout_text.splitlines() if "triton" not in l.lower()
+    )
 
     # Build stderr tail for error reporting
     tail_lines = stderr_lines[-20:] if stderr_lines else []
@@ -497,6 +528,44 @@ def print_event_tui(event: ProgressEvent):
         # Show info lines only when no progress bar is active
         if not _last_was_progress and event.message:
             print(f"  {_MARKER_INFO} {event.message}", file=sys.stderr, flush=True)
+
+    elif event.type == "env_update":
+        msg = event.data.get("message", "Updating environment …") if event.data else "Updating environment …"
+        if _last_was_progress:
+            print("", file=sys.stderr)
+        print(f"  {_MARKER_INFO} {msg}", file=sys.stderr, flush=True)
+        _last_was_progress = False
+
+    elif event.type == "env_update_done":
+        msg = event.data.get("message", "Done.") if event.data else "Done."
+        print(f"  {_MARKER_INFO} {msg}", file=sys.stderr, flush=True)
+
+    elif event.type == "inference_gotcha":
+        if _last_was_progress:
+            print("", file=sys.stderr)
+        print(f"\n  {_MARKER_STAGE} Inference …", file=sys.stderr, flush=True)
+        _last_was_progress = False
+
+    elif event.type == "inference_mode":
+        mode = event.data.get("mode", "?") if event.data else "?"
+        print_event_tui._inference_mode = mode
+        print(f"  {_MARKER_INFO} Mode: {mode}", file=sys.stderr, flush=True)
+
+    elif event.type == "inference_token":
+        text = event.data.get("text", "") if event.data else ""
+        if text:
+            print(text, end="", file=sys.stderr, flush=True)
+        _last_was_progress = False
+
+    elif event.type == "inference_result":
+        # After streaming: just newline. After sync: print full text.
+        mode = getattr(print_event_tui, "_inference_mode", "sync")
+        text = event.data.get("text", "") if event.data else ""
+        if mode == "stream":
+            print("", file=sys.stderr, flush=True)
+        elif text:
+            print(text, file=sys.stderr, flush=True)
+        _last_was_progress = False
 
     elif event.type == "noise":
         # Noise is suppressed in TUI

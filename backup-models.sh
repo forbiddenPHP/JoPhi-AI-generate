@@ -124,6 +124,17 @@ else
     echo "  ── Demucs models: not found, skipping"
 fi
 
+# ── Text worker configs (LLM default overrides) ─────────────────────────────
+
+TEXT_CONFIGS="$SCRIPT_DIR/worker/text/models"
+if [ -d "$TEXT_CONFIGS" ] && [ "$(find "$TEXT_CONFIGS" -name 'config.json' 2>/dev/null | head -1)" ]; then
+    echo "  Backing up text worker configs ..."
+    cp -a "$TEXT_CONFIGS" "$MODELS_DIR/text_configs"
+    echo -e "  ${GREEN}✓${NC} Text configs ($(du -sh "$MODELS_DIR/text_configs" | cut -f1))"
+else
+    echo "  ── Text worker configs: not found, skipping"
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 
 echo ""

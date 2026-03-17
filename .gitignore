@@ -1,6 +1,7 @@
-# Model weights & checkpoints (multi-GB)
+# Model weights & checkpoints (multi-GB) + model configs (backed up via backup-models.sh)
 worker/music/models/
 worker/rvc/models/
+worker/text/models/
 rvc_models/
 worker/enhance/resemble-enhance/
 

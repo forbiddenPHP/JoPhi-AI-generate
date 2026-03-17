@@ -38,12 +38,13 @@ Usage:
   python generate.py output --engine audio-concatenate a.wav b.mp3 -o out.wav  Concatenate audio files
   python generate.py output --engine audio-concatenate a.wav b.wav --output-bitrate 320k -o out.mp3
   python generate.py output --engine audio-concatenate a.wav b.wav c.mp3 --clip 0:fade-in=0.3 --clip 1:crossfade=0.5,volume=1.2 --clip 2:fade-out=0.5 -o out.mp3
-  python generate.py models list                           List installed models
-  python generate.py models search "neutral male"          Search HuggingFace
-  python generate.py models install <id-or-url>            Download from HuggingFace or URL
-  python generate.py models remove <name>                  Remove a model
-  python generate.py models set-pitch <name> <hz>          Set target pitch manually
-  python generate.py models calibrate <name>               Auto-detect target pitch
+  python generate.py models list                                          List all models
+  python generate.py models --engine rvc list                              List RVC models
+  python generate.py models --engine rvc search "neutral male"             Search HuggingFace
+  python generate.py models --engine rvc install <id-or-url>               Download from HuggingFace or URL
+  python generate.py models --engine rvc remove <name>                     Remove a model
+  python generate.py models --engine rvc set-pitch <name> <hz>             Set target pitch manually
+  python generate.py models --engine rvc calibrate <name>                  Auto-detect target pitch
   python generate.py server start                          Start RVC worker
   python generate.py server stop                           Stop RVC worker
   python generate.py server status                         Check worker status
@@ -109,6 +110,9 @@ LANGDETECT_WORKER = SCRIPT_DIR / "worker" / "langdetect" / "detect.py"
 SFX_WORKER_DIR = SCRIPT_DIR / "worker" / "sfx"
 SFX_ENV = "ezaudio"
 # Voice cloning uses Qwen3-TTS Base via TTS_WORKER_DIR / TTS_ENV
+TEXT_WORKER_DIR = SCRIPT_DIR / "worker" / "text"
+TEXT_MODELS_DIR = SCRIPT_DIR / "worker" / "text" / "models"
+TEXT_ENGINES_FILE = SCRIPT_DIR / "worker" / "text" / "engines.json"
 
 
 def _find_uv() -> Path:
@@ -280,22 +284,62 @@ def cmd_server_status(args):
 
 # ── Models ───────────────────────────────────────────────────────────────────
 
-def cmd_models_list(args):
+def cmd_models(args):
+    """Models dispatcher — enforce --engine for non-list subcommands."""
+    if not args.models_cmd:
+        build_parser().parse_args(["models", "--help"])
+        return
+    if args.models_cmd != "list" and not args.engine:
+        _emit(f"ERROR: --engine required for 'models {args.models_cmd}'", "error")
+        _emit(f"  Example: python generate.py models --engine rvc {args.models_cmd} ...")
+        sys.exit(1)
+
+    # Validate subcommand is valid for engine
+    engine = args.engine
+    if engine and args.models_cmd:
+        allowed = _MODELS_ENGINE_CMDS.get(engine, set())
+        if args.models_cmd not in allowed:
+            _emit(f"ERROR: '{args.models_cmd}' not supported for engine '{engine}'", "error")
+            _emit(f"  Valid: {', '.join(sorted(allowed))}")
+            sys.exit(1)
+
+    args.models_func(args)
+
+
+def _models_list_rvc():
+    """List RVC voice models."""
     data = api_get("/models")
     models = data.get("models", [])
     if not models:
-        _emit("No models installed.")
-        _emit("  Search: python generate.py models search \"neutral male\"")
-        _emit("  Install: python generate.py models install <hf-model-id>")
+        _emit("No RVC models installed.")
+        _emit("  Search: python generate.py models --engine rvc search \"neutral male\"")
+        _emit("  Install: python generate.py models --engine rvc install <hf-model-id>")
         return
-
-    _emit(f"Installed models ({len(models)}):\n")
+    _emit(f"RVC models ({len(models)}):\n")
     for m in models:
         if isinstance(m, str):
             _emit(f"  {m}")
         else:
             name = m.get("name", m.get("model_name", str(m)))
             _emit(f"  {name}")
+
+
+def cmd_models_list(args):
+    engine = getattr(args, "engine", None)
+    if engine is None:
+        # List all engines
+        _models_list_rvc()
+        print()
+        _models_list_ollama(args)
+        print()
+        _models_list_huggingface(args)
+        print()
+    elif engine == "rvc":
+        _models_list_rvc()
+    elif engine == "ollama":
+        _models_list_ollama(args)
+    elif engine == "huggingface":
+        _models_list_huggingface(args)
 
 
 def _check_rvc_repo(repo_id: str, files: list[str]) -> tuple[bool, list[str], list[str]]:
@@ -365,6 +409,11 @@ def _search_voice_models_com(query: str, limit: int = 25) -> list[dict]:
 
 
 def cmd_models_search(args):
+    engine = getattr(args, "engine", None)
+    if engine == "huggingface":
+        _models_search_huggingface(args)
+        return
+    # Default: RVC search
     query = args.query
     _emit(f'Searching for: "{query}" ...', "stage")
 
@@ -748,6 +797,14 @@ def cmd_models_set_f0(args):
 
 
 def cmd_models_remove(args):
+    engine = getattr(args, "engine", None)
+    if engine == "ollama":
+        _models_rm_ollama(args)
+        return
+    if engine == "huggingface":
+        _models_rm_huggingface(args)
+        return
+    # Default: RVC
     _emit(f"Removing model '{args.name}' …", "stage")
     try:
         r = requests.delete(f"{RVC_API_URL}/models/{args.name}", timeout=10)
@@ -757,6 +814,423 @@ def cmd_models_remove(args):
             _emit(f"API returned {r.status_code}: {r.text}", "error")
     except Exception as e:
         _emit(f"ERROR: {e}", "error")
+
+
+def cmd_models_pull(args):
+    """Pull model — dispatches to engine-specific pull."""
+    engine = args.engine
+    if engine == "ollama":
+        _models_pull_ollama(args)
+    elif engine == "huggingface":
+        _models_pull_huggingface(args)
+    else:
+        _emit(f"ERROR: 'pull' not supported for engine '{engine}'", "error")
+        sys.exit(1)
+
+
+def cmd_models_show(args):
+    """Show model details — dispatches to engine-specific show."""
+    engine = args.engine
+    if engine == "ollama":
+        _models_show_ollama(args)
+    else:
+        _emit(f"ERROR: 'show' not supported for engine '{engine}'", "error")
+        sys.exit(1)
+
+
+def cmd_models_load(args):
+    """Load model — dispatches to engine-specific load."""
+    _emit(f"ERROR: 'load' not supported for engine '{args.engine}'", "error")
+    sys.exit(1)
+
+
+def cmd_models_unload(args):
+    """Unload model — dispatches to engine-specific unload."""
+    engine = args.engine
+    if engine == "ollama":
+        _models_unload_ollama(args)
+    else:
+        _emit(f"ERROR: 'unload' not supported for engine '{engine}'", "error")
+        sys.exit(1)
+
+
+# ── Models — LLM Engines ────────────────────────────────────────────────────
+
+def _models_engine_conn(engine: str, args):
+    """Get base_url + api_key for an LLM engine from args/config."""
+    base_url = _llm_engine_base_url(engine, args)
+    api_key = _llm_api_key(engine, args)
+    return base_url, api_key
+
+
+def _models_list_ollama(args):
+    """List models in Ollama."""
+    base_url, api_key = _models_engine_conn("ollama", args)
+    data = _llm_get("ollama", base_url, "/api/tags", api_key)
+    if data is None:
+        _emit("Ollama: (offline)")
+        return
+    models = data.get("models", [])
+    if not models:
+        _emit("Ollama: no models installed.")
+        return
+    _emit(f"Ollama models ({len(models)}):\n")
+    for m in models:
+        name = m.get("name", "?")
+        size_gb = m.get("size", 0) / (1024**3)
+        details = m.get("details", {})
+        family = details.get("family", "")
+        quant = details.get("quantization_level", "")
+        extra = f"  {family} {quant}".strip() if (family or quant) else ""
+        _emit(f"  {name:<30s} {size_gb:>5.1f} GB{extra}")
+
+
+_OLLAMA_ENV_UPDATE_STAMP = TEXT_WORKER_DIR / ".last-update-check"
+_OLLAMA_MODEL_UPDATE_STAMP = TEXT_WORKER_DIR / ".last-model-update"
+
+
+def _ollama_maybe_update_env():
+    """Once per day: pip upgrade ollama in the text env."""
+    if _OLLAMA_ENV_UPDATE_STAMP.exists():
+        age = time.time() - _OLLAMA_ENV_UPDATE_STAMP.stat().st_mtime
+        if age < 86400:
+            return
+    _emit("Checking for ollama package updates …")
+    result = subprocess.run(
+        [str(CONDA_BIN), "run", "-n", TEXT_ENV,
+         "pip", "install", "--upgrade", "ollama"],
+        capture_output=True, text=True, timeout=120,
+    )
+    out = result.stdout.strip()
+    if out and "Successfully installed" in out:
+        msg = out.split("\n")[-1]
+        _emit(msg)
+    else:
+        _emit("Environment up to date.")
+    _OLLAMA_ENV_UPDATE_STAMP.touch()
+
+
+def _ollama_maybe_update_models():
+    """Once per day: pull all local Ollama models to check for updates + ensure num_ctx."""
+    if _OLLAMA_MODEL_UPDATE_STAMP.exists():
+        age = time.time() - _OLLAMA_MODEL_UPDATE_STAMP.stat().st_mtime
+        if age < 86400:
+            return
+
+    base_url = "http://localhost:11434"
+    if TEXT_ENGINES_FILE.exists():
+        cfg = json.loads(TEXT_ENGINES_FILE.read_text())
+        base_url = cfg.get("ollama", {}).get("base_url", base_url)
+
+    # Get list of local models
+    data = _llm_get("ollama", base_url, "/api/tags", None)
+    if data is None:
+        return  # Ollama not running
+
+    models = data.get("models", [])
+    if not models:
+        _OLLAMA_MODEL_UPDATE_STAMP.touch()
+        return
+
+    _emit("Checking Ollama models for updates …", "stage")
+    for m in models:
+        name = m.get("name", m.get("model", ""))
+        if not name:
+            continue
+        # Pull (no-op if already up to date)
+        result = subprocess.run(["ollama", "pull", name],
+                                capture_output=True, text=True, timeout=600)
+        if result.returncode == 0:
+            # Ensure num_ctx is set to max
+            _ollama_set_max_context(base_url, None, name)
+
+    _OLLAMA_MODEL_UPDATE_STAMP.touch()
+    _emit("Model update check complete.")
+
+
+def _ollama_set_max_context(base_url: str, api_key: str | None, model: str):
+    """Set num_ctx to the model's maximum supported context length.
+
+    Queries /api/show for the model's architecture context_length,
+    then applies it via `ollama create` with a Modelfile.
+    """
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    # Get model info
+    try:
+        resp = requests.post(f"{base_url}/api/show", json={"name": model},
+                             headers=headers, timeout=30)
+        resp.raise_for_status()
+        info = resp.json()
+    except Exception:
+        return  # non-fatal — model works fine with default ctx
+
+    # Find max context: model_info has keys like "<arch>.context_length"
+    model_info = info.get("model_info", {})
+    max_ctx = None
+    for key, val in model_info.items():
+        if key.endswith(".context_length") and isinstance(val, (int, float)):
+            max_ctx = int(val)
+            break
+
+    if not max_ctx:
+        return
+
+    # Check current Modelfile — skip if num_ctx already set
+    modelfile = info.get("modelfile", "")
+    if "num_ctx" in modelfile.lower():
+        _emit(f"  num_ctx already set ({max_ctx:,d}), skipping.")
+        return
+
+    # Apply via ollama CLI (API /api/create changed in 0.18+)
+    import tempfile
+    modelfile_content = f"FROM {model}\nPARAMETER num_ctx {max_ctx}\n"
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".modelfile",
+                                         delete=False) as f:
+            f.write(modelfile_content)
+            tmp_path = f.name
+        result = subprocess.run(["ollama", "create", model, "-f", tmp_path],
+                                capture_output=True, text=True, timeout=60)
+        os.unlink(tmp_path)
+        if result.returncode == 0:
+            _emit(f"  num_ctx set to {max_ctx:,d} (model maximum).")
+        else:
+            _emit(f"  WARNING: Could not set num_ctx: {result.stderr.strip()}", "log")
+    except Exception:
+        _emit(f"  WARNING: Could not set num_ctx to {max_ctx}.", "log")
+
+
+def _models_pull_ollama(args):
+    """Pull model from Ollama registry."""
+    base_url, api_key = _models_engine_conn("ollama", args)
+    model = args.model_id
+    _emit(f"Pulling {model} via Ollama …", "stage")
+    body = {"name": model, "stream": True}
+    try:
+        resp = requests.post(f"{base_url}/api/pull", json=body,
+                             headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
+                             stream=True, timeout=600)
+        resp.raise_for_status()
+        for line in resp.iter_lines():
+            if not line:
+                continue
+            chunk = json.loads(line.decode("utf-8"))
+            status = chunk.get("status", "")
+            total = chunk.get("total", 0)
+            completed = chunk.get("completed", 0)
+            if total:
+                pct = completed / total * 100
+                print(f"\r  {status}: {pct:.0f}%", end="", flush=True)
+            else:
+                print(f"\r  {status}", end="", flush=True)
+        print()
+    except requests.ConnectionError:
+        _emit("ERROR: Could not connect to Ollama", "error")
+        _emit("  Is Ollama running? Start with: ollama serve")
+        sys.exit(1)
+    except requests.HTTPError as e:
+        _emit(f"ERROR: Ollama returned {resp.status_code}: {resp.text}", "error")
+        sys.exit(1)
+
+    # Create initial config backup
+    cfg_dir = _llm_model_config_dir("ollama", model)
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    cfg_file = cfg_dir / "config.json"
+    if not cfg_file.exists():
+        cfg_file.write_text("{}\n")
+        ts = time.strftime("%Y-%m-%d_%H-%M-%S")
+        backup = cfg_dir / f"config.{ts}.json"
+        backup.write_text("{}\n")
+
+    _emit(f"Model {model} pulled successfully.")
+
+    # Set num_ctx to maximum supported context length
+    _ollama_set_max_context(base_url, api_key, model)
+
+
+def _models_rm_ollama(args):
+    """Remove model from Ollama."""
+    base_url, api_key = _models_engine_conn("ollama", args)
+    model = args.name
+    _emit(f"Removing {model} from Ollama …", "stage")
+    _llm_delete("ollama", base_url, "/api/delete",
+                {"name": model}, api_key)
+    # Remove local config
+    cfg_dir = _llm_model_config_dir("ollama", model)
+    if cfg_dir.exists():
+        import shutil
+        shutil.rmtree(cfg_dir)
+    _emit(f"Model {model} removed.")
+
+
+def _models_unload_ollama(args):
+    """Unload model from Ollama VRAM."""
+    base_url, api_key = _models_engine_conn("ollama", args)
+    model = args.name
+    body = {"model": model, "prompt": "", "stream": False, "keep_alive": 0}
+    _llm_request("ollama", base_url, "/api/generate", body, api_key)
+    _emit(f"Model {model} unloaded from Ollama.")
+
+
+def _models_show_ollama(args):
+    """Show model details from Ollama (modelfile, parameters, context length)."""
+    base_url, api_key = _models_engine_conn("ollama", args)
+    model = args.name
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    try:
+        resp = requests.post(f"{base_url}/api/show", json={"name": model},
+                             headers=headers, timeout=30)
+        resp.raise_for_status()
+    except requests.ConnectionError:
+        _emit("ERROR: Could not connect to Ollama", "error")
+        sys.exit(1)
+    except requests.HTTPError:
+        _emit(f"ERROR: Model '{model}' not found", "error")
+        sys.exit(1)
+
+    info = resp.json()
+
+    # JSON mode: output everything
+    if _event_handler is print_event_json:
+        print(json.dumps(info, ensure_ascii=False))
+        return
+
+    # TUI mode
+    details = info.get("details", {})
+    model_info = info.get("model_info", {})
+    parameters = info.get("parameters", "")
+
+    _emit(f"Model: {model}")
+    if details.get("family"):
+        _emit(f"  Family:         {details['family']}")
+    if details.get("parameter_size"):
+        _emit(f"  Parameters:     {details['parameter_size']}")
+    if details.get("quantization_level"):
+        _emit(f"  Quantization:   {details['quantization_level']}")
+    if details.get("format"):
+        _emit(f"  Format:         {details['format']}")
+
+    # Context length from model_info
+    for key, val in model_info.items():
+        if key.endswith(".context_length"):
+            _emit(f"  Max context:    {int(val):,d}")
+            break
+
+    # Active parameters from Modelfile
+    if parameters:
+        _emit(f"\n  Parameters:")
+        for line in parameters.strip().split("\n"):
+            _emit(f"    {line.strip()}")
+
+
+def _models_list_huggingface(args):
+    """List locally cached HuggingFace models."""
+    hf_cache = Path.home() / ".cache" / "huggingface" / "hub"
+    if not hf_cache.exists():
+        _emit("HuggingFace: no models cached.")
+        return
+    model_dirs = sorted(d for d in hf_cache.iterdir()
+                        if d.is_dir() and d.name.startswith("models--"))
+    if not model_dirs:
+        _emit("HuggingFace: no models cached.")
+        return
+    _emit(f"HuggingFace models ({len(model_dirs)}):\n")
+    for d in model_dirs:
+        # models--org--name → org/name
+        name = d.name.replace("models--", "").replace("--", "/", 1)
+        # Get size of snapshots
+        snapshots = d / "snapshots"
+        size_bytes = sum(f.stat().st_size for f in snapshots.rglob("*")
+                         if f.is_file()) if snapshots.exists() else 0
+        size_gb = size_bytes / (1024**3)
+        _emit(f"  {name:<40s} {size_gb:>5.1f} GB")
+
+
+def _models_pull_huggingface(args):
+    """Download model from HuggingFace Hub."""
+    model = args.model_id
+    _emit(f"Pulling {model} from HuggingFace …", "stage")
+    try:
+        from huggingface_hub import snapshot_download
+        snapshot_download(model)
+    except ImportError:
+        _emit("ERROR: huggingface_hub not installed", "error")
+        _emit("  pip install huggingface_hub")
+        sys.exit(1)
+    except Exception as e:
+        _emit(f"ERROR: {e}", "error")
+        sys.exit(1)
+
+    # Create initial config backup
+    cfg_dir = _llm_model_config_dir("huggingface", model)
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    cfg_file = cfg_dir / "config.json"
+    if not cfg_file.exists():
+        cfg_file.write_text("{}\n")
+        ts = time.strftime("%Y-%m-%d_%H-%M-%S")
+        backup = cfg_dir / f"config.{ts}.json"
+        backup.write_text("{}\n")
+
+    _emit(f"Model {model} downloaded.")
+
+
+def _models_rm_huggingface(args):
+    """Remove locally cached HuggingFace model."""
+    model = args.name
+    hf_cache = Path.home() / ".cache" / "huggingface" / "hub"
+    safe = "models--" + model.replace("/", "--")
+    model_dir = hf_cache / safe
+    if not model_dir.exists():
+        _emit(f"Model {model} not found in HuggingFace cache.", "error")
+        sys.exit(1)
+    import shutil
+    shutil.rmtree(model_dir)
+    # Remove local config
+    cfg_dir = _llm_model_config_dir("huggingface", model)
+    if cfg_dir.exists():
+        shutil.rmtree(cfg_dir)
+    _emit(f"Model {model} removed from cache.")
+
+
+def _models_search_huggingface(args):
+    """Search HuggingFace Hub."""
+    query = args.query
+    _emit(f'Searching HuggingFace for: "{query}" …', "stage")
+    try:
+        from huggingface_hub import HfApi
+        api = HfApi()
+        results = list(api.list_models(search=query, limit=args.limit,
+                                       sort="downloads", direction=-1))
+    except ImportError:
+        _emit("ERROR: huggingface_hub not installed", "error")
+        _emit("  pip install huggingface_hub")
+        sys.exit(1)
+    except Exception as e:
+        _emit(f"ERROR: {e}", "error")
+        sys.exit(1)
+
+    if not results:
+        _emit("No models found.")
+        return
+
+    _emit(f"HuggingFace ({len(results)} results):\n")
+    for m in results:
+        dl = m.downloads if hasattr(m, "downloads") else 0
+        dl_str = f"{dl:>8,d} DL" if dl else ""
+        _emit(f"  {m.modelId:<50s} {dl_str}")
+
+
+# Engine → allowed subcommands
+_MODELS_ENGINE_CMDS = {
+    "rvc": {"list", "search", "install", "remove", "calibrate", "set-pitch"},
+    "ollama": {"list", "pull", "remove", "unload", "show"},
+    "huggingface": {"list", "pull", "remove", "search"},
+}
 
 
 # ── Voice Engines ────────────────────────────────────────────────────────────
@@ -1052,6 +1526,10 @@ def _voice_clone_tts(args):
     """Zero-shot voice cloning via Qwen3-TTS Base."""
     text = _require_text(args, "text")
 
+    # Strip [instructions] — Base model doesn't support inline tags
+    import re as _re
+    text = _re.sub(r"\[.*?\]", "", text, flags=_re.DOTALL).strip()
+
     # Reference audio — --reference flag(s), fallback to default
     DEFAULT_REF = SCRIPT_DIR / "voice" / "default-reference.m4a"
     ref_flags = getattr(args, "reference", None) or []
@@ -1171,11 +1649,7 @@ def _voice_clone_tts(args):
         _emit("ERROR: Voice cloning failed.", "error")
         sys.exit(1)
 
-    # Print JSON result
-    for line in result.stdout.strip().splitlines():
-        line = line.strip()
-        if line.startswith("{") or line.startswith("["):
-            print(line)
+    print(json.dumps([str(wav_path)]))
 
 
 def cmd_voice(args):
@@ -1791,75 +2265,248 @@ def _text_heartmula_transcribe(args):
         print(result.stdout.strip())
 
 
+# ── LLM Text — Shared Helpers ────────────────────────────────────────────────
+# Inference runs in the "text" conda env via worker/text/inference.py.
+# Connection helpers below are shared with models + ps commands.
+
+_LLM_ENGINES = ("ollama",)
+TEXT_ENV = "text"
+TEXT_INFERENCE_SCRIPT = TEXT_WORKER_DIR / "inference.py"
+
+
+def _llm_engine_base_url(engine: str, args) -> str:
+    """Get base URL for engine: --base-url > engines.json > hardcoded default."""
+    if getattr(args, "base_url", None):
+        return args.base_url.rstrip("/")
+    if TEXT_ENGINES_FILE.exists():
+        cfg = json.loads(TEXT_ENGINES_FILE.read_text())
+        if engine in cfg and "base_url" in cfg[engine]:
+            return cfg[engine]["base_url"].rstrip("/")
+    defaults = {"ollama": "http://localhost:11434"}
+    return defaults.get(engine, "http://localhost:8000")
+
+
+def _llm_api_key(engine: str, args) -> str | None:
+    """Get API key: --api-key > env var > engines.json > None."""
+    if getattr(args, "api_key", None):
+        return args.api_key
+    env_map = {"ollama": "OLLAMA_API_KEY"}
+    env_val = os.environ.get(env_map.get(engine, ""), None)
+    if env_val:
+        return env_val
+    if TEXT_ENGINES_FILE.exists():
+        cfg = json.loads(TEXT_ENGINES_FILE.read_text())
+        return cfg.get(engine, {}).get("api_key")
+    return None
+
+
+def _llm_model_config_dir(engine: str, model: str) -> Path:
+    """Get config directory for a model."""
+    safe_name = model.replace("/", "_").replace(":", "_")
+    return TEXT_MODELS_DIR / engine / safe_name
+
+
+
+def _llm_request(engine: str, base_url: str, path: str, body: dict,
+                 api_key: str | None, stream: bool = False):
+    """Make HTTP request to LLM engine. Returns response text or streams."""
+    url = f"{base_url}{path}"
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    try:
+        resp = requests.post(url, json=body, headers=headers,
+                             stream=stream, timeout=300)
+        resp.raise_for_status()
+    except requests.ConnectionError:
+        engine_hints = {
+            "ollama": "Is Ollama running? Start with: ollama serve",
+        }
+        _emit(f"ERROR: Could not connect to {engine} at {base_url}", "error")
+        hint = engine_hints.get(engine, "")
+        if hint:
+            _emit(f"  {hint}")
+        sys.exit(1)
+    except requests.HTTPError as e:
+        _emit(f"ERROR: {engine} returned {resp.status_code}: {resp.text}", "error")
+        sys.exit(1)
+
+    if stream:
+        return resp
+    return resp.json()
+
+
+def _llm_get(engine: str, base_url: str, path: str,
+             api_key: str | None) -> dict | list:
+    """GET request to LLM engine. Returns parsed JSON."""
+    url = f"{base_url}{path}"
+    headers = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    try:
+        resp = requests.get(url, headers=headers, timeout=30)
+        resp.raise_for_status()
+    except requests.ConnectionError:
+        return None  # engine offline
+    except requests.HTTPError:
+        _emit(f"ERROR: {engine} returned {resp.status_code}: {resp.text}", "error")
+        return None
+    return resp.json()
+
+
+def _llm_delete(engine: str, base_url: str, path: str, body: dict,
+                api_key: str | None):
+    """DELETE request to LLM engine."""
+    url = f"{base_url}{path}"
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    try:
+        resp = requests.delete(url, json=body, headers=headers, timeout=30)
+        resp.raise_for_status()
+    except requests.ConnectionError:
+        _emit(f"ERROR: Could not connect to {engine} at {base_url}", "error")
+        sys.exit(1)
+    except requests.HTTPError:
+        _emit(f"ERROR: {engine} returned {resp.status_code}: {resp.text}", "error")
+        sys.exit(1)
+    return resp.json() if resp.text.strip() else {}
+
+
+def _text_llm(args):
+    """Dispatch LLM inference to worker/text/inference.py via text env."""
+    # Daily: 1) update env (pip), 2) pull models + ensure num_ctx
+    _ollama_maybe_update_env()
+    _ollama_maybe_update_models()
+
+    endpoint = getattr(args, "endpoint", None)
+    if not endpoint:
+        _emit("ERROR: --endpoint required for LLM engines", "error")
+        _emit("  Endpoints: chat, generate, set, show, reset, load, unload")
+        sys.exit(1)
+    if not TEXT_INFERENCE_SCRIPT.exists():
+        _emit(f"ERROR: {TEXT_INFERENCE_SCRIPT} not found", "error")
+        _emit("  Run: bash worker/text/install.sh")
+        sys.exit(1)
+
+    cmd = [
+        str(CONDA_BIN), "run", "--no-capture-output", "-n", TEXT_ENV,
+        "python", str(TEXT_INFERENCE_SCRIPT),
+        "--engine", args.engine, "--model", args.model, "--endpoint", endpoint,
+    ]
+
+    # Forward optional flags
+    for flag, attr in [
+        ("--prompt", "prompt"), ("--system", "system"),
+        ("--messages", "messages"),
+        ("--context-length", "context_length"), ("--max-tokens", "max_tokens"),
+        ("--temperature", "temperature"), ("--top-p", "top_p"),
+        ("--top-k", "top_k"), ("--repeat-penalty", "repeat_penalty"),
+        ("--seed", "seed"), ("--stop", "stop"),
+        ("--base-url", "base_url"), ("--api-key", "api_key"),
+        ("-o", "output"),
+    ]:
+        val = getattr(args, attr, None)
+        if val is not None:
+            cmd.extend([flag, str(val)])
+
+    if getattr(args, "stream", False):
+        cmd.append("--stream")
+
+    # Forward --thinking
+    thinking = getattr(args, "thinking", "False")
+    if thinking != "False":
+        cmd.extend(["--thinking", thinking])
+
+    # Forward --images
+    image_paths = getattr(args, "images", None)
+    if image_paths:
+        cmd.append("--images")
+        cmd.extend(image_paths)
+
+    result = run_worker(cmd, on_event=_event_handler)
+    if result.returncode != 0:
+        sys.exit(1)
+
+
 def cmd_text(args):
-    """Text extraction — dispatch by engine."""
+    """Text — dispatch by engine."""
     engine = args.engine
     if engine == "whisper":
         _text_whisper(args)
     elif engine == "heartmula-transcribe":
         _text_heartmula_transcribe(args)
+    elif engine == "ollama":
+        _text_llm(args)
     else:
-        _emit(f"ERROR: Unknown text engine: {engine}", "error")
+        _emit(f"ERROR: Engine '{engine}' is currently not supported. Use --engine ollama.", "error")
         sys.exit(1)
 
 
 # ── PS (Status) ──────────────────────────────────────────────────────────────
 
-def cmd_ps(args):
+def _ps_rvc_models() -> list[dict]:
+    """Get active RVC models for ps."""
+    models = []
     server_running = check_server()
-
-    models_info = []
     if server_running:
         data = api_get("/models")
         for m in data.get("models", []):
             name = m if isinstance(m, str) else m.get("name", str(m))
             config = load_model_config(name)
             target = config.get("target_f0")
-            models_info.append({"name": name, "target_f0": target})
-    elif RVC_MODELS_DIR.exists():
-        for d in sorted(RVC_MODELS_DIR.iterdir()):
-            if d.is_dir() and (d / "revoicer.json").exists():
-                config = load_model_config(d.name)
-                target = config.get("target_f0")
-                models_info.append({"name": d.name, "target_f0": target})
+            extra = f"target: {target:.0f} Hz" if target else ""
+            models.append({"model": name, "engine": "rvc", "status": "loaded",
+                           "vram": "-", "ctx": "-", "extra": extra})
+    return models
+
+
+def _ps_ollama_models() -> list[dict]:
+    """Get running Ollama models for ps."""
+    models = []
+    base_url = "http://localhost:11434"
+    if TEXT_ENGINES_FILE.exists():
+        cfg = json.loads(TEXT_ENGINES_FILE.read_text())
+        base_url = cfg.get("ollama", {}).get("base_url", base_url)
+    data = _llm_get("ollama", base_url, "/api/ps", None)
+    if data is None:
+        return models
+    for m in data.get("models", []):
+        name = m.get("name", "?")
+        vram_bytes = m.get("size_vram", m.get("size", 0))
+        vram_gb = vram_bytes / (1024**3)
+        vram = f"{vram_gb:.1f} GB" if vram_gb > 0 else "-"
+        ctx = str(m.get("context_length", "-")) if m.get("context_length") else "-"
+        details = m.get("details", {})
+        quant = details.get("quantization_level", "")
+        family = details.get("family", "")
+        extra = f"{family} {quant}".strip() if (family or quant) else ""
+        models.append({"model": name, "engine": "ollama", "status": "running",
+                       "vram": vram, "ctx": ctx, "extra": extra})
+    return models
+
+
+def cmd_ps(args):
+    all_models = []
+    all_models.extend(_ps_rvc_models())
+    all_models.extend(_ps_ollama_models())
 
     # JSON mode
     if _event_handler is print_event_json:
-        print(json.dumps({
-            "server": {"running": server_running, "url": RVC_API_URL},
-            "models": models_info,
-            "formats": ["WAV", "MP3", "FLAC", "OGG", "M4A"],
-        }))
+        print(json.dumps(all_models))
         return
 
     # TUI mode
-    print("=== generate — Available Models & Status ===\n")
+    if not all_models:
+        print("No active models.")
+        return
 
-    if models_info:
-        print(f"Installed models ({len(models_info)}):")
-        for m in models_info:
-            hz_info = f"{m['target_f0']:.0f} Hz" if m["target_f0"] else "not set"
-            print(f"  - {m['name']:40s}  target pitch: {hz_info}")
-        if not server_running:
-            print("\n  (Start server for full model list)")
-    else:
-        if server_running:
-            print("No models installed.")
-        else:
-            print("(Start server to see installed models)")
-
-    print()
-    print("Server:")
-    if server_running:
-        print(f"  Running on {RVC_API_URL}")
-    else:
-        print("  Offline — start with: python generate.py server start")
-
-    print()
-    print("Supported languages:")
-    print("  RVC is language-agnostic — any language works.")
-    print()
-    print("Supported formats: WAV, MP3, FLAC, OGG, M4A")
+    # Header
+    print(f"{'MODEL':<30s} {'ENGINE':<13s} {'STATUS':<10s} {'VRAM':<11s} {'CTX':<10s} {'EXTRA'}")
+    for m in all_models:
+        print(f"{m['model']:<30s} {m['engine']:<13s} {m['status']:<10s} "
+              f"{m['vram']:<11s} {m['ctx']:<10s} {m['extra']}")
 
 
 # ── Output (concatenation, mixing) ────────────────────────────────────────────
@@ -2264,13 +2911,15 @@ def build_parser():
     p_audio.set_defaults(func=cmd_audio)
 
     # ── text ──────────────────────────────────────────────────────────────
-    p_text = sub.add_parser("text", help="Text extraction from audio")
-    p_text.add_argument("input", nargs="*", help="Input audio file(s)")
+    p_text = sub.add_parser("text",
+                            help="Text extraction / LLM inference")
+    p_text.add_argument("input", nargs="*", help="Input audio file(s) [whisper]")
     p_text.add_argument("--engine", required=True,
-                        choices=["whisper", "heartmula-transcribe"],
+                        choices=["whisper", "heartmula-transcribe",
+                                 "ollama"],
                         help="Text engine")
     p_text.add_argument("--model", default=None,
-                        help="[whisper] Model: tiny/base/small/medium/large-v3/large-v3-turbo")
+                        help="Model name")
     p_text.add_argument("--input-language", default=None,
                         help="[whisper] Language hint (e.g. 'en', 'de')")
     p_text.add_argument("--word-timestamps", action="store_true",
@@ -2279,6 +2928,47 @@ def build_parser():
                         help="[whisper] Output format: json/txt/srt/vtt/tsv/all")
     p_text.add_argument("-o", "--output",
                         help="Output directory or file")
+    # LLM-specific flags
+    p_text.add_argument("--endpoint",
+                        choices=["chat", "generate", "set", "show",
+                                 "reset", "load", "unload"],
+                        help="[llm] API endpoint")
+    p_text.add_argument("--prompt", default=None,
+                        help="[llm] Text prompt (for endpoint=generate)")
+    p_text.add_argument("--system", default=None,
+                        help="[llm] System prompt (for endpoint=generate)")
+    p_text.add_argument("--messages", default=None,
+                        help="[llm] Messages JSON string or file path (for endpoint=chat)")
+    p_text.add_argument("--context-length", type=int, default=None,
+                        dest="context_length",
+                        help="[llm] Max context window tokens")
+    p_text.add_argument("--max-tokens", type=int, default=None,
+                        dest="max_tokens",
+                        help="[llm] Max output tokens")
+    p_text.add_argument("--temperature", type=float, default=None,
+                        help="[llm] Sampling temperature")
+    p_text.add_argument("--top-p", type=float, default=None, dest="top_p",
+                        help="[llm] Top-p (nucleus) sampling")
+    p_text.add_argument("--top-k", type=int, default=None, dest="top_k",
+                        help="[llm] Top-k sampling")
+    p_text.add_argument("--repeat-penalty", type=float, default=None,
+                        dest="repeat_penalty",
+                        help="[llm] Repetition penalty")
+    p_text.add_argument("--seed", type=int, default=None,
+                        help="[llm] Random seed")
+    p_text.add_argument("--stop", default=None,
+                        help="[llm] Stop sequence")
+    p_text.add_argument("--images", nargs="+", default=None,
+                        help="[llm] Image files for vision models (png, jpg)")
+    p_text.add_argument("--thinking", default="False",
+                        choices=["True", "False", "low", "medium", "high"],
+                        help="[llm] Thinking mode (default: False)")
+    p_text.add_argument("--stream", action="store_true",
+                        help="[llm] Stream output")
+    p_text.add_argument("--base-url", default=None, dest="base_url",
+                        help="[llm] Override engine base URL")
+    p_text.add_argument("--api-key", default=None, dest="api_key",
+                        help="[llm] API key (fallback: env var)")
     p_text.set_defaults(func=cmd_text)
 
     # ── output ────────────────────────────────────────────────────────────
@@ -2320,38 +3010,60 @@ def build_parser():
     p_su.set_defaults(func=cmd_server_status)
 
     # ── models ────────────────────────────────────────────────────────────
-    p_models = sub.add_parser("models", help="Manage voice models")
+    p_models = sub.add_parser("models", help="Manage models")
+    p_models.add_argument("--engine",
+                          choices=["rvc", "ollama", "huggingface"],
+                          default=None,
+                          help="Engine (required for all except list)")
     m_sub = p_models.add_subparsers(dest="models_cmd")
 
     p_ml = m_sub.add_parser("list", help="List installed models")
-    p_ml.set_defaults(func=cmd_models_list)
+    p_ml.set_defaults(models_func=cmd_models_list)
 
-    p_ms = m_sub.add_parser("search", help="Search HuggingFace for RVC models")
+    p_ms = m_sub.add_parser("search", help="Search for models")
     p_ms.add_argument("query", help="Search terms")
     p_ms.add_argument("--limit", type=int, default=30)
-    p_ms.set_defaults(func=cmd_models_search)
+    p_ms.set_defaults(models_func=cmd_models_search)
 
-    p_mi = m_sub.add_parser("install", help="Install model from HuggingFace")
+    p_mi = m_sub.add_parser("install", help="Install RVC model")
     p_mi.add_argument("model_id", help="HuggingFace repo ID or direct URL")
     p_mi.add_argument("--name", help="Local name for the model")
     p_mi.add_argument("--file", help="Specific file from multi-model repos")
-    p_mi.set_defaults(func=cmd_models_install)
+    p_mi.set_defaults(models_func=cmd_models_install)
+
+    p_mp = m_sub.add_parser("pull", help="Pull model (ollama, huggingface)")
+    p_mp.add_argument("model_id", help="Model name/ID")
+    p_mp.set_defaults(models_func=cmd_models_pull)
+
+    p_msh = m_sub.add_parser("show", help="Show model details (ollama)")
+    p_msh.add_argument("name", help="Model name")
+    p_msh.set_defaults(models_func=cmd_models_show)
 
     p_mr = m_sub.add_parser("remove", help="Remove an installed model")
     p_mr.add_argument("name", help="Model name")
-    p_mr.set_defaults(func=cmd_models_remove)
+    p_mr.set_defaults(models_func=cmd_models_remove)
+
+    p_mlo = m_sub.add_parser("load", help="Load model")
+    p_mlo.add_argument("name", help="Model name")
+    p_mlo.set_defaults(models_func=cmd_models_load)
+
+    p_mu = m_sub.add_parser("unload", help="Unload model (ollama)")
+    p_mu.add_argument("name", help="Model name")
+    p_mu.set_defaults(models_func=cmd_models_unload)
 
     p_mc = m_sub.add_parser("calibrate",
-                            help="Calibrate target F0 for a model")
+                            help="Calibrate target F0 for RVC model")
     p_mc.add_argument("name", help="Model name")
-    p_mc.set_defaults(func=cmd_models_calibrate)
+    p_mc.set_defaults(models_func=cmd_models_calibrate)
 
     p_mf = m_sub.add_parser("set-pitch",
-                            help="Set target pitch (Hz) for a model")
+                            help="Set target pitch (Hz) for RVC model")
     p_mf.add_argument("name", help="Model name")
     p_mf.add_argument("hz", type=float,
                       help="Target pitch (male ~120, female ~220, child ~280)")
-    p_mf.set_defaults(func=cmd_models_set_f0)
+    p_mf.set_defaults(models_func=cmd_models_set_f0)
+
+    p_models.set_defaults(func=cmd_models)
 
     return parser
 

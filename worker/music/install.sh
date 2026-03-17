@@ -84,6 +84,13 @@ if [ ! -d "$HEARTLIB_DIR" ]; then
     rm -rf "$HEARTLIB_DIR/.git"
 fi
 
+# Patch: suppress chunk_length_s warning (ignore_warning=True)
+LYRICS_PY="$HEARTLIB_DIR/src/heartlib/pipelines/lyrics_transcription.py"
+if [ -f "$LYRICS_PY" ] && ! grep -q "ignore_warning" "$LYRICS_PY"; then
+    sed -i '' 's/batch_size=16,/batch_size=16, ignore_warning=True,/' "$LYRICS_PY"
+    echo "  Patched: ignore_warning=True"
+fi
+
 # ── Install dependencies ──────────────────────────────────────────────
 
 echo "  Installing heartlib (this may take several minutes) …"

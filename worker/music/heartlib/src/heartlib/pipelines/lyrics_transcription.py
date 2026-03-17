@@ -37,4 +37,5 @@ class HeartTranscriptorPipeline(AutomaticSpeechRecognitionPipeline):
             dtype=dtype,
             chunk_length_s=30,
             batch_size=16,
+            ignore_warning=True,
         )
