@@ -252,21 +252,37 @@ def cmd_server_start(args):
 
 
 def cmd_server_stop(args):
+    stopped = False
+
+    # Try PID file first
     if PID_FILE.exists():
         pid = int(PID_FILE.read_text().strip())
         try:
             os.killpg(os.getpgid(pid), signal.SIGTERM)
             _emit(f"RVC worker stopped (PID {pid})")
+            stopped = True
         except ProcessLookupError:
-            _emit("RVC worker was not running.")
+            pass
         PID_FILE.unlink(missing_ok=True)
-    else:
-        _emit("No PID file found. Checking if server is running …")
-        if check_server():
-            _emit("Server is running but PID unknown. Kill manually or use:")
-            _emit("  lsof -ti:5100 | xargs kill")
-        else:
-            _emit("RVC worker is not running.")
+
+    # Fallback: kill whatever is on the port
+    if not stopped and check_server():
+        import subprocess
+        port = RVC_API_URL.rsplit(":", 1)[-1].rstrip("/")
+        result = subprocess.run(
+            ["lsof", "-ti", f":{port}"],
+            capture_output=True, text=True,
+        )
+        for pid_str in result.stdout.strip().split():
+            try:
+                os.kill(int(pid_str), signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        _emit(f"RVC worker stopped (port {port})")
+        stopped = True
+
+    if not stopped:
+        _emit("RVC worker is not running.")
 
 
 def cmd_server_status(args):

@@ -3,7 +3,6 @@
 Dynamically discovers all installed RVC models and tests each one.
 """
 
-import subprocess
 import sys
 from pathlib import Path
 
@@ -44,25 +43,12 @@ def register(suite):
         prep=True,
     )
 
-    def start_server():
-        print("  Starting RVC server ...")
-        subprocess.run(
-            [sys.executable, "generate.py", "server", "start"],
-            cwd=SCRIPT_DIR,
-        )
-        import time
-        time.sleep(5)
-
-    def stop_server():
-        print("  Stopping RVC server ...")
-        subprocess.run(
-            [sys.executable, "generate.py", "server", "stop"],
-            cwd=SCRIPT_DIR,
-            capture_output=True,
-        )
-
-    suite.on_setup(start_server)
-    suite.on_cleanup(stop_server)
+    # Start RVC server
+    suite.add(
+        name="RVC server start",
+        cmd=[sys.executable, "generate.py", "server", "start"],
+        prep=True,
+    )
 
     # Test: Convert Say output through every installed model
     prep_say_name = prep_say.name
@@ -87,4 +73,10 @@ def register(suite):
             "--text", "Das ist ein Test der Say plus RVC Pipeline.",
             "-o", str(out),
         ],
+    )
+
+    # Stop RVC server
+    suite.add(
+        name="RVC server stop",
+        cmd=[sys.executable, "generate.py", "server", "stop"],
     )

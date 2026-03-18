@@ -314,8 +314,8 @@ print('  OK')
 
     echo ""
     echo "── ACE-Step models ──"
-    for MODEL_NAME in acestep-v15-sft acestep-v15-base acestep-5Hz-lm-0.6B; do
-        if [ -d "$ACESTEP_DIR/checkpoints/$MODEL_NAME" ]; then
+    for MODEL_NAME in acestep-v15-turbo acestep-v15-sft acestep-v15-base acestep-5Hz-lm-0.6B; do
+        if [ -f "$ACESTEP_DIR/checkpoints/$MODEL_NAME/model.safetensors" ]; then
             echo "  $MODEL_NAME already present — skipping"
         else
             echo "  Downloading $MODEL_NAME ..."

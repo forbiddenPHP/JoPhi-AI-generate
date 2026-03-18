@@ -21,14 +21,16 @@ echo ""
 eval "$($CONDA_BIN shell.bash hook)"
 conda activate "$ENV_NAME"
 
-# faiss-cpu 1.7.3 segfaults on arm64 — disable MPS to avoid further issues
-export PYTORCH_MPS_DISABLE=1
+# faiss-cpu 1.7.3 segfaults on arm64, conv1d >65536 channels crashes on MPS
+# Force CPU for all RVC inference
+export PYTORCH_ENABLE_MPS_FALLBACK=1
 
 python -c "
 import torch
 torch.backends.mps.is_available = lambda: False
+torch.backends.mps.is_built = lambda: False
 from rvc_python.__main__ import main
 import sys
-sys.argv = ['rvc_python', 'api', '-p', '$PORT', '-md', '$MODELS_DIR']
+sys.argv = ['rvc_python', 'api', '-p', '$PORT', '-md', '$MODELS_DIR', '-ip', '127.0.0.1', '-de', 'cpu']
 main()
 "

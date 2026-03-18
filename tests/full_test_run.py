@@ -23,28 +23,12 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent.parent
 DEMOS = SCRIPT_DIR / "demos" / "full-test"
 
-# Ordered list of test suites (determines run order)
-TEST_ORDER = [
-    "test_ace_step",
-    "test_heartmula",
-    "test_whisper",
-    "test_heartmula_transcribe",
-    "test_demucs",
-    "test_enhance",
-    "test_say",
-    "test_rvc",
-    "test_diarize",
-    "test_ai_tts",
-    "test_clone_tts",
-    "test_sfx",
-    "test_voice_removal",
-    "test_concatenate",
-    "test_mucs",
-    "test_text",
-    "test_text_vision",
-    "test_text_models",
-    "test_ps",
-]
+SUITES_DIR = Path(__file__).resolve().parent / "suites"
+
+
+def discover_suites():
+    """Auto-discover test suites from tests/suites/test_*.py."""
+    return sorted(p.stem for p in SUITES_DIR.glob("test_*.py"))
 
 
 class TestEntry:
@@ -108,69 +92,67 @@ def run_suite(suite: Suite, results: Results, counter: list, total: int, force: 
     if suite._setup_fn:
         suite._setup_fn()
 
-    for test in suite.tests:
-        if test.prep:
-            # Prep steps: run silently, skip if output exists (--force skips cache)
-            if not force and test.output and test.output.exists() and test.output.stat().st_size > 0:
-                print(f"  CACHED: {test.name}")
+    try:
+        for test in suite.tests:
+            if test.prep:
+                # Prep steps: run silently, skip if output exists (--force skips cache)
+                if not force and test.output and test.output.exists() and test.output.stat().st_size > 0:
+                    print(f"  CACHED: {test.name}")
+                    continue
+                print(f"  PREP: {test.name}")
+                ok, dur = run_cmd(test.cmd)
+                if not ok:
+                    print(f"  PREP FAILED: {test.name} ({dur}s)")
+                    # Skip remaining tests in this suite
+                    for remaining in suite.tests:
+                        if not remaining.prep:
+                            counter[0] += 1
+                            print(f"\n  [{counter[0]}/{total}] SKIP: {remaining.name} (prep failed)")
+                            results.entries.append(("SKIP", 0, remaining.name))
+                            results.skipped += 1
+                    return
                 continue
-            print(f"  PREP: {test.name}")
+
+            counter[0] += 1
+            idx = counter[0]
+
+            print()
+            print()
+            print("━" * 64)
+            print(f"  [{idx}/{total}] {test.name}")
+            print("━" * 64)
+            print()
+
+            # Skip if output exists (--force disables)
+            if not force and test.output and test.output.exists() and test.output.stat().st_size > 0:
+                print(f"  SKIP (exists): {test.output.name}")
+                results.entries.append(("SKIP", 0, test.name))
+                results.skipped += 1
+                continue
+
             ok, dur = run_cmd(test.cmd)
-            if not ok:
-                print(f"  PREP FAILED: {test.name} ({dur}s)")
-                # Skip remaining tests in this suite
-                for remaining in suite.tests:
-                    if not remaining.prep:
-                        counter[0] += 1
-                        print(f"\n  [{counter[0]}/{total}] SKIP: {remaining.name} (prep failed)")
-                        results.entries.append(("SKIP", 0, remaining.name))
-                        results.skipped += 1
-                if suite._cleanup_fn:
-                    suite._cleanup_fn()
-                return
-            continue
 
-        counter[0] += 1
-        idx = counter[0]
+            if ok and test.output:
+                if not test.output.exists() or test.output.stat().st_size == 0:
+                    ok = False
 
-        print()
-        print()
-        print("━" * 64)
-        print(f"  [{idx}/{total}] {test.name}")
-        print("━" * 64)
-        print()
-
-        # Skip if output exists (--force disables)
-        if not force and test.output and test.output.exists() and test.output.stat().st_size > 0:
-            print(f"  SKIP (exists): {test.output.name}")
-            results.entries.append(("SKIP", 0, test.name))
-            results.skipped += 1
-            continue
-
-        ok, dur = run_cmd(test.cmd)
-
-        if ok and test.output:
-            if not test.output.exists() or test.output.stat().st_size == 0:
-                ok = False
-
-        if ok:
-            print(f"\n  >>> PASS ({dur}s)")
-            results.entries.append(("PASS", dur, test.name))
-            results.passed += 1
-        else:
-            print(f"\n  >>> FAIL ({dur}s)")
-            results.entries.append(("FAIL", dur, test.name))
-            results.failed += 1
-
-    # Cleanup
-    if suite._cleanup_fn:
-        suite._cleanup_fn()
+            if ok:
+                print(f"\n  >>> PASS ({dur}s)")
+                results.entries.append(("PASS", dur, test.name))
+                results.passed += 1
+            else:
+                print(f"\n  >>> FAIL ({dur}s)")
+                results.entries.append(("FAIL", dur, test.name))
+                results.failed += 1
+    finally:
+        if suite._cleanup_fn:
+            suite._cleanup_fn()
 
 
 def load_suites(only=None):
     """Import suite modules and collect registrations."""
     suites = []
-    for name in TEST_ORDER:
+    for name in discover_suites():
         if only and name not in only:
             continue
         mod = importlib.import_module(f"suites.{name}")
