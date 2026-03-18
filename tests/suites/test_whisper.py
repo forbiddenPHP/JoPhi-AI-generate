@@ -55,7 +55,7 @@ def register(suite):
         cmd=[
             sys.executable, "generate.py", "text", "--engine", "whisper",
             str(prep_song),
-            "--input-language", "en", "--format", "all",
+            "--language", "en", "--format", "all",
             "-o", str(out / "ace-song-en"),
         ],
         output=out / "ace-song-en",
@@ -66,7 +66,7 @@ def register(suite):
         cmd=[
             sys.executable, "generate.py", "text", "--engine", "whisper",
             str(PODCAST),
-            "--input-language", "de", "--format", "all",
+            "--language", "de", "--format", "all",
             "-o", str(out / "podcast-de"),
         ],
         output=out / "podcast-de",
@@ -77,7 +77,7 @@ def register(suite):
         cmd=[
             sys.executable, "generate.py", "text", "--engine", "whisper",
             str(prep_song),
-            "--input-language", "en", "--format", "srt",
+            "--language", "en", "--format", "srt",
             "-o", str(out / "ace-song-srt"),
         ],
         output=out / "ace-song-srt",

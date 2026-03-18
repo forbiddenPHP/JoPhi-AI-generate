@@ -7,20 +7,17 @@ CLI for voice synthesis, voice conversion, audio enhancement, AI music generatio
 ## Quick Setup
 
 ```bash
-# 1. Install all environments (11 conda envs + 1 uv project)
+# 1. Install all environments
 bash setup.sh
 
-# 2. Activate main env
-conda activate tts-mist
-
-# 3. Start RVC worker (needed for voice conversion)
+# 2. Start RVC worker (needed for voice conversion)
 python generate.py server start
 
-# 4. Install a voice model
+# 3. Install a voice model
 python generate.py models --engine rvc search "neutral male"
 python generate.py models --engine rvc install User/ModelName
 
-# 5. Ready!
+# 4. Ready!
 python generate.py voice --engine rvc --model my-voice input.wav
 ```
 
@@ -64,7 +61,12 @@ generate.py <medium> --engine <backend> [--model <variant>] [input] [options]
 | `models` | `rvc`, `ollama`, `huggingface` | Model management (per engine) |
 | `ps` | — | Active models across all engines |
 
-Future mediums (stubs): `image`, `video`, `vision`, `translation`, `comparison`
+| `image` | `flux.2` | Image generation & editing (FLUX.2 Klein, PyTorch MPS) |
+| `image` | `openpose` | Pose estimation via DWPose (body, hands, face) |
+
+Future mediums (stubs): `video`, `translation`, `comparison`
+
+**Planned:** `video-vision` — video input for Ollama vision models (blocked by upstream Ollama bug)
 
 ---
 
@@ -429,7 +431,7 @@ python generate.py audio --engine heartmula \
 - `-s, --seconds` — Duration in seconds (default: 20)
 - `--duration` — Duration in ms (overrides `--seconds`)
 - `--seed` — Random seed
-- `--topk` — Top-k sampling
+- `--top-k` — Top-k sampling
 - `--temperature` — Sampling temperature
 - `--cfg-scale` — CFG scale
 
@@ -499,6 +501,108 @@ python generate.py audio --engine sfx --text "waves crashing on a rocky shore" -
 
 ---
 
+### Image Generation & Editing (`image --engine flux.2`)
+
+Generate and edit images using FLUX.2 Klein (Black Forest Labs). Runs locally on Apple Silicon via PyTorch MPS.
+
+```bash
+# Text-to-image (4B distilled, fast)
+python generate.py image --engine flux.2 --model 4b-distilled -p "a cat on a cliff overlooking the ocean" -o cat.png
+
+# Higher quality (4B base, more steps)
+python generate.py image --engine flux.2 --model 4b -p "a cat on a cliff" --steps 20 -o cat.png
+
+# 9B model (best quality)
+python generate.py image --engine flux.2 --model 9b-distilled -p "a portrait of a woman" -o portrait.png
+
+# Image editing with reference image
+python generate.py image --engine flux.2 --model 4b-distilled -p "a man standing in front of a mountain lake" --images ref.png -o edited.png
+
+# Multi-reference editing (combine elements from multiple images)
+python generate.py image --engine flux.2 --model 4b-distilled -p "the person from image 1 petting the cat from image 2" --images person.png cat.png -o combined.png
+
+# Custom dimensions (16:9)
+python generate.py image --engine flux.2 -p "a wide cinematic landscape" -W 1360 -H 768 -o landscape.png
+
+# Reproducible output
+python generate.py image --engine flux.2 -p "a sunset" --seed 42 -o sunset.png
+```
+
+<details>
+<summary>Models</summary>
+
+| `--model` | Parameters | Steps | License | Best for |
+|-----------|------------|-------|---------|----------|
+| `4b-distilled` | 4B | 4 (fixed) | Apache 2.0 | Fast generation, real-time |
+| `4b` (default) | 4B | Configurable | Apache 2.0 | Fine-tuning, quality control |
+| `9b-distilled` | 9B | 4 (fixed) | Non-Commercial | Best quality, fast |
+| `9b` | 9B | Configurable | Non-Commercial | Research, maximum flexibility |
+
+</details>
+
+<details>
+<summary>Options</summary>
+
+- `--engine flux.2` — Required
+- `--model`, `-m` — Model variant (default: `4b`)
+- `--prompt`, `-p` — Text prompt (required)
+- `-o, --output` — Output file path (default: `image.png`)
+- `--seed` — Random seed for reproducibility
+- `--steps` — Inference steps (only for base models; distilled = fixed 4 steps)
+- `--cfg-scale` — Guidance scale
+- `-W, --width` — Image width (default: 1360)
+- `-H, --height` — Image height (default: 768)
+- `--images` — Reference image path(s) for editing (up to 10)
+
+</details>
+
+<details>
+<summary>Setup</summary>
+
+```bash
+bash worker/image/install.sh
+```
+
+Creates `flux2` conda env with PyTorch 2.8 + FLUX.2 dependencies. Models are downloaded from HuggingFace on first use.
+
+</details>
+
+**Prompt guide:** See [prompt-guides/FLUX2.md](prompt-guides/FLUX2.md).
+
+---
+
+### Pose Estimation (`image --engine openpose`)
+
+Extract body, hand, and face poses from images using DWPose. Outputs skeleton visualization on black background.
+
+```bash
+# Wholebody (body + hands + face) — default
+python generate.py image --engine openpose --images person.png -o pose.png
+
+# Body only
+python generate.py image --engine openpose --images person.png --pose-mode body -o pose_body.png
+
+# Body + hands
+python generate.py image --engine openpose --images person.png --pose-mode bodyhand -o pose_hands.png
+
+# Body + face
+python generate.py image --engine openpose --images person.png --pose-mode bodyface -o pose_face.png
+
+# Multiple images
+python generate.py image --engine openpose --images img1.png img2.png -o poses/
+```
+
+<details>
+<summary>Options</summary>
+
+- `--images` — Input image(s) (required)
+- `-o, --output` — Output file path (default: `pose.png`)
+- `--pose-mode` — Detection mode: `wholebody` (default), `body`, `bodyhand`, `bodyface`
+
+</details>
+
+---
+
 ### Speaker Diarization (`audio --engine diarize`)
 
 Split dialogue audio into separate tracks per speaker using pyannote.audio (MPS).
@@ -530,7 +634,7 @@ Transcribe audio to text using mlx-whisper (Apple Silicon optimized).
 ```bash
 python generate.py text --engine whisper audio.wav
 python generate.py text --engine whisper audio.wav --format srt -o ./transcripts/
-python generate.py text --engine whisper audio.wav --input-language de --word-timestamps
+python generate.py text --engine whisper audio.wav --language de --word-timestamps
 python generate.py text --engine whisper audio.wav --model large-v3
 ```
 
@@ -538,7 +642,7 @@ python generate.py text --engine whisper audio.wav --model large-v3
 <summary>Options</summary>
 
 - `--model` — Whisper model: `tiny`, `base`, `small`, `medium`, `large-v3`, `large-v3-turbo` (default)
-- `--input-language` — Language hint (e.g. `en`, `de`, `ja`)
+- `--language` — Language hint (e.g. `en`, `de`, `ja`)
 - `--word-timestamps` — Word-level timing
 - `--format` — Output: `json` (default), `txt`, `srt`, `vtt`, `tsv`, `all`
 - `-o, --output` — Output directory
@@ -785,7 +889,7 @@ Shows installed models, target pitch settings, server status, and supported form
 <details>
 <summary><strong>Environments</strong></summary>
 
-`setup.sh` creates 11 isolated conda environments + 1 uv project:
+`setup.sh` creates 13 isolated conda environments + 1 uv project:
 
 | Env | Python | Manager | Purpose |
 |-----|--------|---------|---------|
@@ -800,6 +904,8 @@ Shows installed models, target pitch settings, server status, and supported form
 | `lang-detect` | 3.11 | conda | Language detection (langdetect) |
 | `ezaudio` | 3.10 | conda | Sound effects generation (EzAudio) |
 | `text` | 3.11 | conda | LLM inference (ollama, Pillow, requests) — auto-updates |
+| `flux2` | 3.12 | conda | FLUX.2 image generation (PyTorch MPS) |
+| `openpose` | 3.12 | conda | DWPose pose estimation (ONNX Runtime) |
 | `ace` (uv) | 3.11+ | uv | ACE-Step 1.5 music generation |
 
 </details>
@@ -856,6 +962,8 @@ tts-mist/
 │   ├── separate/           # demucs separation worker
 │   ├── tts/                # Qwen3-TTS worker (mlx-audio)
 │   ├── sfx/                # EzAudio sound effects worker
+│   ├── image/              # FLUX.2 image generation (PyTorch MPS)
+│   ├── pose/               # DWPose pose estimation (ONNX Runtime)
 │   └── whisper/            # mlx-whisper worker
 ├── models/                 # All model checkpoints (gitignored)
 ├── tests/                  # Test scripts

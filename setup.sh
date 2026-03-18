@@ -53,26 +53,87 @@ fi
 # ── Prerequisites ────────────────────────────────────────────────────────────
 
 if [ ! -f "$CONDA_BIN" ]; then
-    echo -e "${RED}ERROR: conda not found at $CONDA_BIN${NC}"
-    echo "  Install: brew install --cask miniconda"
-    exit 1
+    echo -e "${RED}conda not found at $CONDA_BIN${NC}"
+    read -p "  Install Miniconda via brew? [Y/n] " ans
+    if [[ "$ans" =~ ^[Nn] ]]; then
+        echo "  Aborted. Install manually: brew install --cask miniconda"
+        exit 1
+    fi
+    HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask miniconda
+    echo -e "${GREEN}✓${NC} Miniconda installed"
 fi
 
-# Check Xcode license
+# Check Xcode CLI tools + license
+if ! xcode-select -p > /dev/null 2>&1; then
+    echo -e "${RED}Xcode Command Line Tools not found.${NC}"
+    read -p "  Install now? [Y/n] " ans
+    if [[ "$ans" =~ ^[Nn] ]]; then
+        echo "  Aborted. Install manually: xcode-select --install"
+        exit 1
+    fi
+    xcode-select --install
+    echo "  Waiting for installation to complete ..."
+    until xcode-select -p > /dev/null 2>&1; do sleep 5; done
+    echo -e "${GREEN}✓${NC} Xcode CLI tools installed"
+fi
 if ! /usr/bin/clang --version > /dev/null 2>&1; then
-    echo -e "${RED}ERROR: C compiler not available.${NC}"
-    echo "  The RVC worker needs to compile C extensions (fairseq, pyworld)."
-    echo "  Accept the Xcode license:"
-    echo ""
-    echo "    sudo xcodebuild -license accept"
-    echo ""
-    exit 1
+    echo -e "${RED}Xcode license not accepted.${NC}"
+    read -p "  Accept now? (requires sudo) [Y/n] " ans
+    if [[ "$ans" =~ ^[Nn] ]]; then
+        echo "  Aborted. Run manually: sudo xcodebuild -license accept"
+        exit 1
+    fi
+    sudo xcodebuild -license accept
+    echo -e "${GREEN}✓${NC} Xcode license accepted"
 fi
 
 # Check brew
 if ! command -v brew &> /dev/null; then
-    echo -e "${RED}ERROR: brew not found.${NC}"
-    echo "  Install: https://brew.sh"
+    echo -e "${RED}brew not found.${NC}"
+    read -p "  Install Homebrew? [Y/n] " ans
+    if [[ "$ans" =~ ^[Nn] ]]; then
+        echo "  Aborted. Install manually: https://brew.sh"
+        exit 1
+    fi
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+    echo -e "${GREEN}✓${NC} brew installed"
+fi
+
+# Check ffmpeg
+if ! command -v ffmpeg &> /dev/null; then
+    echo -e "${RED}ffmpeg not found.${NC}"
+    read -p "  Install via brew? [Y/n] " ans
+    if [[ "$ans" =~ ^[Nn] ]]; then
+        echo "  Aborted. Install manually: brew install ffmpeg"
+        exit 1
+    fi
+    HOMEBREW_NO_AUTO_UPDATE=1 brew install ffmpeg
+    echo -e "${GREEN}✓${NC} ffmpeg installed"
+fi
+
+# Check git-lfs
+if ! command -v git-lfs &> /dev/null; then
+    echo -e "${RED}git-lfs not found.${NC}"
+    read -p "  Install via brew? [Y/n] " ans
+    if [[ "$ans" =~ ^[Nn] ]]; then
+        echo "  Aborted. Install manually: brew install git-lfs"
+        exit 1
+    fi
+    HOMEBREW_NO_AUTO_UPDATE=1 brew install git-lfs
+    git lfs install
+    echo -e "${GREEN}✓${NC} git-lfs installed"
+fi
+
+# Check macOS + Apple Silicon
+if [ "$(uname)" != "Darwin" ]; then
+    echo -e "${RED}ERROR: macOS required.${NC}"
+    echo "  This project only runs on macOS."
+    exit 1
+fi
+if [ "$(uname -m)" != "arm64" ]; then
+    echo -e "${RED}ERROR: Apple Silicon (arm64) required.${NC}"
+    echo "  This project only runs on macOS with Apple Silicon (M1/M2/M3/M4)."
     exit 1
 fi
 
@@ -162,19 +223,31 @@ bash "$SCRIPT_DIR/worker/langdetect/install.sh"
 # ── Step 10: SFX Worker Env ─────────────────────────────────────────────────
 
 echo ""
-echo "── Step 10/12: SFX Worker (EzAudio) ──"
+echo "── Step 10/14: SFX Worker (EzAudio) ──"
 bash "$SCRIPT_DIR/worker/sfx/install.sh"
 
 # ── Step 11: Text Worker Env ─────────────────────────────────────────────────
 
 echo ""
-echo "── Step 11/12: Text Worker ──"
+echo "── Step 11/14: Text Worker ──"
 bash "$SCRIPT_DIR/worker/text/install.sh"
 
-# ── Step 12: Main App Env ────────────────────────────────────────────────────
+# ── Step 12/14: Image Worker (FLUX.2) ──────────────────────────────────────
 
 echo ""
-echo "── Step 12/12: Main App (tts-mist) ──"
+echo "── Step 12/14: Image Worker (FLUX.2) ──"
+bash "$SCRIPT_DIR/worker/image/install.sh"
+
+# ── Step 13/14: Pose Worker (DWPose/OpenPose) ──────────────────────────────
+
+echo ""
+echo "── Step 13/14: Pose Worker (DWPose) ──"
+bash "$SCRIPT_DIR/worker/pose/install.sh"
+
+# ── Step 14/14: Main App Env ────────────────────────────────────────────────
+
+echo ""
+echo "── Step 14/14: Main App (tts-mist) ──"
 
 ENV_NAME="tts-mist"
 
@@ -263,6 +336,20 @@ if [ -d "$MODELS_DIR" ]; then
         mkdir -p "$SCRIPT_DIR/worker/text/models"
         cp -a "$MODELS_DIR/text_configs/." "$SCRIPT_DIR/worker/text/models/"
         echo -e "  ${GREEN}✓${NC} Text worker configs restored"
+    fi
+
+    # FLUX.2 models (HF cache) → worker/image/models/
+    if [ -d "$MODELS_DIR/image_models" ]; then
+        mkdir -p "$SCRIPT_DIR/worker/image/models"
+        cp -a "$MODELS_DIR/image_models/." "$SCRIPT_DIR/worker/image/models/"
+        echo -e "  ${GREEN}✓${NC} FLUX.2 models restored"
+    fi
+
+    # DWPose models → worker/pose/models/
+    if [ -d "$MODELS_DIR/pose_models" ]; then
+        mkdir -p "$SCRIPT_DIR/worker/pose/models"
+        cp -a "$MODELS_DIR/pose_models/." "$SCRIPT_DIR/worker/pose/models/"
+        echo -e "  ${GREEN}✓${NC} DWPose models restored"
     fi
 
     echo -e "  ${GREEN}✓${NC} Model restore complete"
@@ -385,6 +472,50 @@ print('  flan-t5-xl cached')
 "
     echo -e "${GREEN}✓${NC} EzAudio text encoder downloaded"
 
+    # ── FLUX.2 models ────────────────────────────────────────────────
+    IMAGE_MODELS_DIR="$SCRIPT_DIR/worker/image/models"
+    echo ""
+    echo "── FLUX.2 models ──"
+    "$CONDA_BIN" run -n flux2 python -c "
+import os
+os.environ['HF_HOME'] = '$IMAGE_MODELS_DIR'
+from huggingface_hub import hf_hub_download
+for repo, fn in [
+    ('black-forest-labs/FLUX.2-klein-4B', 'flux-2-klein-4b.safetensors'),
+    ('black-forest-labs/FLUX.2-klein-9B', 'flux-2-klein-9b.safetensors'),
+    ('black-forest-labs/FLUX.2-klein-base-4B', 'flux-2-klein-base-4b.safetensors'),
+    ('black-forest-labs/FLUX.2-klein-base-9B', 'flux-2-klein-base-9b.safetensors'),
+    ('black-forest-labs/FLUX.2-dev', 'ae.safetensors'),
+]:
+    print(f'  Downloading {repo}/{fn} ...')
+    hf_hub_download(repo_id=repo, filename=fn, repo_type='model')
+
+# Text encoders
+from huggingface_hub import snapshot_download
+print('  Downloading Qwen/Qwen3-4B (text encoder for 4B models) ...')
+snapshot_download('Qwen/Qwen3-4B')
+print('  Downloading Qwen/Qwen3-8B (text encoder for 9B models) ...')
+snapshot_download('Qwen/Qwen3-8B')
+print('  Done')
+"
+    echo -e "${GREEN}✓${NC} FLUX.2 models downloaded"
+
+    # ── OpenPose (DWPose) models ──────────────────────────────────────
+    POSE_MODELS_DIR="$SCRIPT_DIR/worker/pose/models"
+    echo ""
+    echo "── DWPose models ──"
+    "$CONDA_BIN" run -n openpose python -c "
+import os
+os.environ['HF_HOME'] = '$POSE_MODELS_DIR'
+from huggingface_hub import hf_hub_download
+print('  Downloading yolox_l.onnx (person detector) ...')
+hf_hub_download('yzd-v/DWPose', 'yolox_l.onnx')
+print('  Downloading dw-ll_ucoco_384.onnx (pose estimator) ...')
+hf_hub_download('yzd-v/DWPose', 'dw-ll_ucoco_384.onnx')
+print('  Done')
+"
+    echo -e "${GREEN}✓${NC} DWPose models downloaded"
+
     echo ""
     echo -e "${GREEN}✓${NC} All model downloads complete"
 fi
@@ -397,7 +528,6 @@ echo "  Setup complete!"
 echo "═══════════════════════════════════════════════════════════"
 echo ""
 echo "  Usage:"
-echo "    conda activate tts-mist"
 echo ""
 echo "    # AI Text-to-Speech"
 echo "    python generate.py voice --engine ai-tts --text 'Hello world' -o demos/"

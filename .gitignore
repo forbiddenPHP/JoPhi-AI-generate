@@ -2,6 +2,8 @@
 worker/music/models/
 worker/rvc/models/
 worker/text/models/
+worker/image/models/
+worker/pose/models/
 rvc_models/
 worker/enhance/resemble-enhance/
 

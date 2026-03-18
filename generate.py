@@ -33,7 +33,7 @@ Usage:
   python generate.py audio --engine sfx --text "thunder and rain" -s 10 -o weather.wav
   python generate.py text --engine whisper audio.wav                   Transcribe audio
   python generate.py text --engine whisper audio.wav --model large-v3 --format srt
-  python generate.py text --engine whisper audio.wav --input-language de
+  python generate.py text --engine whisper audio.wav --language de
   python generate.py text --engine heartmula-transcribe song.mp3       Extract lyrics
   python generate.py output --engine audio-concatenate a.wav b.mp3 -o out.wav  Concatenate audio files
   python generate.py output --engine audio-concatenate a.wav b.wav --output-bitrate 320k -o out.mp3
@@ -1850,8 +1850,8 @@ def _audio_ace(args):
             cmd.extend(["--guidance-scale", str(args.cfg_scale)])
         if args.temperature is not None:
             cmd.extend(["--lm-temperature", str(args.temperature)])
-        if args.topk is not None:
-            cmd.extend(["--lm-top-k", str(args.topk)])
+        if args.top_k is not None:
+            cmd.extend(["--lm-top-k", str(args.top_k)])
         if args.seed is not None:
             cmd.extend(["--seed", str(args.seed)])
         if getattr(args, "steps", None) is not None:
@@ -1957,8 +1957,8 @@ def _audio_heartmula(args):
     duration_ms = args.duration if args.duration else args.seconds * 1000
     cmd.extend(["--duration", str(duration_ms)])
 
-    if args.topk:
-        cmd.extend(["--topk", str(args.topk)])
+    if args.top_k:
+        cmd.extend(["--topk", str(args.top_k)])
     if args.temperature:
         cmd.extend(["--temperature", str(args.temperature)])
     if args.cfg_scale:
@@ -2211,7 +2211,7 @@ def _text_whisper(args):
     cmd.extend(["--model", model])
 
     if getattr(args, "input_language", None):
-        cmd.extend(["--language", args.input_language])
+        cmd.extend(["--language", args.language])
 
     if getattr(args, "word_timestamps", False):
         cmd.append("--word-timestamps")
@@ -2227,7 +2227,7 @@ def _text_whisper(args):
     _emit(f"Transcribing {n_files} file{'s' if n_files > 1 else ''} …", "stage")
     _emit(f"  Model: {model}")
     if getattr(args, "input_language", None):
-        _emit(f"  Language: {args.input_language}")
+        _emit(f"  Language: {args.language}")
     _emit(f"  Format: {fmt}")
 
     result = run_worker(cmd, on_event=_event_handler)
@@ -2783,6 +2783,151 @@ def _output_audio_mucs(args):
     _emit(f"Output: {out_path}")
 
 
+# ── Image generation (FLUX.2) ────────────────────────────────────────────────
+
+IMAGE_WORKER_DIR = SCRIPT_DIR / "worker" / "image"
+IMAGE_WORKER = IMAGE_WORKER_DIR / "generate.py"
+FLUX2_DIR = IMAGE_WORKER_DIR / "flux2"
+FLUX2_ENV = "flux2"
+POSE_WORKER_DIR = SCRIPT_DIR / "worker" / "pose"
+POSE_WORKER = POSE_WORKER_DIR / "generate.py"
+POSE_ENV = "openpose"
+
+# Map user-facing model names to FLUX2_MODEL_INFO keys
+_IMAGE_MODEL_MAP = {
+    "4b":           "flux.2-klein-base-4b",
+    "4b-distilled": "flux.2-klein-4b",
+    "9b":           "flux.2-klein-base-9b",
+    "9b-distilled": "flux.2-klein-9b",
+    "9b-kv":        "flux.2-klein-9b-kv",
+    "dev":          "flux.2-dev",
+}
+
+
+def _image_openpose(args):
+    """Run DWPose pose estimation."""
+    images = getattr(args, "images", None)
+    if not images:
+        _emit("ERROR: --images required for openpose", "error")
+        sys.exit(1)
+
+    for img in images:
+        if not Path(img).exists():
+            _emit(f"ERROR: Image not found: {img}", "error")
+            sys.exit(1)
+
+    if not POSE_WORKER.exists():
+        _emit("ERROR: worker/pose/generate.py not found", "error")
+        _emit("  Run: bash worker/pose/install.sh", "error")
+        sys.exit(1)
+
+    out_path = Path(args.output) if args.output else Path("pose.png")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    cmd = [
+        str(CONDA_BIN), "run", "--no-capture-output", "-n", POSE_ENV,
+        "python", str(POSE_WORKER),
+        "--images", *images,
+        "-o", str(out_path),
+    ]
+
+    mode = getattr(args, "pose_mode", None)
+    if mode:
+        cmd.extend(["--mode", mode])
+
+    _emit(f"Extracting pose ({len(images)} image(s)) …", "stage")
+
+    result = run_worker(cmd, on_event=_event_handler)
+    finish_progress()
+    if result.returncode != 0:
+        _emit("ERROR: Pose estimation failed.", "error")
+        sys.exit(1)
+
+    if result.stdout.strip():
+        print(result.stdout.strip())
+
+    _emit(f"Output: {out_path}")
+
+
+def cmd_image(args):
+    """Generate or process images."""
+    engine = args.engine
+    if engine == "openpose":
+        return _image_openpose(args)
+
+    if engine != "flux.2":
+        _emit(f"ERROR: Unknown image engine '{engine}'", "error")
+        sys.exit(1)
+
+    if not IMAGE_WORKER.exists():
+        _emit("ERROR: worker/image/generate.py not found", "error")
+        _emit("  Run: bash worker/image/install.sh", "error")
+        sys.exit(1)
+
+    # Resolve model
+    model_key = getattr(args, "model", None) or "4b"
+    flux2_model = _IMAGE_MODEL_MAP.get(model_key)
+    if not flux2_model:
+        valid = ", ".join(_IMAGE_MODEL_MAP.keys())
+        _emit(f"ERROR: Unknown model '{model_key}'. Valid: {valid}", "error")
+        sys.exit(1)
+
+    prompt = getattr(args, "prompt", None)
+    if not prompt:
+        _emit("ERROR: --prompt required for image generation", "error")
+        sys.exit(1)
+
+    # Output path
+    out_path = Path(args.output) if args.output else Path("image.png")
+    if out_path.is_dir() or str(out_path).endswith("/"):
+        out_path = out_path / f"image_{int(time.time())}.png"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Build command
+    cmd = [
+        str(CONDA_BIN), "run", "--no-capture-output", "-n", FLUX2_ENV,
+        "python", str(IMAGE_WORKER),
+        "--model", flux2_model,
+        "--prompt", prompt,
+        "-o", str(out_path),
+        "-W", str(getattr(args, "width", 1360)),
+        "-H", str(getattr(args, "height", 768)),
+    ]
+
+    seed = getattr(args, "seed", None)
+    if seed is not None:
+        cmd.extend(["--seed", str(seed)])
+
+    steps = getattr(args, "steps", None)
+    if steps is not None:
+        cmd.extend(["--steps", str(steps)])
+
+    guidance = getattr(args, "cfg_scale", None)
+    if guidance is not None:
+        cmd.extend(["--guidance", str(guidance)])
+
+    images = getattr(args, "images", None)
+    if images:
+        for img in images:
+            if not Path(img).exists():
+                _emit(f"ERROR: Image not found: {img}", "error")
+                sys.exit(1)
+        cmd.extend(["--images"] + images)
+
+    _emit(f"Generating image (flux.2/{model_key}) …", "stage")
+
+    result = run_worker(cmd, on_event=_event_handler)
+    finish_progress()
+    if result.returncode != 0:
+        _emit("ERROR: Image generation failed.", "error")
+        sys.exit(1)
+
+    if result.stdout.strip():
+        print(result.stdout.strip())
+
+    _emit(f"Output: {out_path}")
+
+
 # ── Stub handler for future mediums ──────────────────────────────────────────
 
 def _stub_medium(args):
@@ -2883,7 +3028,7 @@ def build_parser():
                          help="[ace-step/heartmula] Duration in ms (overrides --seconds)")
     p_audio.add_argument("--seed", type=int, default=None,
                          help="[ace-step/heartmula] Random seed")
-    p_audio.add_argument("--topk", type=int, default=None,
+    p_audio.add_argument("--top-k", type=int, default=None, dest="top_k",
                          help="[ace-step/heartmula] Top-k sampling")
     p_audio.add_argument("--temperature", type=float, default=None,
                          help="[ace-step/heartmula] Sampling temperature")
@@ -2936,7 +3081,7 @@ def build_parser():
                         help="Text engine")
     p_text.add_argument("--model", default=None,
                         help="Model name")
-    p_text.add_argument("--input-language", default=None,
+    p_text.add_argument("--language", default=None,
                         help="[whisper] Language hint (e.g. 'en', 'de')")
     p_text.add_argument("--word-timestamps", action="store_true",
                         help="[whisper] Include word-level timestamps")
@@ -3003,7 +3148,29 @@ def build_parser():
     p_output.set_defaults(func=cmd_output)
 
     # ── Stubs for future mediums ──────────────────────────────────────────
-    for stub_name in ["image", "video", "vision", "translation", "comparison"]:
+    # ── image ─────────────────────────────────────────────────────────────
+    p_image = sub.add_parser("image", help="Image generation & processing")
+    p_image.add_argument("--engine", required=True, choices=["flux.2", "openpose"],
+                          help="Image engine")
+    p_image.add_argument("--model", "-m", default=None,
+                          help="Model: 4b (default), 4b-distilled, 9b, 9b-distilled, 9b-kv, dev")
+    p_image.add_argument("--prompt", "-p", default=None, help="Text prompt")
+    p_image.add_argument("-o", "--output", default=None, help="Output file path")
+    p_image.add_argument("--seed", type=int, default=None, help="Random seed")
+    p_image.add_argument("--steps", type=int, default=None, help="Inference steps")
+    p_image.add_argument("--cfg-scale", type=float, default=None, dest="cfg_scale",
+                          help="Guidance scale")
+    p_image.add_argument("-W", "--width", type=int, default=1360, help="Image width (default: 1360)")
+    p_image.add_argument("-H", "--height", type=int, default=768, help="Image height (default: 768)")
+    p_image.add_argument("--images", nargs="+", default=None,
+                          help="Reference image path(s), up to 10")
+    p_image.add_argument("--pose-mode", default=None, dest="pose_mode",
+                          choices=["wholebody", "body", "bodyhand", "bodyface"],
+                          help="[openpose] Detection mode (default: wholebody)")
+    p_image.set_defaults(func=cmd_image)
+
+    # ── Stubs for future mediums ──────────────────────────────────────────
+    for stub_name in ["video", "translation", "comparison"]:
         p_stub = sub.add_parser(stub_name, help=f"{stub_name.title()} (coming soon)")
         p_stub.set_defaults(func=_stub_medium, medium=stub_name)
 

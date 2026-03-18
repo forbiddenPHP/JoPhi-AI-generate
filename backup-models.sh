@@ -124,6 +124,29 @@ else
     echo "  ── Demucs models: not found, skipping"
 fi
 
+# ── FLUX.2 models (worker/image/models/) ─────────────────────────────────────
+
+IMAGE_MODELS="$SCRIPT_DIR/worker/image/models"
+if [ -d "$IMAGE_MODELS" ] && [ "$(ls -A "$IMAGE_MODELS" 2>/dev/null)" ]; then
+    echo "  Backing up FLUX.2 models ..."
+    # -rL: dereference symlinks (HF cache uses symlinks snapshots → blobs)
+    cp -rL "$IMAGE_MODELS" "$MODELS_DIR/image_models"
+    echo -e "  ${GREEN}✓${NC} FLUX.2 models ($(du -sh "$MODELS_DIR/image_models" | cut -f1))"
+else
+    echo "  ── FLUX.2 models: not found, skipping"
+fi
+
+# ── DWPose models (worker/pose/models/) ──────────────────────────────────────
+
+POSE_MODELS="$SCRIPT_DIR/worker/pose/models"
+if [ -d "$POSE_MODELS" ] && [ "$(ls -A "$POSE_MODELS" 2>/dev/null)" ]; then
+    echo "  Backing up DWPose models ..."
+    cp -rL "$POSE_MODELS" "$MODELS_DIR/pose_models"
+    echo -e "  ${GREEN}✓${NC} DWPose models ($(du -sh "$MODELS_DIR/pose_models" | cut -f1))"
+else
+    echo "  ── DWPose models: not found, skipping"
+fi
+
 # ── Text worker configs (LLM default overrides) ─────────────────────────────
 
 TEXT_CONFIGS="$SCRIPT_DIR/worker/text/models"
