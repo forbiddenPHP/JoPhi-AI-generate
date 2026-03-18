@@ -4,6 +4,9 @@ worker/rvc/models/
 worker/text/models/
 worker/image/models/
 worker/pose/models/
+worker/sd15/models/
+worker/sd15/loras/
+worker/depth/models/
 rvc_models/
 worker/enhance/resemble-enhance/
 

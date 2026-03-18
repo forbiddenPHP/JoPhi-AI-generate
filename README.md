@@ -62,7 +62,9 @@ generate.py <medium> --engine <backend> [--model <variant>] [input] [options]
 | `ps` | — | Active models across all engines |
 
 | `image` | `flux.2` | Image generation & editing (FLUX.2 Klein, PyTorch MPS) |
+| `image` | `sd1.5` | Image generation (Stable Diffusion 1.5, CivitAI models + LoRAs) |
 | `image` | `openpose` | Pose estimation via DWPose (body, hands, face) |
+| `image` | `depth` | Depth estimation via Depth Anything V2 (zero-shot) |
 
 Future mediums (stubs): `video`, `translation`, `comparison`
 
@@ -553,6 +555,7 @@ python generate.py image --engine flux.2 -p "a sunset" --seed 42 -o sunset.png
 - `-W, --width` — Image width (default: 1360)
 - `-H, --height` — Image height (default: 768)
 - `--images` — Reference image path(s) for editing (up to 10)
+- `--depth` — Depth map image for structural conditioning (resized to output dimensions)
 
 </details>
 
@@ -600,6 +603,90 @@ python generate.py image --engine openpose --images img1.png img2.png -o poses/
 - `--pose-mode` — Detection mode: `wholebody` (default), `body`, `bodyhand`, `bodyface`
 
 </details>
+
+---
+
+### Stable Diffusion 1.5 (`image --engine sd1.5`)
+
+Generate images using Stable Diffusion 1.5 checkpoints from CivitAI. Supports multiple LoRAs with per-LoRA intensity.
+
+```bash
+# MatureMaleMix (default model, includes add_detail LoRA at 1.2)
+python generate.py image --engine sd1.5 -p "a muscular man with a beard, studio lighting" -o man.png
+
+# Without LoRA
+python generate.py image --engine sd1.5 --no-lora -p "a muscular man" -o man.png
+
+# DreamShaper
+python generate.py image --engine sd1.5 --model dreamshaper -p "fantasy landscape" -o landscape.png
+
+# Custom LoRA with intensity
+python generate.py image --engine sd1.5 --lora add_detail:1.5 -p "a warrior" -o warrior.png
+
+# Multiple LoRAs
+python generate.py image --engine sd1.5 --lora add_detail:1.2 --lora style:0.8 -p "..." -o out.png
+
+# Custom negative prompt
+python generate.py image --engine sd1.5 -p "a man" --negative-prompt "blurry, deformed" -o out.png
+```
+
+<details>
+<summary>Options</summary>
+
+- `--engine sd1.5` — Required
+- `--model` — Checkpoint: `mm` (default), `dreamshaper`
+- `-p, --prompt` — Text prompt (required)
+- `-o, --output` — Output file path (default: `image.png`)
+- `--negative-prompt` — Negative prompt (default: model-specific)
+- `-W, --width` — Image width (default: 1280, must be multiple of 64)
+- `-H, --height` — Image height (default: 768, must be multiple of 64)
+- `--steps` — Inference steps (default: 20)
+- `--cfg-scale` — Guidance scale (default: 3.5)
+- `--seed` — Random seed (default: random)
+- `--lora` — LoRA: `name:intensity` (repeatable, e.g. `add_detail:1.2`)
+- `--no-lora` — Disable default LoRA(s)
+
+</details>
+
+**Available models:**
+
+| Model | `--model` | Description |
+|---|---|---|
+| MatureMaleMix v1.4 | `mm` | Realistic/2.5D mature male characters (default LoRA: add_detail at 1.2) |
+| DreamShaper 8 | `dreamshaper` | Versatile artistic/photorealistic generation |
+
+---
+
+### Depth Estimation (`image --engine depth`)
+
+Estimate depth from any image using Depth Anything V2. Outputs a grayscale depth map (white = near, black = far).
+
+```bash
+# Single image
+python generate.py image --engine depth --images photo.png -o depth.png
+
+# Multiple images
+python generate.py image --engine depth --images img1.png img2.png -o depths/
+```
+
+<details>
+<summary>Options</summary>
+
+- `--images` — Input image(s) (required)
+- `-o, --output` — Output file path (default: `depth.png`)
+- `--model` — Model size: `small` (default, fast), `large` (detailed)
+
+</details>
+
+**Depth-conditioned generation with FLUX.2:**
+
+Use a depth map as structural reference for FLUX.2 image generation:
+
+```bash
+# Extract depth, then generate with same structure
+python generate.py image --engine depth --images photo.png -o depth.png
+python generate.py image --engine flux.2 --model 4b-distilled --depth depth.png -p "turn image 1 into a cartoon character" -o cartoon.png
+```
 
 ---
 
@@ -906,6 +993,8 @@ Shows installed models, target pitch settings, server status, and supported form
 | `text` | 3.11 | conda | LLM inference (ollama, Pillow, requests) — auto-updates |
 | `flux2` | 3.12 | conda | FLUX.2 image generation (PyTorch MPS) |
 | `openpose` | 3.12 | conda | DWPose pose estimation (ONNX Runtime) |
+| `sd15` | 3.12 | conda | Stable Diffusion 1.5 (PyTorch MPS, CivitAI models) |
+| `depth` | 3.12 | conda | Depth Anything V2 depth estimation (PyTorch MPS) |
 | `ace` (uv) | 3.11+ | uv | ACE-Step 1.5 music generation |
 
 </details>

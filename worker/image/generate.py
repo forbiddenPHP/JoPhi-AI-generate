@@ -6,6 +6,7 @@ Usage:
 """
 
 import argparse
+import gc
 import os
 import random
 import sys
@@ -38,6 +39,28 @@ from flux2.sampling import (
 from flux2.util import FLUX2_MODEL_INFO, load_ae, load_flow_model, load_text_encoder
 
 
+def _pan_and_scan(img, target_w, target_h):
+    """Upscale if needed, center-crop to target aspect ratio, then resize (Pan & Scan)."""
+    src_w, src_h = img.size
+    # Upscale so both sides are >= target
+    scale = max(target_w / src_w, target_h / src_h)
+    if scale > 1:
+        img = img.resize((int(src_w * scale), int(src_h * scale)), Image.LANCZOS)
+        src_w, src_h = img.size
+    # Center-crop to target ratio
+    target_ratio = target_w / target_h
+    src_ratio = src_w / src_h
+    if src_ratio > target_ratio:
+        new_w = int(src_h * target_ratio)
+        left = (src_w - new_w) // 2
+        img = img.crop((left, 0, left + new_w, src_h))
+    elif src_ratio < target_ratio:
+        new_h = int(src_w / target_ratio)
+        top = (src_h - new_h) // 2
+        img = img.crop((0, top, src_w, top + new_h))
+    return img.resize((target_w, target_h), Image.LANCZOS)
+
+
 def _device():
     if torch.backends.mps.is_available():
         return torch.device("mps")
@@ -53,6 +76,46 @@ def _dtype(device: torch.device):
     return torch.bfloat16
 
 
+def _free_memory() -> int:
+    """Return free RAM in bytes."""
+    import psutil
+    return psutil.virtual_memory().available
+
+
+def _memory_budget() -> int:
+    """Return usable memory: free RAM minus 1/9 safety margin."""
+    free = _free_memory()
+    return free - free // 9
+
+
+def _check_memory(label: str, needed_estimate: int):
+    """Check if enough memory is available before a step. Exit if not."""
+    budget = _memory_budget()
+    if needed_estimate > budget:
+        free_gb = _free_memory() / (1024**3)
+        need_gb = needed_estimate / (1024**3)
+        print(f"ERROR: Not enough memory for '{label}'. "
+              f"Need ~{need_gb:.1f} GB, have {free_gb:.1f} GB free.",
+              file=sys.stderr)
+        sys.exit(1)
+
+
+def _auto_chunk_dimensions(width: int, height: int, dtype: torch.dtype):
+    """If requested image exceeds memory budget, reduce dimensions proportionally."""
+    budget = _memory_budget()
+    bytes_per_pixel = 200 if dtype == torch.float32 else 100
+    max_pixels = budget // bytes_per_pixel
+    requested = width * height
+    if requested <= max_pixels:
+        return width, height
+    scale = (max_pixels / requested) ** 0.5
+    new_w = int(width * scale) // 16 * 16
+    new_h = int(height * scale) // 16 * 16
+    print(f"WARNING: {width}x{height} exceeds memory budget. "
+          f"Reducing to {new_w}x{new_h}", file=sys.stderr)
+    return new_w, new_h
+
+
 def main():
     parser = argparse.ArgumentParser(description="FLUX.2 image generation")
     parser.add_argument("--model", required=True, help="Model name (e.g. flux.2-klein-4b)")
@@ -64,6 +127,9 @@ def main():
     parser.add_argument("--steps", type=int, default=None, help="Inference steps")
     parser.add_argument("--guidance", type=float, default=None, help="Guidance scale")
     parser.add_argument("--images", nargs="+", default=None, help="Reference image path(s)")
+    parser.add_argument("--depth", default=None, help="Depth map image for structural conditioning")
+    parser.add_argument("--depth-strength", type=float, default=0.5,
+                        help="Depth conditioning strength 0.0-1.0 (default: 0.5)")
     args = parser.parse_args()
 
     model_name = args.model.lower()
@@ -82,8 +148,7 @@ def main():
     guidance = args.guidance if args.guidance is not None else defaults.get("guidance", 4.0)
 
     seed = args.seed if args.seed is not None else random.randrange(2**31)
-    width = args.width
-    height = args.height
+    width, height = _auto_chunk_dimensions(args.width, args.height, dtype)
 
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -94,30 +159,35 @@ def main():
     print(f"Steps: {num_steps}, Guidance: {guidance}", file=sys.stderr)
     print(f"Dimensions: {width}x{height}", file=sys.stderr)
 
-    # Load models
-    print("Loading text encoder ...", file=sys.stderr)
-    text_encoder = load_text_encoder(model_name, device=device)
-    text_encoder.eval()
+    import gc
 
-    print("Loading flow model ...", file=sys.stderr)
-    model = load_flow_model(model_name, device=device)
-    model.eval()
-
-    print("Loading autoencoder ...", file=sys.stderr)
+    # Step 1: Load autoencoder (small, ~500MB, needed for ref images + decode)
+    print("Loading autoencoder …", file=sys.stderr)
     ae = load_ae(model_name, device=device)
     ae.eval()
 
-    # Reference images
+    # Step 2: Encode reference images (if any) — depth map is added as first reference
     ref_tokens = None
     ref_ids = None
-    if args.images:
-        img_ctx = [Image.open(p) for p in args.images]
-        print(f"Encoding {len(img_ctx)} reference image(s) ...", file=sys.stderr)
+    all_images = list(args.images or [])
+    if args.depth:
+        all_images.insert(0, args.depth)
+    if all_images:
+        img_ctx = [Image.open(p) for p in all_images]
+        # Pan & Scan depth map to target aspect ratio + dimensions
+        if args.depth:
+            img_ctx[0] = _pan_and_scan(img_ctx[0], width, height)
+        print(f"Encoding {len(img_ctx)} reference image(s) …", file=sys.stderr)
         with torch.no_grad():
             ref_tokens, ref_ids = encode_image_refs(ae, img_ctx)
 
+    # Step 3: Load text encoder, encode prompt, then free it
+    print("Loading text encoder …", file=sys.stderr)
+    text_encoder = load_text_encoder(model_name, device=device)
+    text_encoder.eval()
+
     with torch.no_grad():
-        # Encode text
+        print("Encoding prompt …", file=sys.stderr)
         if model_info["guidance_distilled"]:
             ctx = text_encoder([args.prompt]).to(dtype)
         else:
@@ -126,15 +196,29 @@ def main():
             ctx = torch.cat([ctx_empty, ctx_prompt], dim=0)
         ctx, ctx_ids = batched_prc_txt(ctx)
 
-        # Create noise
+    # Free text encoder to make room for flow model
+    print("Freeing text encoder …", file=sys.stderr)
+    del text_encoder
+    gc.collect()
+    if device.type == 'mps':
+        torch.mps.empty_cache()
+
+    # Step 4: Load flow model on MPS
+    print("Loading flow model …", file=sys.stderr)
+    model = load_flow_model(model_name, device=device)
+    model.eval()
+
+    with torch.no_grad():
+        # Create noise latent
         shape = (1, 128, height // 16, width // 16)
         generator = torch.Generator(device=device).manual_seed(seed)
         randn = torch.randn(shape, generator=generator, dtype=dtype, device=device)
+
         x, x_ids = batched_prc_img(randn)
 
-        # Denoise
+        # Denoise (attention auto-chunks based on available memory)
         timesteps = get_schedule(num_steps, x.shape[1])
-        print("Generating ...", file=sys.stderr)
+        print("Denoising …", file=sys.stderr)
 
         if model_info["guidance_distilled"]:
             denoise_fn = (
@@ -154,7 +238,14 @@ def main():
                 img_cond_seq=ref_tokens, img_cond_seq_ids=ref_ids,
             )
 
+        # Free flow model before decoding
+        del model
+        gc.collect()
+        if device.type == 'mps':
+            torch.mps.empty_cache()
+
         # Decode
+        print("Decoding …", file=sys.stderr)
         x = torch.cat(scatter_ids(x, x_ids)).squeeze(2)
         x = ae.decode(x).float()
 

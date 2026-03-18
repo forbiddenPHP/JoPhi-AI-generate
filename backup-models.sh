@@ -147,6 +147,39 @@ else
     echo "  ── DWPose models: not found, skipping"
 fi
 
+# ── SD 1.5 models (worker/sd15/models/) ───────────────────────────────────────
+
+SD15_MODELS="$SCRIPT_DIR/worker/sd15/models"
+if [ -d "$SD15_MODELS" ] && [ "$(ls -A "$SD15_MODELS" 2>/dev/null)" ]; then
+    echo "  Backing up SD 1.5 models …"
+    cp -rL "$SD15_MODELS" "$MODELS_DIR/sd15_models"
+    echo -e "  ${GREEN}✓${NC} SD 1.5 models ($(du -sh "$MODELS_DIR/sd15_models" | cut -f1))"
+else
+    echo "  ── SD 1.5 models: not found, skipping"
+fi
+
+# ── SD 1.5 LoRAs (worker/sd15/loras/) ────────────────────────────────────────
+
+SD15_LORAS="$SCRIPT_DIR/worker/sd15/loras"
+if [ -d "$SD15_LORAS" ] && [ "$(ls -A "$SD15_LORAS" 2>/dev/null)" ]; then
+    echo "  Backing up SD 1.5 LoRAs …"
+    cp -rL "$SD15_LORAS" "$MODELS_DIR/sd15_loras"
+    echo -e "  ${GREEN}✓${NC} SD 1.5 LoRAs ($(du -sh "$MODELS_DIR/sd15_loras" | cut -f1))"
+else
+    echo "  ── SD 1.5 LoRAs: not found, skipping"
+fi
+
+# ── Depth Anything V2 models (worker/depth/models/) ──────────────────────────
+
+DEPTH_MODELS="$SCRIPT_DIR/worker/depth/models"
+if [ -d "$DEPTH_MODELS" ] && [ "$(ls -A "$DEPTH_MODELS" 2>/dev/null)" ]; then
+    echo "  Backing up Depth Anything V2 models …"
+    cp -rL "$DEPTH_MODELS" "$MODELS_DIR/depth_models"
+    echo -e "  ${GREEN}✓${NC} Depth Anything V2 models ($(du -sh "$MODELS_DIR/depth_models" | cut -f1))"
+else
+    echo "  ── Depth Anything V2 models: not found, skipping"
+fi
+
 # ── Text worker configs (LLM default overrides) ─────────────────────────────
 
 TEXT_CONFIGS="$SCRIPT_DIR/worker/text/models"

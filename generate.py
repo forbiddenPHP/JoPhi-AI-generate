@@ -2783,7 +2783,7 @@ def _output_audio_mucs(args):
     _emit(f"Output: {out_path}")
 
 
-# ── Image generation (FLUX.2) ────────────────────────────────────────────────
+# ── Image generation (FLUX.2 / SD 1.5) ──────────────────────────────────────
 
 IMAGE_WORKER_DIR = SCRIPT_DIR / "worker" / "image"
 IMAGE_WORKER = IMAGE_WORKER_DIR / "generate.py"
@@ -2792,6 +2792,12 @@ FLUX2_ENV = "flux2"
 POSE_WORKER_DIR = SCRIPT_DIR / "worker" / "pose"
 POSE_WORKER = POSE_WORKER_DIR / "generate.py"
 POSE_ENV = "openpose"
+SD15_WORKER_DIR = SCRIPT_DIR / "worker" / "sd15"
+SD15_WORKER = SD15_WORKER_DIR / "generate.py"
+SD15_ENV = "sd15"
+DEPTH_WORKER_DIR = SCRIPT_DIR / "worker" / "depth"
+DEPTH_WORKER = DEPTH_WORKER_DIR / "generate.py"
+DEPTH_ENV = "depth"
 
 # Map user-facing model names to FLUX2_MODEL_INFO keys
 _IMAGE_MODEL_MAP = {
@@ -2849,11 +2855,124 @@ def _image_openpose(args):
     _emit(f"Output: {out_path}")
 
 
+def _image_depth(args):
+    """Run Apple Depth Pro depth estimation."""
+    images = getattr(args, "images", None)
+    if not images:
+        _emit("ERROR: --images required for depth estimation", "error")
+        sys.exit(1)
+
+    for img in images:
+        if not Path(img).exists():
+            _emit(f"ERROR: Image not found: {img}", "error")
+            sys.exit(1)
+
+    if not DEPTH_WORKER.exists():
+        _emit("ERROR: worker/depth/generate.py not found", "error")
+        _emit("  Run: bash worker/depth/install.sh", "error")
+        sys.exit(1)
+
+    out_path = Path(args.output) if args.output else Path("depth.png")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    cmd = [
+        str(CONDA_BIN), "run", "--no-capture-output", "-n", DEPTH_ENV,
+        "python", str(DEPTH_WORKER),
+        "--images", *images,
+        "-o", str(out_path),
+    ]
+
+    _emit(f"Estimating depth ({len(images)} image(s)) …", "stage")
+
+    result = run_worker(cmd, on_event=_event_handler)
+    finish_progress()
+    if result.returncode != 0:
+        _emit("ERROR: Depth estimation failed.", "error")
+        sys.exit(1)
+
+    if result.stdout.strip():
+        print(result.stdout.strip())
+
+    _emit(f"Output: {out_path}")
+
+
+def _image_sd15(args):
+    """Run SD 1.5 image generation (maturemalemix etc.)."""
+    if not SD15_WORKER.exists():
+        _emit("ERROR: worker/sd15/generate.py not found", "error")
+        _emit("  Run: bash worker/sd15/install.sh", "error")
+        sys.exit(1)
+
+    prompt = getattr(args, "prompt", None)
+    if not prompt:
+        _emit("ERROR: --prompt required for image generation", "error")
+        sys.exit(1)
+
+    model = getattr(args, "model", None) or "mm"
+    out_path = Path(args.output) if args.output else Path("image.png")
+    if out_path.is_dir() or str(out_path).endswith("/"):
+        out_path = out_path / f"image_{int(time.time())}.png"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    cmd = [
+        str(CONDA_BIN), "run", "--no-capture-output", "-n", SD15_ENV,
+        "python", str(SD15_WORKER),
+        "--model", model,
+        "--prompt", prompt,
+        "-o", str(out_path),
+        "-W", str(getattr(args, "width", 512)),
+        "-H", str(getattr(args, "height", 512)),
+    ]
+
+    seed = getattr(args, "seed", None)
+    if seed is not None:
+        cmd.extend(["--seed", str(seed)])
+
+    steps = getattr(args, "steps", None)
+    if steps is not None:
+        cmd.extend(["--steps", str(steps)])
+
+    cfg = getattr(args, "cfg_scale", None)
+    if cfg is not None:
+        cmd.extend(["--cfg", str(cfg)])
+
+    negative = getattr(args, "negative_prompt", None)
+    if negative is not None:
+        cmd.extend(["--negative-prompt", negative])
+
+    loras = getattr(args, "lora", None)
+    if loras:
+        for lora_spec in loras:
+            cmd.extend(["--lora", lora_spec])
+
+    if getattr(args, "no_lora", False):
+        cmd.append("--no-lora")
+
+    _emit(f"Generating image (sd1.5/{model}) …", "stage")
+
+    result = run_worker(cmd, on_event=_event_handler)
+    finish_progress()
+    if result.returncode != 0:
+        _emit("ERROR: Image generation failed.", "error")
+        sys.exit(1)
+
+    if result.stdout.strip():
+        print(result.stdout.strip())
+
+    _emit(f"Output: {out_path}")
+
+
 def cmd_image(args):
     """Generate or process images."""
     engine = args.engine
     if engine == "openpose":
         return _image_openpose(args)
+
+    if engine == "sd1.5":
+        return _image_sd15(args)
+
+    if engine == "depth":
+        return _image_depth(args)
 
     if engine != "flux.2":
         _emit(f"ERROR: Unknown image engine '{engine}'", "error")
@@ -2913,6 +3032,13 @@ def cmd_image(args):
                 _emit(f"ERROR: Image not found: {img}", "error")
                 sys.exit(1)
         cmd.extend(["--images"] + images)
+
+    depth = getattr(args, "depth", None)
+    if depth:
+        if not Path(depth).exists():
+            _emit(f"ERROR: Depth map not found: {depth}", "error")
+            sys.exit(1)
+        cmd.extend(["--depth", depth])
 
     _emit(f"Generating image (flux.2/{model_key}) …", "stage")
 
@@ -3150,10 +3276,10 @@ def build_parser():
     # ── Stubs for future mediums ──────────────────────────────────────────
     # ── image ─────────────────────────────────────────────────────────────
     p_image = sub.add_parser("image", help="Image generation & processing")
-    p_image.add_argument("--engine", required=True, choices=["flux.2", "openpose"],
+    p_image.add_argument("--engine", required=True, choices=["flux.2", "openpose", "sd1.5", "depth"],
                           help="Image engine")
     p_image.add_argument("--model", "-m", default=None,
-                          help="Model: 4b (default), 4b-distilled, 9b, 9b-distilled, 9b-kv, dev")
+                          help="Model: flux.2: 4b|4b-distilled|9b|9b-distilled; mm: mm (default)")
     p_image.add_argument("--prompt", "-p", default=None, help="Text prompt")
     p_image.add_argument("-o", "--output", default=None, help="Output file path")
     p_image.add_argument("--seed", type=int, default=None, help="Random seed")
@@ -3167,6 +3293,14 @@ def build_parser():
     p_image.add_argument("--pose-mode", default=None, dest="pose_mode",
                           choices=["wholebody", "body", "bodyhand", "bodyface"],
                           help="[openpose] Detection mode (default: wholebody)")
+    p_image.add_argument("--depth", default=None,
+                          help="[flux.2] Depth map image for structural conditioning (uses empty latent)")
+    p_image.add_argument("--negative-prompt", default=None, dest="negative_prompt",
+                          help="[sd1.5] Negative prompt")
+    p_image.add_argument("--lora", action="append", default=None,
+                          help="[sd1.5] LoRA: name:intensity (e.g. add_detail:1.2). Repeatable.")
+    p_image.add_argument("--no-lora", action="store_true", dest="no_lora",
+                          help="[sd1.5] Disable default LoRA")
     p_image.set_defaults(func=cmd_image)
 
     # ── Stubs for future mediums ──────────────────────────────────────────

@@ -67,7 +67,7 @@ FLUX2_MODEL_INFO = {
         "params": Klein4BParams(),
         "text_encoder_load_fn": lambda device="cuda": load_qwen3_embedder(variant="4B", device=device),
         "model_path": "KLEIN_4B_BASE_MODEL_PATH",
-        "defaults": {"guidance": 4.0, "num_steps": 50},
+        "defaults": {"guidance": 4.0, "num_steps": 20},
         "fixed_params": {},
         "guidance_distilled": False,
     },
@@ -79,7 +79,7 @@ FLUX2_MODEL_INFO = {
         "params": Klein9BParams(),
         "text_encoder_load_fn": lambda device="cuda": load_qwen3_embedder(variant="8B", device=device),
         "model_path": "KLEIN_9B_BASE_MODEL_PATH",
-        "defaults": {"guidance": 4.0, "num_steps": 50},
+        "defaults": {"guidance": 4.0, "num_steps": 20},
         "fixed_params": {},
         "guidance_distilled": False,
     },
@@ -90,14 +90,15 @@ FLUX2_MODEL_INFO = {
         "params": Flux2Params(),
         "text_encoder_load_fn": load_mistral_small_embedder,
         "model_path": "FLUX2_MODEL_PATH",
-        "defaults": {"guidance": 4.0, "num_steps": 50},
+        "defaults": {"guidance": 4.0, "num_steps": 20},
         "fixed_params": {},
         "guidance_distilled": True,
     },
 }
 
 
-def load_flow_model(model_name: str, debug_mode: bool = False, device: str | torch.device = "cuda") -> Flux2:
+def load_flow_model(model_name: str, debug_mode: bool = False, device: str | torch.device = "cuda",
+                     target_dtype: torch.dtype | None = None) -> Flux2:
     config = FLUX2_MODEL_INFO[model_name.lower()]
 
     if debug_mode:
@@ -123,7 +124,7 @@ def load_flow_model(model_name: str, debug_mode: bool = False, device: str | tor
                 )
                 sys.exit(1)
 
-    dtype = model_dtype(device)
+    dtype = target_dtype or model_dtype(device)
     if not debug_mode:
         with torch.device("meta"):
             model = Flux2(FLUX2_MODEL_INFO[model_name.lower()]["params"]).to(dtype)

@@ -141,12 +141,8 @@ class Flux2(nn.Module):
 
         for block in self.double_blocks:
             img, txt, _ = block.forward_kv_extract(
-                img,
-                txt,
-                pe_x,
-                pe_ctx,
-                double_block_mod_img,
-                double_block_mod_txt,
+                img, txt, pe_x, pe_ctx,
+                double_block_mod_img, double_block_mod_txt,
                 num_ref_tokens=0,
             )
 
@@ -155,15 +151,11 @@ class Flux2(nn.Module):
 
         for block in self.single_blocks:
             img, _ = block.forward_kv_extract(
-                img,
-                pe,
-                single_block_mod,
-                num_txt_tokens,
-                num_ref_tokens=0,
+                img, pe, single_block_mod,
+                num_txt_tokens, num_ref_tokens=0,
             )
 
         img = img[:, num_txt_tokens:, ...]
-
         img = self.final_layer(img, vec)
         return img
 
@@ -223,12 +215,8 @@ class Flux2(nn.Module):
         double_block_cache = []
         for block in self.double_blocks:
             img, txt, cache = block.forward_kv_extract(
-                img,
-                txt,
-                pe_x,
-                pe_ctx,
-                double_block_mod_img,
-                double_block_mod_txt,
+                img, txt, pe_x, pe_ctx,
+                double_block_mod_img, double_block_mod_txt,
                 num_ref_tokens,
             )
             double_block_cache.append(cache)
@@ -245,11 +233,8 @@ class Flux2(nn.Module):
         single_block_cache = []
         for block in self.single_blocks:
             img, cache = block.forward_kv_extract(
-                img,
-                pe,
-                single_block_mod,
-                num_txt_tokens,
-                num_ref_tokens,
+                img, pe, single_block_mod,
+                num_txt_tokens, num_ref_tokens,
             )
             single_block_cache.append(cache)
 
@@ -299,12 +284,8 @@ class Flux2(nn.Module):
 
         for i, block in enumerate(self.double_blocks):
             img, txt = block.forward_kv_cached(
-                img,
-                txt,
-                pe_x,
-                pe_ctx,
-                double_block_mod_img,
-                double_block_mod_txt,
+                img, txt, pe_x, pe_ctx,
+                double_block_mod_img, double_block_mod_txt,
                 kv_cache["double_blocks"][i],
             )
 
@@ -313,11 +294,8 @@ class Flux2(nn.Module):
 
         for i, block in enumerate(self.single_blocks):
             img = block.forward_kv_cached(
-                img,
-                pe,
-                single_block_mod,
-                num_txt_tokens,
-                kv_cache["single_blocks"][i],
+                img, pe, single_block_mod,
+                num_txt_tokens, kv_cache["single_blocks"][i],
             )
 
         # Strip txt tokens only (no ref tokens in sequence)
@@ -755,6 +733,65 @@ class QKNorm(torch.nn.Module):
         return q.to(v), k.to(v)
 
 
+def _compute_attn_chunks(q: Tensor, k: Tensor) -> int:
+    """Compute how many chunks to split Q into based on available memory.
+
+    Uses 8/9 of free RAM as budget. If attention fits in one go, returns 1 (no chunking).
+    Accepts both 4D (B, H, N, D) and 3D (B, N, C) tensors.
+    """
+    import psutil
+    free = psutil.virtual_memory().available
+    budget = free - free // 9
+
+    if q.ndim == 4:
+        B, H, N_q, D = q.shape
+        N_k = k.shape[2]
+    elif q.ndim == 3:
+        B, N_q, C = q.shape
+        # Estimate attention dimensions from typical model config
+        H = 48  # max heads (FLUX.2-dev), conservative estimate
+        D = C // H if C % H == 0 else 128
+        N_k = k.shape[1]
+    else:
+        return 1
+
+    bytes_per_elem = q.element_size()
+
+    # Attention needs: scores (B, H, N_q, N_k) + output (B, H, N_q, D)
+    attn_mem = B * H * N_q * N_k * bytes_per_elem  # scores
+    attn_mem += B * H * N_q * D * bytes_per_elem    # output
+    attn_mem *= 2  # safety margin for intermediates
+
+    if attn_mem <= budget:
+        return 1  # fits, no chunking
+
+    # How many Q rows fit in budget?
+    per_row = B * H * N_k * bytes_per_elem * 2 + B * H * D * bytes_per_elem * 2
+    rows_per_chunk = max(1, int(budget / per_row))
+    num_chunks = math.ceil(N_q / rows_per_chunk)
+    return max(1, num_chunks)
+
+
+def _chunked_sdpa(q: Tensor, k: Tensor, v: Tensor) -> Tensor:
+    """Scaled dot-product attention with automatic Q-chunking if memory is tight."""
+    num_chunks = _compute_attn_chunks(q, k)
+    if num_chunks == 1:
+        return F.scaled_dot_product_attention(q, k, v, is_causal=False)
+
+    N_q = q.shape[2]
+    chunk_size = math.ceil(N_q / num_chunks)
+    results = []
+    for i in range(0, N_q, chunk_size):
+        q_chunk = q[:, :, i:i + chunk_size, :]
+        out_chunk = F.scaled_dot_product_attention(q_chunk, k, v, is_causal=False)
+        results.append(out_chunk)
+    return torch.cat(results, dim=2)
+
+
+# Global chunk info for progress reporting (set by denoise loop)
+_current_chunk_info = {"num_chunks": 1, "enabled": False}
+
+
 def causal_attn_fn(
     q: Tensor,
     k: Tensor,
@@ -765,6 +802,7 @@ def causal_attn_fn(
 ) -> Tensor:
     """
     Causal attention where reference tokens only attend to themselves.
+    Automatically chunks Q dimension if memory is tight.
 
     Without cache: layout is [txt, ref, img]. txt+img attend to all, ref self-attends.
     With cache: layout is [txt, img]. Cached ref K/V injected into attention.
@@ -783,7 +821,7 @@ def causal_attn_fn(
         q_txt_img = torch.cat([q_txt, q_img], dim=2)
         k_all = torch.cat([k_txt, k_ref, k_img], dim=2)
         v_all = torch.cat([v_txt, v_ref, v_img], dim=2)
-        out = F.scaled_dot_product_attention(q_txt_img, k_all, v_all, is_causal=False)
+        out = _chunked_sdpa(q_txt_img, k_all, v_all)
 
     else:
         ref_start = num_txt_tokens
@@ -803,11 +841,11 @@ def causal_attn_fn(
         q_txt_img = torch.cat([q_txt, q_img], dim=2)
         k_all = torch.cat([k_txt, k_ref, k_img], dim=2)
         v_all = torch.cat([v_txt, v_ref, v_img], dim=2)
-        attn_txt_img = F.scaled_dot_product_attention(q_txt_img, k_all, v_all, is_causal=False)
+        attn_txt_img = _chunked_sdpa(q_txt_img, k_all, v_all)
         attn_txt = attn_txt_img[:, :, :ref_start, :]
         attn_img = attn_txt_img[:, :, ref_start:, :]
 
-        # ref only attends to itself
+        # ref only attends to itself (small, no chunking needed)
         attn_ref = F.scaled_dot_product_attention(q_ref, k_ref, v_ref, is_causal=False)
 
         out = torch.cat([attn_txt, attn_ref, attn_img], dim=2)

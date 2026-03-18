@@ -1,4 +1,5 @@
 import math
+import sys
 
 import torch
 import torchvision
@@ -281,8 +282,19 @@ def denoise(
     img_cond_seq: Tensor | None = None,
     img_cond_seq_ids: Tensor | None = None,
 ):
+    from tqdm import tqdm
+    from .model import _compute_attn_chunks
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
-    for t_curr, t_prev in zip(timesteps[:-1], timesteps[1:]):
+    steps = list(zip(timesteps[:-1], timesteps[1:]))
+    num_steps = len(steps)
+
+    pbar = tqdm(enumerate(steps), total=num_steps, desc="Denoising", file=sys.stderr)
+    for step_idx, (t_curr, t_prev) in pbar:
+        num_chunks = _compute_attn_chunks(img, img)
+        if num_chunks > 1:
+            pbar.set_description(f"Denoising  {step_idx+1}/{num_steps} Chunk 1/{num_chunks}")
+        else:
+            pbar.set_description(f"Denoising")
         t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
         img_input = img
         img_input_ids = img_ids
@@ -326,7 +338,18 @@ def denoise_cached(
     """
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
 
-    for step_idx, (t_curr, t_prev) in enumerate(zip(timesteps[:-1], timesteps[1:])):
+    from tqdm import tqdm
+    from .model import _compute_attn_chunks
+    steps_pairs = list(zip(timesteps[:-1], timesteps[1:]))
+    num_steps = len(steps_pairs)
+
+    pbar = tqdm(enumerate(steps_pairs), total=num_steps, desc="Denoising", file=sys.stderr)
+    for step_idx, (t_curr, t_prev) in pbar:
+        num_chunks = _compute_attn_chunks(img, img)
+        if num_chunks > 1:
+            pbar.set_description(f"Denoising  {step_idx+1}/{num_steps} Chunk 1/{num_chunks}")
+        else:
+            pbar.set_description(f"Denoising")
         t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
 
         if step_idx == 0:
@@ -381,7 +404,18 @@ def denoise_cfg(
         img_cond_seq = torch.cat([img_cond_seq, img_cond_seq], dim=0)
         img_cond_seq_ids = torch.cat([img_cond_seq_ids, img_cond_seq_ids], dim=0)
 
-    for t_curr, t_prev in zip(timesteps[:-1], timesteps[1:]):
+    from tqdm import tqdm
+    from .model import _compute_attn_chunks
+    steps_pairs = list(zip(timesteps[:-1], timesteps[1:]))
+    num_steps = len(steps_pairs)
+
+    pbar = tqdm(enumerate(steps_pairs), total=num_steps, desc="Denoising", file=sys.stderr)
+    for step_idx, (t_curr, t_prev) in pbar:
+        num_chunks = _compute_attn_chunks(img, img)
+        if num_chunks > 1:
+            pbar.set_description(f"Denoising  {step_idx+1}/{num_steps} Chunk 1/{num_chunks}")
+        else:
+            pbar.set_description(f"Denoising")
         t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
 
         img_input = img

@@ -2,12 +2,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-FLUX2_DIR="$SCRIPT_DIR/flux2"
 CONDA_BIN="${CONDA_BIN:-/opt/miniconda3/bin/conda}"
-ENV_NAME="flux2"
+ENV_NAME="depth"
 WHEELS_DIR="$SCRIPT_DIR/wheels"
 
-echo "── Image Worker (FLUX.2) ──"
+echo "── Depth Worker (Apple Depth Pro) ──"
 
 if "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} " || [ -d "/opt/miniconda3/envs/$ENV_NAME" ]; then
     echo "  Removing old '$ENV_NAME' env …"
@@ -20,10 +19,12 @@ echo "  Creating env: $ENV_NAME (Python 3.12) …"
 
 if [ -d "$WHEELS_DIR" ] && [ "$(ls -A "$WHEELS_DIR"/*.whl 2>/dev/null)" ]; then
     echo "  Using cached wheels (offline) …"
-    "$CONDA_BIN" run --no-capture-output -n "$ENV_NAME" pip install -q --no-index --find-links "$WHEELS_DIR" "$FLUX2_DIR"
+    "$CONDA_BIN" run --no-capture-output -n "$ENV_NAME" pip install -q --no-index --find-links "$WHEELS_DIR" \
+        depth-pro
 else
-    echo "  Installing FLUX.2 dependencies from PyPI …"
-    "$CONDA_BIN" run --no-capture-output -n "$ENV_NAME" pip install -q "$FLUX2_DIR"
+    echo "  Installing Depth Pro from GitHub …"
+    "$CONDA_BIN" run --no-capture-output -n "$ENV_NAME" pip install -q \
+        git+https://github.com/apple/ml-depth-pro.git
 fi
 
-echo "✓ flux2 env ready"
+echo "✓ depth env ready"

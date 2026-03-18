@@ -244,10 +244,18 @@ echo ""
 echo "── Step 13/14: Pose Worker (DWPose) ──"
 bash "$SCRIPT_DIR/worker/pose/install.sh"
 
-# ── Step 14/14: Main App Env ────────────────────────────────────────────────
+echo ""
+echo "── Step 14/16: SD 1.5 Worker (MatureMaleMix) ──"
+bash "$SCRIPT_DIR/worker/sd15/install.sh"
 
 echo ""
-echo "── Step 14/14: Main App (tts-mist) ──"
+echo "── Step 15/16: Depth Worker (Depth Anything V2) ──"
+bash "$SCRIPT_DIR/worker/depth/install.sh"
+
+# ── Step 16/16: Main App Env ────────────────────────────────────────────────
+
+echo ""
+echo "── Step 16/16: Main App (tts-mist) ──"
 
 ENV_NAME="tts-mist"
 
@@ -350,6 +358,25 @@ if [ -d "$MODELS_DIR" ]; then
         mkdir -p "$SCRIPT_DIR/worker/pose/models"
         cp -a "$MODELS_DIR/pose_models/." "$SCRIPT_DIR/worker/pose/models/"
         echo -e "  ${GREEN}✓${NC} DWPose models restored"
+    fi
+
+    # SD 1.5 models + LoRAs → worker/sd15/
+    if [ -d "$MODELS_DIR/sd15_models" ]; then
+        mkdir -p "$SCRIPT_DIR/worker/sd15/models"
+        cp -a "$MODELS_DIR/sd15_models/." "$SCRIPT_DIR/worker/sd15/models/"
+        echo -e "  ${GREEN}✓${NC} SD 1.5 models restored"
+    fi
+    if [ -d "$MODELS_DIR/sd15_loras" ]; then
+        mkdir -p "$SCRIPT_DIR/worker/sd15/loras"
+        cp -a "$MODELS_DIR/sd15_loras/." "$SCRIPT_DIR/worker/sd15/loras/"
+        echo -e "  ${GREEN}✓${NC} SD 1.5 LoRAs restored"
+    fi
+
+    # Depth Pro model → worker/depth/models/
+    if [ -d "$MODELS_DIR/depth_models" ]; then
+        mkdir -p "$SCRIPT_DIR/worker/depth/models"
+        cp -a "$MODELS_DIR/depth_models/." "$SCRIPT_DIR/worker/depth/models/"
+        echo -e "  ${GREEN}✓${NC} Depth Anything V2 models restored"
     fi
 
     echo -e "  ${GREEN}✓${NC} Model restore complete"
@@ -515,6 +542,63 @@ hf_hub_download('yzd-v/DWPose', 'dw-ll_ucoco_384.onnx')
 print('  Done')
 "
     echo -e "${GREEN}✓${NC} DWPose models downloaded"
+
+    # ── SD 1.5 models (CivitAI) ──────────────────────────────────────
+    SD15_MODELS_DIR="$SCRIPT_DIR/worker/sd15/models"
+    SD15_LORAS_DIR="$SCRIPT_DIR/worker/sd15/loras"
+    mkdir -p "$SD15_MODELS_DIR" "$SD15_LORAS_DIR"
+
+    echo ""
+    echo "── SD 1.5 models (CivitAI) ──"
+
+    if [ ! -f "$SD15_MODELS_DIR/maturemalemix_v14.safetensors" ]; then
+        echo "  Downloading MatureMaleMix v1.4 …"
+        curl -L -o "$SD15_MODELS_DIR/maturemalemix_v14.safetensors" \
+            "https://civitai.com/api/download/models/75441?type=Model&format=SafeTensor&size=full&fp=fp16" || {
+            echo "  ⚠ Failed to download MatureMaleMix"
+        }
+    else
+        echo "  MatureMaleMix v1.4 already exists"
+    fi
+
+    if [ ! -f "$SD15_MODELS_DIR/dreamshaper_8.safetensors" ]; then
+        echo "  Downloading DreamShaper 8 …"
+        curl -L -o "$SD15_MODELS_DIR/dreamshaper_8.safetensors" \
+            "https://civitai.com/api/download/models/128713?type=Model&format=SafeTensor&size=pruned&fp=fp16" || {
+            echo "  ⚠ Failed to download DreamShaper"
+        }
+    else
+        echo "  DreamShaper 8 already exists"
+    fi
+
+    if [ ! -f "$SD15_LORAS_DIR/add_detail.safetensors" ]; then
+        echo "  Downloading Add More Details LoRA …"
+        curl -L -o "$SD15_LORAS_DIR/add_detail.safetensors" \
+            "https://civitai.com/api/download/models/87153?type=Model&format=SafeTensor" || {
+            echo "  ⚠ Failed to download LoRA"
+        }
+    else
+        echo "  Add More Details LoRA already exists"
+    fi
+
+    echo -e "${GREEN}✓${NC} SD 1.5 models downloaded"
+
+    # ── Depth Anything V2 models ────────────────────────────────────────
+    echo ""
+    echo "── Depth Anything V2 models ──"
+
+    "$CONDA_BIN" run --no-capture-output -n depth python -c "
+import os
+os.environ['HF_HOME'] = '$SCRIPT_DIR/worker/depth/models'
+from transformers import pipeline
+print('  Downloading Depth Anything V2 Small …')
+pipeline('depth-estimation', model='depth-anything/Depth-Anything-V2-Small-hf')
+print('  Done')
+" || {
+        echo "  ⚠ Failed to download Depth Anything V2"
+    }
+
+    echo -e "${GREEN}✓${NC} Depth Anything V2 models downloaded"
 
     echo ""
     echo -e "${GREEN}✓${NC} All model downloads complete"

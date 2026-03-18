@@ -9,23 +9,46 @@ import argparse
 import json
 import os
 import sys
+import warnings
 from pathlib import Path
+
+warnings.filterwarnings("ignore", message="USE_SYMLINKS")
 
 # Store models alongside this script
 _MODELS_DIR = Path(__file__).resolve().parent / "models"
 _MODELS_DIR.mkdir(exist_ok=True)
 os.environ["HF_HOME"] = str(_MODELS_DIR)
+os.environ["USE_SYMLINKS"] = "False"
 
-from huggingface_hub import hf_hub_download
 from dwpose.wholebody import Wholebody
 from dwpose import DwposeDetector
 from PIL import Image
 
+# Local model paths (downloaded by setup.sh)
+_DET_MODEL = "yolox_l.onnx"
+_POSE_MODEL = "dw-ll_ucoco_384.onnx"
+
+
+def _find_model(name):
+    """Find model file in local models dir, fallback to HF download."""
+    # Check HF cache structure
+    hf_dir = _MODELS_DIR / "hub" / "models--yzd-v--DWPose"
+    if hf_dir.exists():
+        for onnx in hf_dir.rglob(name):
+            return str(onnx)
+    # Flat layout
+    flat = _MODELS_DIR / name
+    if flat.exists():
+        return str(flat)
+    # Fallback: download
+    from huggingface_hub import hf_hub_download
+    return hf_hub_download("yzd-v/DWPose", name)
+
 
 def _load_detector():
-    """Download ONNX models and create detector."""
-    det_path = hf_hub_download("yzd-v/DWPose", "yolox_l.onnx")
-    pose_path = hf_hub_download("yzd-v/DWPose", "dw-ll_ucoco_384.onnx")
+    """Load ONNX models and create detector."""
+    det_path = _find_model(_DET_MODEL)
+    pose_path = _find_model(_POSE_MODEL)
     wb = Wholebody(det_model_path=det_path, pose_model_path=pose_path, torchscript_device="cpu")
     return DwposeDetector(wb)
 
