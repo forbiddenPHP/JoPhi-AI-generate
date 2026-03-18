@@ -18,6 +18,8 @@ Usage:
   python generate.py voice --engine rvc --model my-voice input.wav --pitch 12
   python generate.py voice --engine rvc --model my-voice input.wav --target-hz 280
   python generate.py voice --engine rvc --model my-voice input.wav --decoder crepe
+  python generate.py voice --engine clone-tts --text "Hello" -o out.wav           Voice cloning (default ref)
+  python generate.py voice --engine clone-tts --reference ref.wav --text "Hello"  Voice cloning (custom ref)
   python generate.py audio --engine enhance input.wav                  Denoise + enhance audio
   python generate.py audio --engine enhance input.wav --denoise-only   Denoise only (faster)
   python generate.py audio --engine enhance input.wav --enhance-only   Super-resolution only
@@ -31,13 +33,23 @@ Usage:
   python generate.py audio --engine diarize interview.wav --verify
   python generate.py audio --engine sfx --text "a dog barking" -o sfx.wav      Sound effect generation
   python generate.py audio --engine sfx --text "thunder and rain" -s 10 -o weather.wav
+  python generate.py audio --engine voice-removal song.mp3 -o karaoke/             Remove vocals
   python generate.py text --engine whisper audio.wav                   Transcribe audio
   python generate.py text --engine whisper audio.wav --model large-v3 --format srt
   python generate.py text --engine whisper audio.wav --language de
   python generate.py text --engine heartmula-transcribe song.mp3       Extract lyrics
+  python generate.py text --engine ollama --model qwen3.5:latest --endpoint chat --messages '[{"role":"user","content":"Hi"}]'
+  python generate.py text --engine ollama --model qwen3.5:latest --endpoint generate --prompt "Explain X"
   python generate.py output --engine audio-concatenate a.wav b.mp3 -o out.wav  Concatenate audio files
   python generate.py output --engine audio-concatenate a.wav b.wav --output-bitrate 320k -o out.mp3
   python generate.py output --engine audio-concatenate a.wav b.wav c.mp3 --clip 0:fade-in=0.3 --clip 1:crossfade=0.5,volume=1.2 --clip 2:fade-out=0.5 -o out.mp3
+  python generate.py output --engine audio-mucs vocals.wav drums.wav -o mix.wav   Mix/overlay audio
+  python generate.py output --engine audio-mucs v.wav d.wav --clip 0:pan=-0.2,volume=0.8 -o mix.wav
+  python generate.py image --engine flux.2 -p "a cat on a cliff" -o cat.png       Image generation (FLUX.2)
+  python generate.py image --engine flux.2 --model 4b-distilled -p "a cat" -o cat.png
+  python generate.py image --engine sd1.5 -p "a warrior, studio lighting" -o out.png  Stable Diffusion 1.5
+  python generate.py image --engine openpose --images person.png -o pose.png      Pose estimation
+  python generate.py image --engine depth --images photo.png -o depth.png         Depth estimation
   python generate.py models list                                          List all models
   python generate.py models --engine rvc list                              List RVC models
   python generate.py models --engine rvc search "neutral male"             Search HuggingFace
@@ -45,6 +57,12 @@ Usage:
   python generate.py models --engine rvc remove <name>                     Remove a model
   python generate.py models --engine rvc set-pitch <name> <hz>             Set target pitch manually
   python generate.py models --engine rvc calibrate <name>                  Auto-detect target pitch
+  python generate.py models --engine ollama list                              List Ollama models
+  python generate.py models --engine ollama pull qwen3.5:latest               Pull Ollama model
+  python generate.py models --engine ollama remove <name>                     Remove Ollama model
+  python generate.py models --engine huggingface list                         List cached HF models
+  python generate.py models --engine huggingface search "qwen vision"         Search HuggingFace
+  python generate.py models --engine huggingface pull Org/Model               Download HF model
   python generate.py server start                          Start RVC worker
   python generate.py server stop                           Stop RVC worker
   python generate.py server status                         Check worker status
