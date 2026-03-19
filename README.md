@@ -695,6 +695,75 @@ python generate.py image --engine flux.2 --model 4b-distilled --controlnet depth
 
 ---
 
+### Line Art Extraction (`image --engine lineart`)
+
+Extract line art from images using TEED (learned) or Canny (classical).
+
+```bash
+# TEED (default, learned edge detection)
+python generate.py image --engine lineart --images photo.png -o lines.png
+
+# Canny (classical, no ML model)
+python generate.py image --engine lineart --model canny --images photo.png -o edges.png
+
+# Use as ControlNet conditioning
+python generate.py image --engine flux.2 --controlnet lineart:lines.png -p "colorful illustration" -o out.png
+```
+
+<details>
+<summary>Options</summary>
+
+- `--images` — Input image(s) (required)
+- `-o, --output` — Output file path (default: `lineart.png`)
+- `--model` — Extraction method: `teed` (default, learned), `canny` (classical)
+
+</details>
+
+---
+
+### Normal Map Estimation (`image --engine normalmap`)
+
+Estimate surface normals from images using Marigold-Normals v1.1. Outputs RGB normal map (standard color encoding).
+
+```bash
+python generate.py image --engine normalmap --images photo.png -o normals.png
+
+# Use as ControlNet conditioning
+python generate.py image --engine flux.2 --controlnet normalmap:normals.png -p "dramatic lighting" -o out.png
+```
+
+<details>
+<summary>Options</summary>
+
+- `--images` — Input image(s) (required)
+- `-o, --output` — Output file path (default: `normalmap.png`)
+- `--steps` — Denoising steps (default: 4)
+
+</details>
+
+---
+
+### Sketch/Edge Extraction (`image --engine sketch`)
+
+Extract edges from images using HED (Holistically-Nested Edge Detection). Runs on CPU via OpenCV DNN — no PyTorch required.
+
+```bash
+python generate.py image --engine sketch --images photo.png -o sketch.png
+
+# Use as ControlNet conditioning
+python generate.py image --engine flux.2 --controlnet sketch:sketch.png -p "fantasy scene" -o out.png
+```
+
+<details>
+<summary>Options</summary>
+
+- `--images` — Input image(s) (required)
+- `-o, --output` — Output file path (default: `sketch.png`)
+
+</details>
+
+---
+
 ### Speaker Diarization (`audio --engine diarize`)
 
 Split dialogue audio into separate tracks per speaker using pyannote.audio (MPS).
@@ -999,6 +1068,9 @@ Shows installed models, target pitch settings, server status, and supported form
 | `openpose` | 3.12 | conda | DWPose pose estimation (ONNX Runtime) |
 | `sd15` | 3.12 | conda | Stable Diffusion 1.5 (PyTorch MPS, CivitAI models) |
 | `depth` | 3.12 | conda | Depth Anything V2 depth estimation (PyTorch MPS) |
+| `lineart` | 3.12 | conda | TEED/AnyLine line art extraction (controlnet-aux) |
+| `normalmap` | 3.12 | conda | Marigold-Normals v1.1 surface normal estimation |
+| `sketch` | 3.12 | conda | HED edge extraction (OpenCV DNN, no PyTorch) |
 | `ace` (uv) | 3.11+ | uv | ACE-Step 1.5 music generation |
 
 </details>

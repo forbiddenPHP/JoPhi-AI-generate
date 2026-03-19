@@ -169,93 +169,105 @@ echo -e "${GREEN}✓${NC} Prerequisites OK"
 # ── Step 1: RVC Worker Env ───────────────────────────────────────────────────
 
 echo ""
-echo "── Step 1/12: RVC Worker ──"
+echo "── Step 1/19: RVC Worker ──"
 bash "$SCRIPT_DIR/worker/rvc/install.sh"
 
 # ── Step 2: Enhance Worker Env ───────────────────────────────────────────────
 
 echo ""
-echo "── Step 2/12: Enhance Worker ──"
+echo "── Step 2/19: Enhance Worker ──"
 bash "$SCRIPT_DIR/worker/enhance/install.sh"
 
 # ── Step 3: HeartMuLa Music Worker Env ───────────────────────────────────────
 
 echo ""
-echo "── Step 3/12: HeartMuLa Music Worker ──"
+echo "── Step 3/19: HeartMuLa Music Worker ──"
 bash "$SCRIPT_DIR/worker/music/install.sh"
 
 # ── Step 4: ACE-Step Music Worker (uv) ───────────────────────────────────────
 
 echo ""
-echo "── Step 4/12: ACE-Step Music Worker ──"
+echo "── Step 4/19: ACE-Step Music Worker ──"
 bash "$SCRIPT_DIR/worker/ace/install.sh"
 
 # ── Step 5: Whisper Worker Env ────────────────────────────────────────────────
 
 echo ""
-echo "── Step 5/12: Whisper Worker ──"
+echo "── Step 5/19: Whisper Worker ──"
 bash "$SCRIPT_DIR/worker/whisper/install.sh"
 
 # ── Step 6: Diarize Worker Env ───────────────────────────────────────────────
 
 echo ""
-echo "── Step 6/12: Diarize Worker ──"
+echo "── Step 6/19: Diarize Worker ──"
 bash "$SCRIPT_DIR/worker/diarize/install.sh"
 
 # ── Step 7: Separate Worker Env ──────────────────────────────────────────────
 
 echo ""
-echo "── Step 7/12: Separate Worker ──"
+echo "── Step 7/19: Separate Worker ──"
 bash "$SCRIPT_DIR/worker/separate/install.sh"
 
 # ── Step 8: AI-TTS Worker Env ────────────────────────────────────────────────
 
 echo ""
-echo "── Step 8/12: AI-TTS Worker ──"
+echo "── Step 8/19: AI-TTS Worker ──"
 bash "$SCRIPT_DIR/worker/tts/install.sh"
 
 # ── Step 9: Language Detect Worker Env ───────────────────────────────────────
 
 echo ""
-echo "── Step 9/12: Language Detect Worker ──"
+echo "── Step 9/19: Language Detect Worker ──"
 bash "$SCRIPT_DIR/worker/langdetect/install.sh"
 
 # ── Step 10: SFX Worker Env ─────────────────────────────────────────────────
 
 echo ""
-echo "── Step 10/14: SFX Worker (EzAudio) ──"
+echo "── Step 10/19: SFX Worker (EzAudio) ──"
 bash "$SCRIPT_DIR/worker/sfx/install.sh"
 
 # ── Step 11: Text Worker Env ─────────────────────────────────────────────────
 
 echo ""
-echo "── Step 11/14: Text Worker ──"
+echo "── Step 11/19: Text Worker ──"
 bash "$SCRIPT_DIR/worker/text/install.sh"
 
-# ── Step 12/14: Image Worker (FLUX.2) ──────────────────────────────────────
+# ── Step 12/19: Image Worker (FLUX.2) ─────────────────────────────────────
 
 echo ""
-echo "── Step 12/14: Image Worker (FLUX.2) ──"
+echo "── Step 12/19: Image Worker (FLUX.2) ──"
 bash "$SCRIPT_DIR/worker/image/install.sh"
 
-# ── Step 13/14: Pose Worker (DWPose/OpenPose) ──────────────────────────────
+# ── Step 13/19: Pose Worker (DWPose/OpenPose) ─────────────────────────────
 
 echo ""
-echo "── Step 13/14: Pose Worker (DWPose) ──"
+echo "── Step 13/19: Pose Worker (DWPose) ──"
 bash "$SCRIPT_DIR/worker/pose/install.sh"
 
 echo ""
-echo "── Step 14/16: SD 1.5 Worker (MatureMaleMix) ──"
+echo "── Step 14/19: SD 1.5 Worker (MatureMaleMix) ──"
 bash "$SCRIPT_DIR/worker/sd15/install.sh"
 
 echo ""
-echo "── Step 15/16: Depth Worker (Depth Anything V2) ──"
+echo "── Step 15/19: Depth Worker (Depth Anything V2) ──"
 bash "$SCRIPT_DIR/worker/depth/install.sh"
 
-# ── Step 16/16: Main App Env ────────────────────────────────────────────────
+echo ""
+echo "── Step 16/19: Lineart Worker (TEED / Canny) ──"
+bash "$SCRIPT_DIR/worker/lineart/install.sh"
 
 echo ""
-echo "── Step 16/16: Main App (tts-mist) ──"
+echo "── Step 17/19: NormalMap Worker (Marigold-Normals) ──"
+bash "$SCRIPT_DIR/worker/normalmap/install.sh"
+
+echo ""
+echo "── Step 18/19: Sketch Worker (HED / OpenCV DNN) ──"
+bash "$SCRIPT_DIR/worker/sketch/install.sh"
+
+# ── Step 19/19: Main App Env ────────────────────────────────────────────────
+
+echo ""
+echo "── Step 19/19: Main App (tts-mist) ──"
 
 ENV_NAME="tts-mist"
 
