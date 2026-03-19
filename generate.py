@@ -375,6 +375,9 @@ def _query_worker_models(env: str, worker_script: str, runner: str = "conda") ->
             project_dir = str(Path(worker_script).resolve().parent / "ACE-Step-1.5")
             cmd = [str(UV_BIN), "run", "--project", project_dir,
                    "python", worker_script, "--list-models"]
+        elif runner == "native":
+            # No conda env needed (e.g. say voices)
+            cmd = [sys.executable, worker_script, "--list-models"]
         else:
             cmd = [str(CONDA_BIN), "run", "--no-capture-output", "-n", env,
                    "python", worker_script, "--list-models"]
@@ -399,6 +402,7 @@ def _get_worker_registry():
         # voice
         ("voice", "ai-tts",             TTS_ENV,       str(TTS_WORKER_DIR / "generate_speech.py")),
         ("voice", "rvc",                RVC_ENV,       str(RVC_WORKER_DIR / "list_models.py")),
+        ("voice", "say",                "",            str(SCRIPT_DIR / "worker" / "say" / "list_models.py"), "native"),
         # audio
         ("audio", "enhance",            ENHANCE_ENV,   str(SCRIPT_DIR / "worker" / "enhance" / "enhance.py")),
         ("audio", "demucs",             SEPARATE_ENV,  str(SEPARATE_WORKER_DIR / "separate.py")),
@@ -426,7 +430,6 @@ def _get_worker_registry():
 
 # Static entries for engines that don't have a worker with --list-models
 _STATIC_MODELS = [
-    ("voice", "say",               "",  "macOS built-in voices"),
     ("voice", "clone-tts",         "",  "clone any voice from audio"),
     ("audio", "voice-removal",     "",  "demucs-based"),
     ("output", "audio-concatenate", "", ""),
