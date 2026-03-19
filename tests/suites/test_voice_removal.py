@@ -26,7 +26,7 @@ def register(suite):
     suite.add(
         name="Prep: generate 60s party song (ACE-Step)",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "ace-step",
+            sys.executable, "generate.py", "audio", "ace-step",
             "--model", "turbo",
             "-l", LYRICS, "-t", TAGS,
             "-s", "60", "-o", str(prep_song),
@@ -38,7 +38,7 @@ def register(suite):
     suite.add(
         name="Voice removal (strip vocals)",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "voice-removal",
+            sys.executable, "generate.py", "audio", "voice-removal",
             str(prep_song),
             "-o", str(out),
         ],

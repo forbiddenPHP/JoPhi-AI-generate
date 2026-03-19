@@ -8,7 +8,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent.parent.parent
 TEST_MODEL = "smollm2:360m"
 
 _GEN = [sys.executable, "generate.py"]
-_MODELS = [*_GEN, "models", "--engine", "ollama"]
+_MODELS = [*_GEN, "models", "ollama"]
 
 
 def _model_already_installed() -> bool:
@@ -47,7 +47,7 @@ def register(suite):
     # 3. Quick inference test (model actually works)
     suite.add(
         name="Models: inference smollm2:360m",
-        cmd=[*_GEN, "text", "--engine", "ollama", "--model", TEST_MODEL,
+        cmd=[*_GEN, "text", "ollama", "--model", TEST_MODEL,
              "--endpoint", "generate", "--prompt", "Say hi."],
     )
 

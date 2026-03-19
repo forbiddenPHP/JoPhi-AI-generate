@@ -19,7 +19,7 @@ def register(suite):
         name="SD1.5 CN: extract depth",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "depth",
+            "depth",
             "--images", str(REF_IMAGE),
             "-o", str(out / "cn_depth.png"),
         ],
@@ -30,7 +30,7 @@ def register(suite):
         name="SD1.5 CN: extract lineart (TEED)",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "lineart",
+            "lineart",
             "--images", str(REF_IMAGE),
             "-o", str(out / "cn_lineart_teed.png"),
         ],
@@ -41,7 +41,7 @@ def register(suite):
         name="SD1.5 CN: extract lineart (Canny)",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "lineart",
+            "lineart",
             "--model", "canny",
             "--images", str(REF_IMAGE),
             "-o", str(out / "cn_lineart_canny.png"),
@@ -53,7 +53,7 @@ def register(suite):
         name="SD1.5 CN: extract sketch",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "sketch",
+            "sketch",
             "--images", str(REF_IMAGE),
             "-o", str(out / "cn_sketch.png"),
         ],
@@ -64,7 +64,7 @@ def register(suite):
         name="SD1.5 CN: extract normalmap",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "normalmap",
+            "normalmap",
             "--images", str(REF_IMAGE),
             "-o", str(out / "cn_normalmap.png"),
         ],
@@ -77,7 +77,7 @@ def register(suite):
         name="SD1.5 CN: depth-conditioned",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "sd1.5",
+            "sd1.5",
             "--controlnet", "depth:" + str(out / "cn_depth.png"),
             "-p", PROMPT,
             "--negative-prompt", NEGATIVE,
@@ -92,7 +92,7 @@ def register(suite):
         name="SD1.5 CN: lineart-conditioned (TEED)",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "sd1.5",
+            "sd1.5",
             "--controlnet", "lineart:" + str(out / "cn_lineart_teed.png"),
             "-p", PROMPT,
             "--negative-prompt", NEGATIVE,
@@ -107,7 +107,7 @@ def register(suite):
         name="SD1.5 CN: lineart-conditioned (Canny)",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "sd1.5",
+            "sd1.5",
             "--controlnet", "lineart:" + str(out / "cn_lineart_canny.png"),
             "-p", PROMPT,
             "--negative-prompt", NEGATIVE,
@@ -122,7 +122,7 @@ def register(suite):
         name="SD1.5 CN: sketch-conditioned",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "sd1.5",
+            "sd1.5",
             "--controlnet", "sketch:" + str(out / "cn_sketch.png"),
             "-p", PROMPT,
             "--negative-prompt", NEGATIVE,
@@ -137,7 +137,7 @@ def register(suite):
         name="SD1.5 CN: normalmap-conditioned",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "sd1.5",
+            "sd1.5",
             "--controlnet", "normalmap:" + str(out / "cn_normalmap.png"),
             "-p", PROMPT,
             "--negative-prompt", NEGATIVE,

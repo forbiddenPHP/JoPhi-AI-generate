@@ -22,7 +22,7 @@ def register(suite):
         name="Edit: remove glasses",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2", "--model", "4b-distilled",
+            "flux.2", "--model", "4b-distilled",
             "--images", str(JOHANNES),
             "-p", "remove the glasses from the man's face",
             "-W", "512", "-H", "512", "--seed", "42",
@@ -35,7 +35,7 @@ def register(suite):
         name="Edit: smooth skin",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2", "--model", "4b-distilled",
+            "flux.2", "--model", "4b-distilled",
             "--images", str(JOHANNES),
             "-p", "make the man's skin perfectly smooth and youthful, remove all wrinkles",
             "-W", "512", "-H", "512", "--seed", "42",
@@ -48,7 +48,7 @@ def register(suite):
         name="Edit: remove person",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2", "--model", "4b-distilled",
+            "flux.2", "--model", "4b-distilled",
             "--images", str(JOHANNES),
             "-p", "remove the person from the photo, show only the pool and hotel background",
             "-W", "512", "-H", "512", "--seed", "42",
@@ -62,7 +62,7 @@ def register(suite):
             name=f"Edit: turn to age {age}",
             cmd=[
                 sys.executable, "generate.py", "image",
-                "--engine", "flux.2", "--model", "4b-distilled",
+                "flux.2", "--model", "4b-distilled",
                 "--images", str(JOHANNES),
                 "-p", f"turn this 47 year old man to the age of {age} years",
                 "-W", "512", "-H", "512", "--seed", "42",
@@ -77,7 +77,7 @@ def register(suite):
         name="Edit: add painting on wall",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2", "--model", "4b-distilled",
+            "flux.2", "--model", "4b-distilled",
             "--images", str(LIVINGROOM),
             "-p", "add a framed oil painting of a sunset over the ocean on the wall above the sofa",
             "-W", "768", "-H", "512", "--seed", "42",
@@ -90,7 +90,7 @@ def register(suite):
         name="Edit: remove books from table",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2", "--model", "4b-distilled",
+            "flux.2", "--model", "4b-distilled",
             "--images", str(LIVINGROOM),
             "-p", "remove the books from the table",
             "-W", "768", "-H", "512", "--seed", "42",
@@ -103,7 +103,7 @@ def register(suite):
         name="Edit: replace mug with flowers",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2", "--model", "4b-distilled",
+            "flux.2", "--model", "4b-distilled",
             "--images", str(LIVINGROOM),
             "-p", "replace the mug on the table with a small bouquet of colorful flowers",
             "-W", "768", "-H", "512", "--seed", "42",
@@ -116,7 +116,7 @@ def register(suite):
         name="Edit: replace lamp with bookshelf",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2", "--model", "4b-distilled",
+            "flux.2", "--model", "4b-distilled",
             "--images", str(LIVINGROOM),
             "-p", "replace the lamp in the background with a slim bookshelf",
             "-W", "768", "-H", "512", "--seed", "42",

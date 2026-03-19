@@ -9,7 +9,7 @@ ENGINE = "ollama"
 TEST_IMAGE = SCRIPT_DIR / "tests" / "assets" / "test.png"
 IMAGE_URL = "https://www.ihpoj.at/~/2/media/0_johannes-in-bulgarien.jpg"
 
-_BASE = [sys.executable, "generate.py", "text", "--engine", ENGINE, "--model", MODEL]
+_BASE = [sys.executable, "generate.py", "text", ENGINE, "--model", MODEL]
 
 
 def _add_tui_json(suite, name, extra_args, output_tui=None, output_json=None):

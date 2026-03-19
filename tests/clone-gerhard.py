@@ -12,7 +12,7 @@ OUTPUT = SCRIPT_DIR / "demos" / "custom-voice" / "gerhard" / "clone_output.wav"
 TEXT = "Ich bin der kleine dicke, ich stell mich in die Mitte, ich mach' einen Knicks, denn sonst kann ich nix'!"
 
 cmd = [
-    sys.executable, "generate.py", "voice", "--engine", "clone-tts",
+    sys.executable, "generate.py", "voice", "clone-tts",
     "--reference", str(REFERENCE),
     "--language", "de",
     "--text", TEXT,

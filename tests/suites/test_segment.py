@@ -17,7 +17,7 @@ def register(suite):
         name="Segment: johannes foreground",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "segment",
+            "segment",
             "--images", str(JOHANNES),
             "-o", str(out / "johannes" / "foreground.png"),
         ],
@@ -28,7 +28,7 @@ def register(suite):
         name="Segment: johannes background",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "segment",
+            "segment",
             "--output-layer", "background",
             "--images", str(JOHANNES),
             "-o", str(out / "johannes" / "background.png"),
@@ -40,7 +40,7 @@ def register(suite):
         name="Segment: johannes both",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "segment",
+            "segment",
             "--output-layer", "both",
             "--images", str(JOHANNES),
             "-o", str(out / "johannes_both/"),
@@ -54,7 +54,7 @@ def register(suite):
         name="Segment: livingroom foreground",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "segment",
+            "segment",
             "--images", str(LIVINGROOM),
             "-o", str(out / "livingroom" / "foreground.png"),
         ],
@@ -65,7 +65,7 @@ def register(suite):
         name="Segment: livingroom background",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "segment",
+            "segment",
             "--output-layer", "background",
             "--images", str(LIVINGROOM),
             "-o", str(out / "livingroom" / "background.png"),
@@ -77,7 +77,7 @@ def register(suite):
         name="Segment: livingroom both",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "segment",
+            "segment",
             "--output-layer", "both",
             "--images", str(LIVINGROOM),
             "-o", str(out / "livingroom_both/"),

@@ -40,7 +40,7 @@ def register(suite):
     suite.add(
         name="Prep: generate 60s song (ACE-Step)",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "ace-step",
+            sys.executable, "generate.py", "audio", "ace-step",
             "--model", "turbo",
             "-l", PREP_LYRICS,
             "-t", "pop,vocal,english,clear vocals",
@@ -53,7 +53,7 @@ def register(suite):
     suite.add(
         name="Whisper EN transcribe (all formats)",
         cmd=[
-            sys.executable, "generate.py", "text", "--engine", "whisper",
+            sys.executable, "generate.py", "text", "whisper",
             str(prep_song),
             "--language", "en", "--format", "all",
             "-o", str(out / "ace-song-en"),
@@ -64,7 +64,7 @@ def register(suite):
     suite.add(
         name="Whisper DE transcribe (podcast)",
         cmd=[
-            sys.executable, "generate.py", "text", "--engine", "whisper",
+            sys.executable, "generate.py", "text", "whisper",
             str(PODCAST),
             "--language", "de", "--format", "all",
             "-o", str(out / "podcast-de"),
@@ -75,7 +75,7 @@ def register(suite):
     suite.add(
         name="Whisper SRT output",
         cmd=[
-            sys.executable, "generate.py", "text", "--engine", "whisper",
+            sys.executable, "generate.py", "text", "whisper",
             str(prep_song),
             "--language", "en", "--format", "srt",
             "-o", str(out / "ace-song-srt"),

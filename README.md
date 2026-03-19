@@ -14,11 +14,11 @@ bash setup.sh
 python generate.py server start
 
 # 3. Install a voice model
-python generate.py models --engine rvc search "neutral male"
-python generate.py models --engine rvc install User/ModelName
+python generate.py models rvc search "neutral male"
+python generate.py models rvc install User/ModelName
 
 # 4. Ready!
-python generate.py voice --engine rvc --model my-voice input.wav
+python generate.py voice rvc --model my-voice input.wav
 ```
 
 ### Requirements
@@ -36,7 +36,7 @@ python generate.py voice --engine rvc --model my-voice input.wav
 ## ABI Overview
 
 ```
-generate.py <medium> --engine <backend> [--model <variant>] [input] [options]
+generate.py <medium> <engine> [--model <variant>] [input] [options]
 ```
 
 | Medium | Engine | Purpose |
@@ -84,7 +84,7 @@ Future mediums (stubs): `video`, `translation`, `comparison`
 Switches all status/progress output from human-readable TUI to machine-readable JSON events. Works with every command.
 
 ```bash
-python generate.py voice --engine rvc --model my-voice input.wav --screen-log-format json
+python generate.py voice rvc --model my-voice input.wav --screen-log-format json
 python generate.py ps --screen-log-format json
 ```
 
@@ -118,46 +118,46 @@ Both `--lyrics` and `--text` are aliases — they resolve to the same internal f
 
 ## Features
 
-### Voice — AI TTS (`voice --engine ai-tts`)
+### Voice — AI TTS (`voice ai-tts`)
 
 Neural text-to-speech via Qwen3-TTS (mlx-audio). Runs locally on Apple Silicon.
 
 ```bash
 # Basic
-python generate.py voice --engine ai-tts --text "Hello world" -o demos/
+python generate.py voice ai-tts --text "Hello world" -o demos/
 
 # With preset voice
-python generate.py voice --engine ai-tts -v Serena --text "Hello" -o demos/
+python generate.py voice ai-tts -v Serena --text "Hello" -o demos/
 
 # With style instructions (refine mode)
-python generate.py voice --engine ai-tts -v Aiden -t "dramatic, slow" --text "Silence." -o demos/
+python generate.py voice ai-tts -v Aiden -t "dramatic, slow" --text "Silence." -o demos/
 
 # Smaller model (faster, less quality)
-python generate.py voice --engine ai-tts --tts-model small --text "Quick test" -o demos/
+python generate.py voice ai-tts --tts-model small --text "Quick test" -o demos/
 
 # Auto-detect language
-python generate.py voice --engine ai-tts --text "Der Fuchs springt über den Bach" -o demos/
+python generate.py voice ai-tts --text "Der Fuchs springt über den Bach" -o demos/
 
 # Explicit language
-python generate.py voice --engine ai-tts -v Dylan --language de --text "Hallo Welt" -o demos/
+python generate.py voice ai-tts -v Dylan --language de --text "Hallo Welt" -o demos/
 
 # Text from file
-python generate.py voice --engine ai-tts --text-file story.txt -o demos/
+python generate.py voice ai-tts --text-file story.txt -o demos/
 
 # Dialog (multiple voices)
-python generate.py voice --engine ai-tts --text "[Aiden] Hi! [Serena] Hello there!" -o demos/
+python generate.py voice ai-tts --text "[Aiden] Hi! [Serena] Hello there!" -o demos/
 
 # Dialog with per-segment style instructions
-python generate.py voice --engine ai-tts --text "[Aiden: excited, fast] Hi! [Serena: calm, slow] Hello there." -o demos/
+python generate.py voice ai-tts --text "[Aiden: excited, fast] Hi! [Serena: calm, slow] Hello there." -o demos/
 
 # Reproduce from prompt sidecar file
-python generate.py voice --engine ai-tts --prompt-file demos/speech.txt -o demos/
+python generate.py voice ai-tts --prompt-file demos/speech.txt -o demos/
 
 # Reproduce with different voice (CLI flags override sidecar values)
-python generate.py voice --engine ai-tts --prompt-file demos/speech.txt -v Dylan -o demos/
+python generate.py voice ai-tts --prompt-file demos/speech.txt -v Dylan -o demos/
 
 # List available voices
-python generate.py voice --engine ai-tts --list-voices
+python generate.py voice ai-tts --list-voices
 ```
 
 <details>
@@ -213,26 +213,26 @@ Language is auto-detected if `--language` is not set (via langdetect).
 
 ---
 
-### Voice — macOS TTS (`voice --engine say`)
+### Voice — macOS TTS (`voice say`)
 
 Generate speech from text using macOS `say` command. Optionally pipe through RVC for voice conversion.
 
 ```bash
 # System default voice
-python generate.py voice --engine say --text "Hallo Welt" -o demos/
+python generate.py voice say --text "Hallo Welt" -o demos/
 
 # Specific macOS voice
-python generate.py voice --engine say -v Anna --text "Hallo Welt" -o demos/
+python generate.py voice say -v Anna --text "Hallo Welt" -o demos/
 
 # With speaking rate
-python generate.py voice --engine say -v Samantha --rate 180 --text "Hello world" -o demos/
+python generate.py voice say -v Samantha --rate 180 --text "Hello world" -o demos/
 
 # Text from file
-python generate.py voice --engine say --text-file story.txt -o demos/
+python generate.py voice say --text-file story.txt -o demos/
 
 # Say + RVC voice conversion pipeline
-python generate.py voice --engine say --model my-voice --text "Hallo Welt" -o demos/
-python generate.py voice --engine say -v Anna --model my-voice --text "Hallo" -o demos/
+python generate.py voice say --model my-voice --text "Hallo Welt" -o demos/
+python generate.py voice say -v Anna --model my-voice --text "Hallo" -o demos/
 ```
 
 <details>
@@ -258,25 +258,25 @@ python generate.py voice --engine say -v Anna --model my-voice --text "Hallo" -o
 
 ---
 
-### Voice — RVC Conversion (`voice --engine rvc`)
+### Voice — RVC Conversion (`voice rvc`)
 
 Convert audio to a different voice using RVC with automatic pitch detection. Requires running server (`generate.py server start`).
 
 ```bash
 # Single file (auto-pitch from model config)
-python generate.py voice --engine rvc --model my-voice input.wav
+python generate.py voice rvc --model my-voice input.wav
 
 # Batch conversion
-python generate.py voice --engine rvc --model my-voice *.wav -o ./output/
+python generate.py voice rvc --model my-voice *.wav -o ./output/
 
 # Manual pitch shift (semitones, disables auto-pitch)
-python generate.py voice --engine rvc --model my-voice input.wav --pitch 12
+python generate.py voice rvc --model my-voice input.wav --pitch 12
 
 # Set target pitch directly (Hz)
-python generate.py voice --engine rvc --model my-voice input.wav --target-hz 280
+python generate.py voice rvc --model my-voice input.wav --target-hz 280
 
 # Choose pitch detection algorithm
-python generate.py voice --engine rvc --model my-voice input.wav --decoder crepe
+python generate.py voice rvc --model my-voice input.wav --decoder crepe
 ```
 
 <details>
@@ -297,7 +297,7 @@ When neither `--pitch` nor `--target-hz` is set:
 3. Computes pitch shift: `semitones = 12 * log2(target_f0 / input_f0)`
 4. Applies the shift via RVC's `f0up_key` parameter
 
-If the model has no `target_f0`, run `models --engine rvc set-pitch` first.
+If the model has no `target_f0`, run `models rvc set-pitch` first.
 
 **Implicit behaviors:**
 - Non-WAV files are auto-converted to WAV (44.1 kHz) via ffmpeg
@@ -308,19 +308,19 @@ If the model has no `target_f0`, run `models --engine rvc set-pitch` first.
 
 ---
 
-### Voice Cloning (`voice --engine clone-tts`)
+### Voice Cloning (`voice clone-tts`)
 
 Zero-shot voice cloning via Qwen3-TTS Base. Provide a 3–10 second reference audio sample and text to synthesize in that voice. Falls back to `voice/default-reference.m4a` if no `--reference` given.
 
 ```bash
 # Basic voice cloning (uses default reference)
-python generate.py voice --engine clone-tts --text "Hello world" -o output.wav
+python generate.py voice clone-tts --text "Hello world" -o output.wav
 
 # With explicit reference audio
-python generate.py voice --engine clone-tts --reference ref.wav --text "Hello world" -o output.wav
+python generate.py voice clone-tts --reference ref.wav --text "Hello world" -o output.wav
 
 # German with explicit reference text (auto-transcribed if omitted)
-python generate.py voice --engine clone-tts --reference ref.wav --language de --text "Guten Tag" -o output.wav
+python generate.py voice clone-tts --reference ref.wav --language de --text "Guten Tag" -o output.wav
 ```
 
 <details>
@@ -340,15 +340,15 @@ python generate.py voice --engine clone-tts --reference ref.wav --language de --
 
 ---
 
-### Audio Enhancement (`audio --engine enhance`)
+### Audio Enhancement (`audio enhance`)
 
 Denoise and super-resolve audio using resemble-enhance.
 
 ```bash
-python generate.py audio --engine enhance input.wav -o ./enhanced/
-python generate.py audio --engine enhance input.wav --denoise-only
-python generate.py audio --engine enhance input.wav --enhance-only
-python generate.py audio --engine enhance *.wav -o ./enhanced/
+python generate.py audio enhance input.wav -o ./enhanced/
+python generate.py audio enhance input.wav --denoise-only
+python generate.py audio enhance input.wav --enhance-only
+python generate.py audio enhance *.wav -o ./enhanced/
 ```
 
 <details>
@@ -362,13 +362,13 @@ python generate.py audio --engine enhance *.wav -o ./enhanced/
 
 ---
 
-### Audio Separation (`audio --engine demucs`)
+### Audio Separation (`audio demucs`)
 
 Split audio into stems (vocals, drums, bass, other) using demucs.
 
 ```bash
-python generate.py audio --engine demucs song.mp3 -o ./stems/
-python generate.py audio --engine demucs song.mp3 -o ./stems/ --model htdemucs_ft
+python generate.py audio demucs song.mp3 -o ./stems/
+python generate.py audio demucs song.mp3 -o ./stems/ --model htdemucs_ft
 ```
 
 Output: `song_vocals.wav`, `song_drums.wav`, `song_bass.wav`, `song_other.wav`
@@ -383,13 +383,13 @@ Output: `song_vocals.wav`, `song_drums.wav`, `song_bass.wav`, `song_other.wav`
 
 ---
 
-### Voice Removal (`audio --engine voice-removal`)
+### Voice Removal (`audio voice-removal`)
 
 Remove vocals from audio — keeps drums, bass, and other instruments. Uses AI-based stem separation (demucs) instead of old-school frequency filtering, producing clean karaoke tracks with minimal artifacts.
 
 ```bash
-python generate.py audio --engine voice-removal song.mp3 -o ./karaoke/
-python generate.py audio --engine voice-removal song.mp3 -o ./karaoke/ --model htdemucs_ft
+python generate.py audio voice-removal song.mp3 -o ./karaoke/
+python generate.py audio voice-removal song.mp3 -o ./karaoke/ --model htdemucs_ft
 ```
 
 Output: `song_no_vocals.wav`
@@ -405,26 +405,26 @@ Output: `song_no_vocals.wav`
 
 ---
 
-### Music Generation (`audio --engine ace-step` / `audio --engine heartmula`)
+### Music Generation (`audio ace-step` / `audio heartmula`)
 
 Generate music from lyrics and style tags.
 
 ```bash
 # ACE-Step (default turbo model)
-python generate.py audio --engine ace-step \
+python generate.py audio ace-step \
   -l "[Verse] La la la" -t "upbeat disco" -s 30 -o song.mp3
 
 # ACE-Step SFT (50 steps)
-python generate.py audio --engine ace-step --model sft \
+python generate.py audio ace-step --model sft \
   -f lyrics.txt -t "cinematic orchestral" -s 60
 
 # ACE-Step with language hint (improves vocal pronunciation)
-python generate.py audio --engine ace-step \
+python generate.py audio ace-step \
   -l "[Verse] Die Sonne geht auf" -t "german pop, female vocal" \
   --language de -s 60 -o deutsch.mp3
 
 # HeartMuLa
-python generate.py audio --engine heartmula \
+python generate.py audio heartmula \
   -l "[Verse] La la la" -t "disco,happy" -s 30 -o song.mp3
 ```
 
@@ -470,22 +470,22 @@ ACE-Step `--model` variants: `turbo` (default if omitted, 8 steps), `sft` (50 st
 
 ---
 
-### Sound Effects (`audio --engine sfx`)
+### Sound Effects (`audio sfx`)
 
 Generate sound effects from text descriptions using EzAudio (diffusion-based text-to-audio).
 
 ```bash
 # Basic sound effect
-python generate.py audio --engine sfx --text "a dog barking in the distance" -o sfx.wav
+python generate.py audio sfx --text "a dog barking in the distance" -o sfx.wav
 
 # Layered scene, 8 seconds
-python generate.py audio --engine sfx --text "rain falling on leaves as thunder rumbles" -s 8 -o rain.wav
+python generate.py audio sfx --text "rain falling on leaves as thunder rumbles" -s 8 -o rain.wav
 
 # With custom steps and guidance
-python generate.py audio --engine sfx --text "a car horn honking" --steps 50 --cfg-scale 3.0 -o horn.wav
+python generate.py audio sfx --text "a car horn honking" --steps 50 --cfg-scale 3.0 -o horn.wav
 
 # Reproducible output
-python generate.py audio --engine sfx --text "waves crashing on a rocky shore" --seed 42 -o waves.wav
+python generate.py audio sfx --text "waves crashing on a rocky shore" --seed 42 -o waves.wav
 ```
 
 <details>
@@ -508,39 +508,39 @@ python generate.py audio --engine sfx --text "waves crashing on a rocky shore" -
 
 ---
 
-### Image Generation & Editing (`image --engine flux.2`)
+### Image Generation & Editing (`image flux.2`)
 
 Generate and edit images using FLUX.2 Klein (Black Forest Labs). Runs locally on Apple Silicon via PyTorch MPS.
 
 ```bash
 # Text-to-image (4B distilled, fast)
-python generate.py image --engine flux.2 --model 4b-distilled -p "a cat on a cliff overlooking the ocean" -o cat.png
+python generate.py image flux.2 --model 4b-distilled -p "a cat on a cliff overlooking the ocean" -o cat.png
 
 # Higher quality (4B base, more steps)
-python generate.py image --engine flux.2 --model 4b -p "a cat on a cliff" --steps 20 -o cat.png
+python generate.py image flux.2 --model 4b -p "a cat on a cliff" --steps 20 -o cat.png
 
 # 9B model (best quality)
-python generate.py image --engine flux.2 --model 9b-distilled -p "a portrait of a woman" -o portrait.png
+python generate.py image flux.2 --model 9b-distilled -p "a portrait of a woman" -o portrait.png
 
 # Image editing with reference image
-python generate.py image --engine flux.2 --model 4b-distilled -p "a man standing in front of a mountain lake" --images ref.png -o edited.png
+python generate.py image flux.2 --model 4b-distilled -p "a man standing in front of a mountain lake" --images ref.png -o edited.png
 
 # Multi-reference editing (combine elements from multiple images)
-python generate.py image --engine flux.2 --model 4b-distilled -p "the person from image 1 petting the cat from image 2" --images person.png cat.png -o combined.png
+python generate.py image flux.2 --model 4b-distilled -p "the person from image 1 petting the cat from image 2" --images person.png cat.png -o combined.png
 
 # Custom dimensions (16:9)
-python generate.py image --engine flux.2 -p "a wide cinematic landscape" -W 1360 -H 768 -o landscape.png
+python generate.py image flux.2 -p "a wide cinematic landscape" -W 1360 -H 768 -o landscape.png
 
 # Reproducible output
-python generate.py image --engine flux.2 -p "a sunset" --seed 42 -o sunset.png
+python generate.py image flux.2 -p "a sunset" --seed 42 -o sunset.png
 
 # Image editing (no mask needed — FLUX.2 Klein is a native edit model)
-python generate.py image --engine flux.2 --images photo.png -p "remove the glasses" -o no_glasses.png
-python generate.py image --engine flux.2 --images photo.png -p "add a painting on the wall" -o with_painting.png
+python generate.py image flux.2 --images photo.png -p "remove the glasses" -o no_glasses.png
+python generate.py image flux.2 --images photo.png -p "add a painting on the wall" -o with_painting.png
 
 # Iterative editing (output of step 1 → input of step 2)
-python generate.py image --engine flux.2 --images scene.png -p "remove the lamp" -o step1.png
-python generate.py image --engine flux.2 --images step1.png -p "add a bookshelf where the lamp was" -o step2.png
+python generate.py image flux.2 --images scene.png -p "remove the lamp" -o step1.png
+python generate.py image flux.2 --images step1.png -p "add a bookshelf where the lamp was" -o step2.png
 ```
 
 **Image editing:** FLUX.2 Klein is a native edit model — no inpainting masks needed. Just describe what to change. For complex edits, use iterative steps: remove first, then add.
@@ -560,7 +560,7 @@ python generate.py image --engine flux.2 --images step1.png -p "add a bookshelf 
 <details>
 <summary>Options</summary>
 
-- `--engine flux.2` — Required
+- `flux.2` — Engine (positional, required)
 - `--model`, `-m` — Model variant (default: `4b`)
 - `--prompt`, `-p` — Text prompt (required)
 - `-o, --output` — Output file path (default: `image.png`)
@@ -589,25 +589,25 @@ Creates `flux2` conda env with PyTorch 2.8 + FLUX.2 dependencies. Models are dow
 
 ---
 
-### Pose Estimation (`image --engine openpose`)
+### Pose Estimation (`image openpose`)
 
 Extract body, hand, and face poses from images using DWPose. Outputs skeleton visualization on black background.
 
 ```bash
 # Wholebody (body + hands + face) — default
-python generate.py image --engine openpose --images person.png -o pose.png
+python generate.py image openpose --images person.png -o pose.png
 
 # Body only
-python generate.py image --engine openpose --images person.png --pose-mode body -o pose_body.png
+python generate.py image openpose --images person.png --pose-mode body -o pose_body.png
 
 # Body + hands
-python generate.py image --engine openpose --images person.png --pose-mode bodyhand -o pose_hands.png
+python generate.py image openpose --images person.png --pose-mode bodyhand -o pose_hands.png
 
 # Body + face
-python generate.py image --engine openpose --images person.png --pose-mode bodyface -o pose_face.png
+python generate.py image openpose --images person.png --pose-mode bodyface -o pose_face.png
 
 # Multiple images
-python generate.py image --engine openpose --images img1.png img2.png -o poses/
+python generate.py image openpose --images img1.png img2.png -o poses/
 ```
 
 <details>
@@ -621,41 +621,41 @@ python generate.py image --engine openpose --images img1.png img2.png -o poses/
 
 ---
 
-### Stable Diffusion 1.5 (`image --engine sd1.5`)
+### Stable Diffusion 1.5 (`image sd1.5`)
 
 Generate images using Stable Diffusion 1.5 checkpoints from CivitAI. Supports multiple LoRAs with per-LoRA intensity.
 
 ```bash
 # MatureMaleMix (default model, includes add_detail LoRA at 1.2)
-python generate.py image --engine sd1.5 -p "a muscular man with a beard, studio lighting" -o man.png
+python generate.py image sd1.5 -p "a muscular man with a beard, studio lighting" -o man.png
 
 # Without LoRA
-python generate.py image --engine sd1.5 --no-lora -p "a muscular man" -o man.png
+python generate.py image sd1.5 --no-lora -p "a muscular man" -o man.png
 
 # DreamShaper
-python generate.py image --engine sd1.5 --model dreamshaper -p "fantasy landscape" -o landscape.png
+python generate.py image sd1.5 --model dreamshaper -p "fantasy landscape" -o landscape.png
 
 # Custom LoRA with intensity
-python generate.py image --engine sd1.5 --lora add_detail:1.5 -p "a warrior" -o warrior.png
+python generate.py image sd1.5 --lora add_detail:1.5 -p "a warrior" -o warrior.png
 
 # Multiple LoRAs
-python generate.py image --engine sd1.5 --lora add_detail:1.2 --lora style:0.8 -p "..." -o out.png
+python generate.py image sd1.5 --lora add_detail:1.2 --lora style:0.8 -p "..." -o out.png
 
 # Custom negative prompt
-python generate.py image --engine sd1.5 -p "a man" --negative-prompt "blurry, deformed" -o out.png
+python generate.py image sd1.5 -p "a man" --negative-prompt "blurry, deformed" -o out.png
 
 # ControlNet conditioning (depth, lineart, sketch, normalmap, pose)
-python generate.py image --engine sd1.5 --controlnet depth:depth.png -p "a man standing in a room" -o out.png
-python generate.py image --engine sd1.5 --controlnet lineart:lines.png -p "detailed illustration" -o out.png
-python generate.py image --engine sd1.5 --controlnet sketch:sketch.png -p "anime character" -o out.png
-python generate.py image --engine sd1.5 --controlnet normalmap:normals.png -p "relit scene" -o out.png
-python generate.py image --engine sd1.5 --controlnet pose:pose.png -p "woman in red dress" -o out.png
+python generate.py image sd1.5 --controlnet depth:depth.png -p "a man standing in a room" -o out.png
+python generate.py image sd1.5 --controlnet lineart:lines.png -p "detailed illustration" -o out.png
+python generate.py image sd1.5 --controlnet sketch:sketch.png -p "anime character" -o out.png
+python generate.py image sd1.5 --controlnet normalmap:normals.png -p "relit scene" -o out.png
+python generate.py image sd1.5 --controlnet pose:pose.png -p "woman in red dress" -o out.png
 ```
 
 <details>
 <summary>Options</summary>
 
-- `--engine sd1.5` — Required
+- `sd1.5` — Engine (positional, required)
 - `--model` — Checkpoint: `mm` (default), `dreamshaper`
 - `-p, --prompt` — Text prompt (required)
 - `-o, --output` — Output file path (default: `image.png`)
@@ -680,16 +680,16 @@ python generate.py image --engine sd1.5 --controlnet pose:pose.png -p "woman in 
 
 ---
 
-### Depth Estimation (`image --engine depth`)
+### Depth Estimation (`image depth`)
 
 Estimate depth from any image using Depth Anything V2. Outputs a grayscale depth map (white = near, black = far).
 
 ```bash
 # Single image
-python generate.py image --engine depth --images photo.png -o depth.png
+python generate.py image depth --images photo.png -o depth.png
 
 # Multiple images
-python generate.py image --engine depth --images img1.png img2.png -o depths/
+python generate.py image depth --images img1.png img2.png -o depths/
 ```
 
 <details>
@@ -707,25 +707,25 @@ Use a depth map as structural reference for FLUX.2 image generation:
 
 ```bash
 # Extract depth, then generate with same structure
-python generate.py image --engine depth --images photo.png -o depth.png
-python generate.py image --engine flux.2 --model 4b-distilled --controlnet depth:depth.png -p "turn image 1 into a cartoon character" -o cartoon.png
+python generate.py image depth --images photo.png -o depth.png
+python generate.py image flux.2 --model 4b-distilled --controlnet depth:depth.png -p "turn image 1 into a cartoon character" -o cartoon.png
 ```
 
 ---
 
-### Line Art Extraction (`image --engine lineart`)
+### Line Art Extraction (`image lineart`)
 
 Extract line art from images using TEED (learned) or Canny (classical).
 
 ```bash
 # Canny (default, classical edge detection)
-python generate.py image --engine lineart --images photo.png -o lines.png
+python generate.py image lineart --images photo.png -o lines.png
 
 # TEED (learned, thicker lines)
-python generate.py image --engine lineart --model teed --images photo.png -o lines_teed.png
+python generate.py image lineart --model teed --images photo.png -o lines_teed.png
 
 # Use as ControlNet conditioning
-python generate.py image --engine flux.2 --controlnet lineart:lines.png -p "colorful illustration" -o out.png
+python generate.py image flux.2 --controlnet lineart:lines.png -p "colorful illustration" -o out.png
 ```
 
 <details>
@@ -739,15 +739,15 @@ python generate.py image --engine flux.2 --controlnet lineart:lines.png -p "colo
 
 ---
 
-### Normal Map Estimation (`image --engine normalmap`)
+### Normal Map Estimation (`image normalmap`)
 
 Estimate surface normals from images using Marigold-Normals v1.1. Outputs RGB normal map (standard color encoding).
 
 ```bash
-python generate.py image --engine normalmap --images photo.png -o normals.png
+python generate.py image normalmap --images photo.png -o normals.png
 
 # Use as ControlNet conditioning
-python generate.py image --engine flux.2 --controlnet normalmap:normals.png -p "dramatic lighting" -o out.png
+python generate.py image flux.2 --controlnet normalmap:normals.png -p "dramatic lighting" -o out.png
 ```
 
 <details>
@@ -761,15 +761,15 @@ python generate.py image --engine flux.2 --controlnet normalmap:normals.png -p "
 
 ---
 
-### Sketch/Edge Extraction (`image --engine sketch`)
+### Sketch/Edge Extraction (`image sketch`)
 
 Extract edges from images using HED (Holistically-Nested Edge Detection). Runs on CPU via OpenCV DNN — no PyTorch required.
 
 ```bash
-python generate.py image --engine sketch --images photo.png -o sketch.png
+python generate.py image sketch --images photo.png -o sketch.png
 
 # Use as ControlNet conditioning
-python generate.py image --engine flux.2 --controlnet sketch:sketch.png -p "fantasy scene" -o out.png
+python generate.py image flux.2 --controlnet sketch:sketch.png -p "fantasy scene" -o out.png
 ```
 
 <details>
@@ -782,22 +782,22 @@ python generate.py image --engine flux.2 --controlnet sketch:sketch.png -p "fant
 
 ---
 
-### Image Upscaling (`image --engine upscale`)
+### Image Upscaling (`image upscale`)
 
 Upscale images using Real-ESRGAN. Standalone RRDBNet architecture with MPS acceleration.
 
 ```bash
 # 4x upscale (default)
-python generate.py image --engine upscale --images photo.png -o upscaled.png
+python generate.py image upscale --images photo.png -o upscaled.png
 
 # 2x upscale
-python generate.py image --engine upscale --images photo.png --model 2x -o upscaled.png
+python generate.py image upscale --images photo.png --model 2x -o upscaled.png
 
 # Anime-optimized 4x
-python generate.py image --engine upscale --images photo.png --model anime -o upscaled.png
+python generate.py image upscale --images photo.png --model anime -o upscaled.png
 
 # Batch upscale
-python generate.py image --engine upscale --images img1.png img2.png img3.png -o upscaled/
+python generate.py image upscale --images img1.png img2.png img3.png -o upscaled/
 ```
 
 <details>
@@ -811,19 +811,19 @@ python generate.py image --engine upscale --images img1.png img2.png img3.png -o
 
 ---
 
-### Image Segmentation (`image --engine segment`)
+### Image Segmentation (`image segment`)
 
 Separate foreground from background using BiRefNet (MIT license). Outputs transparent RGBA PNG.
 
 ```bash
 # Foreground only (default)
-python generate.py image --engine segment --images photo.png -o foreground.png
+python generate.py image segment --images photo.png -o foreground.png
 
 # Background only
-python generate.py image --engine segment --output-layer background --images photo.png -o background.png
+python generate.py image segment --output-layer background --images photo.png -o background.png
 
 # Both (foreground + background in a directory)
-python generate.py image --engine segment --output-layer both --images photo.png -o output/
+python generate.py image segment --output-layer both --images photo.png -o output/
 ```
 
 <details>
@@ -837,14 +837,14 @@ python generate.py image --engine segment --output-layer both --images photo.png
 
 ---
 
-### Speaker Diarization (`audio --engine diarize`)
+### Speaker Diarization (`audio diarize`)
 
 Split dialogue audio into separate tracks per speaker using pyannote.audio (MPS).
 
 ```bash
-python generate.py audio --engine diarize interview.wav -o ./speakers/
-python generate.py audio --engine diarize podcast.wav -o ./speakers/ --speakers 3
-python generate.py audio --engine diarize dialog.wav -o ./speakers/ --verify
+python generate.py audio diarize interview.wav -o ./speakers/
+python generate.py audio diarize podcast.wav -o ./speakers/ --speakers 3
+python generate.py audio diarize dialog.wav -o ./speakers/ --verify
 ```
 
 <details>
@@ -861,15 +861,15 @@ python generate.py audio --engine diarize dialog.wav -o ./speakers/ --verify
 
 ---
 
-### Transcription (`text --engine whisper`)
+### Transcription (`text whisper`)
 
 Transcribe audio to text using mlx-whisper (Apple Silicon optimized).
 
 ```bash
-python generate.py text --engine whisper audio.wav
-python generate.py text --engine whisper audio.wav --format srt -o ./transcripts/
-python generate.py text --engine whisper audio.wav --language de --word-timestamps
-python generate.py text --engine whisper audio.wav --model large-v3
+python generate.py text whisper audio.wav
+python generate.py text whisper audio.wav --format srt -o ./transcripts/
+python generate.py text whisper audio.wav --language de --word-timestamps
+python generate.py text whisper audio.wav --model large-v3
 ```
 
 <details>
@@ -885,53 +885,53 @@ python generate.py text --engine whisper audio.wav --model large-v3
 
 ---
 
-### Lyrics Extraction (`text --engine heartmula-transcribe`)
+### Lyrics Extraction (`text heartmula-transcribe`)
 
 Extract lyrics from audio using HeartTranscriptor.
 
 ```bash
-python generate.py text --engine heartmula-transcribe song.mp3
-python generate.py text --engine heartmula-transcribe song.mp3 -o lyrics.txt
+python generate.py text heartmula-transcribe song.mp3
+python generate.py text heartmula-transcribe song.mp3 -o lyrics.txt
 ```
 
 ---
 
-### LLM Inference (`text --engine ollama`)
+### LLM Inference (`text ollama`)
 
 Unified interface for local LLM inference via Ollama.
 
 ```bash
 # Chat (messages as JSON string or file)
-python generate.py text --engine ollama --model qwen3.5:latest --endpoint chat \
+python generate.py text ollama --model qwen3.5:latest --endpoint chat \
   --messages '[{"role":"user","content":"Hello!"}]'
-python generate.py text --engine ollama --model qwen3.5:latest --endpoint chat \
+python generate.py text ollama --model qwen3.5:latest --endpoint chat \
   --messages chat.json --stream
 
 # Generate (prompt + optional system)
-python generate.py text --engine ollama --model qwen3.5:latest --endpoint generate \
+python generate.py text ollama --model qwen3.5:latest --endpoint generate \
   --prompt "Explain quantum computing" --system "You are a physicist"
 
 # Thinking (enable reasoning for supported models)
-python generate.py text --engine ollama --model qwen3.5:latest --endpoint chat \
+python generate.py text ollama --model qwen3.5:latest --endpoint chat \
   --messages '[{"role":"user","content":"What is 15*17?"}]' --thinking True --stream
 
 # Vision (attach local images)
-python generate.py text --engine ollama --model qwen3.5:latest --endpoint chat \
+python generate.py text ollama --model qwen3.5:latest --endpoint chat \
   --messages '[{"role":"user","content":"What do you see?"}]' --images photo.jpg
 
 # Vision (image URLs in prompt — auto-downloaded)
-python generate.py text --engine ollama --model qwen3.5:latest --endpoint chat \
+python generate.py text ollama --model qwen3.5:latest --endpoint chat \
   --messages '[{"role":"user","content":"Describe this. https://example.com/photo.jpg"}]'
 
 # Config management (persistent default overrides)
-python generate.py text --engine ollama --model qwen3.5:latest --endpoint set \
+python generate.py text ollama --model qwen3.5:latest --endpoint set \
   --context-length 256000 --temperature 0.7
-python generate.py text --engine ollama --model qwen3.5:latest --endpoint show
-python generate.py text --engine ollama --model qwen3.5:latest --endpoint reset
+python generate.py text ollama --model qwen3.5:latest --endpoint show
+python generate.py text ollama --model qwen3.5:latest --endpoint reset
 
 # Load/unload models
-python generate.py text --engine ollama --model qwen3.5:latest --endpoint load
-python generate.py text --engine ollama --model qwen3.5:latest --endpoint unload
+python generate.py text ollama --model qwen3.5:latest --endpoint load
+python generate.py text ollama --model qwen3.5:latest --endpoint unload
 ```
 
 Supported params: `--context-length`, `--max-tokens`, `--temperature`, `--top-p`, `--top-k`, `--repeat-penalty`, `--seed`, `--stop`, `--stream`, `--thinking`, `--images`, `--base-url`, `--api-key`.
@@ -940,23 +940,23 @@ Supported params: `--context-length`, `--max-tokens`, `--temperature`, `--top-p`
 
 ### Model Management (`models`)
 
-Per-engine model management. `--engine` required for all subcommands except `list`.
+Per-engine model management.
 
 ```bash
 # List all engines
 python generate.py models list
 
 # Ollama
-python generate.py models --engine ollama list
-python generate.py models --engine ollama pull qwen3.5:latest
-python generate.py models --engine ollama show qwen3.5:latest
-python generate.py models --engine ollama remove qwen3.5:latest
-python generate.py models --engine ollama unload qwen3.5:latest
+python generate.py models ollama list
+python generate.py models ollama pull qwen3.5:latest
+python generate.py models ollama show qwen3.5:latest
+python generate.py models ollama remove qwen3.5:latest
+python generate.py models ollama unload qwen3.5:latest
 
 # HuggingFace
-python generate.py models --engine huggingface list
-python generate.py models --engine huggingface search "qwen vision"
-python generate.py models --engine huggingface pull Qwen/Qwen2.5-VL-7B
+python generate.py models huggingface list
+python generate.py models huggingface search "qwen vision"
+python generate.py models huggingface pull Qwen/Qwen2.5-VL-7B
 ```
 
 ---
@@ -978,19 +978,19 @@ qwen3.5:latest                 ollama        running    13.2 GB     131072     q
 
 ---
 
-### Audio Concatenation (`output --engine audio-concatenate`)
+### Audio Concatenation (`output audio-concatenate`)
 
 Concatenate multiple audio files into one. Supports per-clip trim, volume, fades, and crossfade via `--clip`.
 
 ```bash
 # Simple concatenation
-python generate.py output --engine audio-concatenate a.wav b.wav c.mp3 -o out.wav
+python generate.py output audio-concatenate a.wav b.wav c.mp3 -o out.wav
 
 # With bitrate (for compressed formats)
-python generate.py output --engine audio-concatenate a.wav b.wav -o out.mp3 --output-bitrate 128k
+python generate.py output audio-concatenate a.wav b.wav -o out.mp3 --output-bitrate 128k
 
 # Per-clip options via --clip INDEX:key=val,key=val
-python generate.py output --engine audio-concatenate \
+python generate.py output audio-concatenate \
   intro.wav speech.wav outro.wav background.mp3 \
   --clip 0:fade-in=0.3 \
   --clip 1:crossfade=0.5,volume=1.2 \
@@ -1023,16 +1023,16 @@ Clips without `--clip` entry are used as-is. All inputs are normalized to 44100 
 
 ---
 
-### Audio Mixing (`output --engine audio-mucs`)
+### Audio Mixing (`output audio-mucs`)
 
 Mix multiple audio files in parallel (overlay). Supports per-clip trim, volume, pan, and fades via `--clip`.
 
 ```bash
 # Simple mix (all tracks overlaid)
-python generate.py output --engine audio-mucs track1.wav track2.wav -o mix.wav
+python generate.py output audio-mucs track1.wav track2.wav -o mix.wav
 
 # Stereo remix with per-clip pan and volume
-python generate.py output --engine audio-mucs \
+python generate.py output audio-mucs \
   vocals.wav drums.wav bass.wav guitars.wav \
   --clip 0:pan=-0.2,volume=0.8 \
   --clip 1:pan=0.3,volume=0.6 \
@@ -1060,18 +1060,18 @@ All inputs are normalized to 44100 Hz stereo. Output is passed through `alimiter
 
 ```bash
 python generate.py models list                                          # all engines
-python generate.py models --engine rvc list                             # RVC only
-python generate.py models --engine rvc search "female singer"
-python generate.py models --engine rvc search "anime" --limit 50
-python generate.py models --engine rvc install User/ModelRepo
-python generate.py models --engine rvc install User/MultiModelRepo --file "specific_voice"
-python generate.py models --engine rvc install User/Repo --name "my-custom-name"
-python generate.py models --engine rvc install "https://example.com/model.zip"
-python generate.py models --engine rvc remove my-model
-python generate.py models --engine rvc calibrate my-model        # guess target F0 from model name (heuristic)
-python generate.py models --engine rvc set-pitch my-model 120   # male ~120 Hz
-python generate.py models --engine rvc set-pitch my-model 220   # female ~220 Hz
-python generate.py models --engine rvc set-pitch my-model 280   # child ~280 Hz
+python generate.py models rvc list                                      # RVC only
+python generate.py models rvc search "female singer"
+python generate.py models rvc search "anime" --limit 50
+python generate.py models rvc install User/ModelRepo
+python generate.py models rvc install User/MultiModelRepo --file "specific_voice"
+python generate.py models rvc install User/Repo --name "my-custom-name"
+python generate.py models rvc install "https://example.com/model.zip"
+python generate.py models rvc remove my-model
+python generate.py models rvc calibrate my-model                        # guess target F0 from model name (heuristic)
+python generate.py models rvc set-pitch my-model 120                    # male ~120 Hz
+python generate.py models rvc set-pitch my-model 220                    # female ~220 Hz
+python generate.py models rvc set-pitch my-model 280                    # child ~280 Hz
 ```
 
 <details>

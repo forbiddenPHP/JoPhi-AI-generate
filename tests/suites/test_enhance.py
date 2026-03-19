@@ -38,7 +38,7 @@ def register(suite):
     suite.add(
         name="Prep: generate 60s song (ACE-Step)",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "ace-step",
+            sys.executable, "generate.py", "audio", "ace-step",
             "--model", "turbo",
             "-l", PREP_LYRICS,
             "-t", "rock,drums,bass,guitar,vocal",
@@ -52,7 +52,7 @@ def register(suite):
     suite.add(
         name="Prep: demucs separation (vocals)",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "demucs",
+            sys.executable, "generate.py", "audio", "demucs",
             str(prep_song),
             "-o", str(prep),
         ],
@@ -63,7 +63,7 @@ def register(suite):
     suite.add(
         name="Enhance full (denoise + super-res)",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "enhance",
+            sys.executable, "generate.py", "audio", "enhance",
             str(prep_vocals),
             "-o", str(out / "full"),
         ],
@@ -73,7 +73,7 @@ def register(suite):
     suite.add(
         name="Enhance denoise only",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "enhance",
+            sys.executable, "generate.py", "audio", "enhance",
             str(prep_vocals),
             "--denoise-only",
             "-o", str(out / "denoise-only"),

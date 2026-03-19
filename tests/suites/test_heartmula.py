@@ -21,7 +21,7 @@ def register(suite):
     suite.add(
         name="HeartMuLa 60s synthwave",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "heartmula",
+            sys.executable, "generate.py", "audio", "heartmula",
             "-l", LYRICS,
             "-t", "synthwave,electronic,upbeat,80s,energetic",
             "-s", "60", "-o", str(out / "synthwave_60s.wav"),

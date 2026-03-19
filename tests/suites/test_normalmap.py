@@ -20,7 +20,7 @@ def register(suite):
         name="NormalMap: estimate normals",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "normalmap",
+            "normalmap",
             "--images", str(REF_IMAGE),
             "-o", str(out / "normalmap_johannes.png"),
         ],
@@ -33,7 +33,7 @@ def register(suite):
         name="NormalMap: generate man from normals",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "--controlnet", "normalmap:" + str(out / "normalmap_johannes.png"),
             "-p", PROMPT_MAN,
@@ -48,7 +48,7 @@ def register(suite):
         name="NormalMap: generate woman from normals",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "--controlnet", "normalmap:" + str(out / "normalmap_johannes.png"),
             "-p", PROMPT_WOMAN,
@@ -63,7 +63,7 @@ def register(suite):
         name="NormalMap: generate monster from normals",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "--controlnet", "normalmap:" + str(out / "normalmap_johannes.png"),
             "-p", PROMPT_MONSTER,

@@ -16,7 +16,7 @@ def register(suite):
         name="Depth: extract from johannes",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "depth",
+            "depth",
             "--images", str(REF_IMAGE),
             "-o", str(out / "depth_johannes.png"),
         ],
@@ -29,7 +29,7 @@ def register(suite):
         name="Depth: generate man from depth",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "-p", "close-up, turn image 1 into a 30-year-old male cartoon character shaped like image 1, wearing glasses, with messy brown hair, bright blue eyes and a confident sexy smile, chair backrest visible in the lower right background, warm studio lighting",
             "--controlnet", "depth:" + str(out / "depth_johannes.png"),
@@ -43,7 +43,7 @@ def register(suite):
         name="Depth: generate woman from depth",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "-p", "close-up, turn image 1 into a 25-year-old East African woman shaped like image 1, wearing glasses, with short curly hair, golden earrings, deep brown eyes and a wide smile, chair backrest visible in the lower right background, sunset lighting from the left",
             "--controlnet", "depth:" + str(out / "depth_johannes.png"),
@@ -57,7 +57,7 @@ def register(suite):
         name="Depth: generate creature from depth",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "-p", "close-up, turn image 1 into a friendly swamp creature shaped like image 1, wearing glasses, with mossy green skin, glowing yellow eyes, small antlers and a wide toothy grin, chair backrest visible in the lower right background, misty forest lighting",
             "--controlnet", "depth:" + str(out / "depth_johannes.png"),
@@ -73,7 +73,7 @@ def register(suite):
         name="Depth: man 16:9 (pan&scan)",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "-p", "close-up, turn image 1 into a 30-year-old male cartoon character shaped like image 1, wearing glasses, with messy brown hair, bright blue eyes and a confident sexy smile, warm studio lighting",
             "--controlnet", "depth:" + str(out / "depth_johannes.png"),
@@ -87,7 +87,7 @@ def register(suite):
         name="Depth: woman 9:16 (pan&scan)",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "-p", "close-up, turn image 1 into a 25-year-old East African woman shaped like image 1, wearing glasses, with short curly hair, golden earrings, deep brown eyes and a wide smile, sunset lighting from the left",
             "--controlnet", "depth:" + str(out / "depth_johannes.png"),
@@ -101,7 +101,7 @@ def register(suite):
         name="Depth: creature 16:9 (pan&scan)",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "-p", "close-up, turn image 1 into a friendly swamp creature shaped like image 1, wearing glasses, with mossy green skin, glowing yellow eyes, small antlers and a wide toothy grin, misty forest lighting",
             "--controlnet", "depth:" + str(out / "depth_johannes.png"),

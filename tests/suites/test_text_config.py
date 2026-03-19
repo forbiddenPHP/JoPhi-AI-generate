@@ -7,7 +7,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent.parent.parent
 MODEL = "qwen3.5:latest"
 ENGINE = "ollama"
 
-_BASE = [sys.executable, "generate.py", "text", "--engine", ENGINE, "--model", MODEL]
+_BASE = [sys.executable, "generate.py", "text", ENGINE, "--model", MODEL]
 
 
 def _add_tui_json(suite, name, extra_args):

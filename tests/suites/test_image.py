@@ -19,7 +19,7 @@ def register(suite):
         name="Image: FLUX.2 4b-distilled",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2", "--model", "4b-distilled",
+            "flux.2", "--model", "4b-distilled",
             "-p", PROMPT, "--seed", "42",
             "-W", "896", "-H", "504",
             "-o", str(out / "flux2_4b_distilled.png"),
@@ -31,7 +31,7 @@ def register(suite):
         name="Image: FLUX.2 4b (base)",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2", "--model", "4b",
+            "flux.2", "--model", "4b",
             "-p", PROMPT, "--seed", "42",
             "--steps", "20",
             "-W", "896", "-H", "504",
@@ -44,7 +44,7 @@ def register(suite):
         name="Image: FLUX.2 9b-distilled",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2", "--model", "9b-distilled",
+            "flux.2", "--model", "9b-distilled",
             "-p", PROMPT, "--seed", "42",
             "-W", "896", "-H", "504",
             "-o", str(out / "flux2_9b_distilled.png"),
@@ -56,7 +56,7 @@ def register(suite):
         name="Image: FLUX.2 9b (base)",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2", "--model", "9b",
+            "flux.2", "--model", "9b",
             "-p", PROMPT, "--seed", "42",
             "--steps", "20",
             "-W", "896", "-H", "504",
@@ -71,7 +71,7 @@ def register(suite):
         name="Image: FLUX.2 4b-distilled + ref (johannes)",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2", "--model", "4b-distilled",
+            "flux.2", "--model", "4b-distilled",
             "-p", PROMPT_REF,
             "--images", str(REF_IMAGE),
             "--seed", "42",
@@ -85,7 +85,7 @@ def register(suite):
         name="Image: FLUX.2 9b-distilled + ref (johannes)",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2", "--model", "9b-distilled",
+            "flux.2", "--model", "9b-distilled",
             "-p", PROMPT_REF,
             "--images", str(REF_IMAGE),
             "--seed", "42",

@@ -16,7 +16,7 @@ def register(suite):
         name="Style: SD1.5 oil painting reference",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "sd1.5",
+            "sd1.5",
             "--model", "dreamshaper",
             "--no-lora",
             "-p", "oil painting with thick impasto brushstrokes, portrait of a nobleman in a dark room, Rembrandt lighting, golden frame",
@@ -31,7 +31,7 @@ def register(suite):
         name="Style: SD1.5 watercolor reference",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "sd1.5",
+            "sd1.5",
             "--model", "dreamshaper",
             "--no-lora",
             "-p", "delicate watercolor painting, soft washes of color bleeding into wet paper, a garden scene with flowers, pastel tones",
@@ -46,7 +46,7 @@ def register(suite):
         name="Style: SD1.5 anime reference",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "sd1.5",
+            "sd1.5",
             "--model", "dreamshaper",
             "--no-lora",
             "-p", "anime style illustration, vibrant cel shading, a hero character with dramatic pose, bold outlines, colorful background",
@@ -63,7 +63,7 @@ def register(suite):
         name="Style: johannes as oil painting",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "--images", str(JOHANNES), str(out / "style_oil.png"),
             "-p", "turn image 1 into a painting like image 2",
@@ -77,7 +77,7 @@ def register(suite):
         name="Style: johannes as watercolor",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "--images", str(JOHANNES), str(out / "style_watercolor.png"),
             "-p", "turn image 1 into a watercolor artwork in the style of image 2",
@@ -91,7 +91,7 @@ def register(suite):
         name="Style: johannes as anime",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "--images", str(JOHANNES), str(out / "style_anime.png"),
             "-p", "transform image 1 into the art style of image 2",

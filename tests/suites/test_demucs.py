@@ -36,7 +36,7 @@ def register(suite):
     suite.add(
         name="Prep: generate 60s song (ACE-Step)",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "ace-step",
+            sys.executable, "generate.py", "audio", "ace-step",
             "--model", "turbo",
             "-l", PREP_LYRICS,
             "-t", "rock,drums,bass,guitar,vocal",
@@ -49,7 +49,7 @@ def register(suite):
     suite.add(
         name="Demucs default model (4 stems)",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "demucs",
+            sys.executable, "generate.py", "audio", "demucs",
             str(prep_song),
             "-o", str(out / "default"),
         ],
@@ -59,7 +59,7 @@ def register(suite):
     suite.add(
         name="Demucs fine-tuned model (htdemucs_ft)",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "demucs",
+            sys.executable, "generate.py", "audio", "demucs",
             str(prep_song),
             "--model", "htdemucs_ft",
             "-o", str(out / "fine-tuned"),

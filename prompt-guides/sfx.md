@@ -137,14 +137,14 @@ a vehicle engine accelerating at a high rate
 
 ```bash
 # Simple sound effect
-python generate.py audio --engine sfx --text "a dog barking in the distance" -o dog.wav
+python generate.py audio sfx --text "a dog barking in the distance" -o dog.wav
 
 # Layered nature scene, 8 seconds
-python generate.py audio --engine sfx --text "rain falling on leaves as thunder rumbles in the distance" --seconds 8 -o rain.wav
+python generate.py audio sfx --text "rain falling on leaves as thunder rumbles in the distance" --seconds 8 -o rain.wav
 
 # Fast draft with lower quality
-python generate.py audio --engine sfx --text "a car horn honking" --steps 50 --cfg-scale 3.0 -o horn.wav
+python generate.py audio sfx --text "a car horn honking" --steps 50 --cfg-scale 3.0 -o horn.wav
 
 # Reproducible output
-python generate.py audio --engine sfx --text "waves crashing on a rocky shore" --seed 42 -o waves.wav
+python generate.py audio sfx --text "waves crashing on a rocky shore" --seed 42 -o waves.wav
 ```

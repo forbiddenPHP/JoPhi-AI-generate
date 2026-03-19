@@ -14,7 +14,7 @@ def register(suite):
         name="SD1.5: mm default (with LoRA)",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "sd1.5",
+            "sd1.5",
             "--model", "mm",
             "-p", "a muscular man with a beard, looking at the camera, studio lighting, sharp focus",
             "-W", "512", "-H", "512",
@@ -28,7 +28,7 @@ def register(suite):
         name="SD1.5: mm without LoRA",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "sd1.5",
+            "sd1.5",
             "--model", "mm",
             "--no-lora",
             "-p", "a muscular man with a beard, looking at the camera, studio lighting, sharp focus",
@@ -43,7 +43,7 @@ def register(suite):
         name="SD1.5: mm portrait (16:9)",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "sd1.5",
+            "sd1.5",
             "--model", "mm",
             "--no-lora",
             "-p", "a handsome man in a leather jacket, cinematic lighting, bokeh background",
@@ -61,7 +61,7 @@ def register(suite):
         name="SD1.5: dreamshaper landscape (16:9)",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "sd1.5",
+            "sd1.5",
             "--model", "dreamshaper",
             "--no-lora",
             "-p", "a fantasy landscape with floating islands, dramatic clouds, golden sunlight, highly detailed digital painting",
@@ -76,7 +76,7 @@ def register(suite):
         name="SD1.5: dreamshaper portrait (9:16)",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "sd1.5",
+            "sd1.5",
             "--model", "dreamshaper",
             "--no-lora",
             "-p", "portrait of an elven warrior princess with silver hair, intricate armor, forest background, fantasy art style",

@@ -149,10 +149,10 @@ Three ways to generate instrumental (no vocals):
 
 ```bash
 # Using [inst] shorthand
-python generate.py audio --engine ace-step -l "[inst]" -t "lo-fi hip hop with jazzy piano" -s 60
+python generate.py audio ace-step -l "[inst]" -t "lo-fi hip hop with jazzy piano" -s 60
 
 # Using --instrumental flag
-python generate.py audio --engine ace-step -l "[inst]" -t "cinematic orchestral" --instrumental -s 120
+python generate.py audio ace-step -l "[inst]" -t "cinematic orchestral" --instrumental -s 120
 ```
 
 Both `[inst]` and `[instrumental]` are case-insensitive and whitespace-tolerant.
@@ -172,8 +172,8 @@ Both `[inst]` and `[instrumental]` are case-insensitive and whitespace-tolerant.
 
 ```bash
 # Explicit language for best results
-python generate.py audio --engine ace-step -l "..." -t "..." --language de -s 120
-python generate.py audio --engine ace-step -l "..." -t "..." --language ja -s 60
+python generate.py audio ace-step -l "..." -t "..." --language de -s 120
+python generate.py audio ace-step -l "..." -t "..." --language ja -s 60
 ```
 
 **Best performance (top 10):** English (`en`), Chinese (`zh`), Russian (`ru`), Spanish (`es`), Japanese (`ja`), German (`de`), French (`fr`), Portuguese (`pt`), Italian (`it`), Korean (`ko`).
@@ -228,9 +228,9 @@ ACE-Step is **highly sensitive to random seeds**. The same prompt + lyrics with 
 
 ```bash
 # Try multiple seeds to find a good generation
-python generate.py audio --engine ace-step -l "[inst]" -t "jazz piano trio" --seed 42 -s 30
-python generate.py audio --engine ace-step -l "[inst]" -t "jazz piano trio" --seed 123 -s 30
-python generate.py audio --engine ace-step -l "[inst]" -t "jazz piano trio" --seed 7777 -s 30
+python generate.py audio ace-step -l "[inst]" -t "jazz piano trio" --seed 42 -s 30
+python generate.py audio ace-step -l "[inst]" -t "jazz piano trio" --seed 123 -s 30
+python generate.py audio ace-step -l "[inst]" -t "jazz piano trio" --seed 7777 -s 30
 ```
 
 ## Known Limitations

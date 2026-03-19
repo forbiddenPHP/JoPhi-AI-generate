@@ -15,7 +15,7 @@ def register(suite):
         name="Upscale: johannes 4x",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "upscale",
+            "upscale",
             "--images", str(REF_IMAGE),
             "--model", "4x",
             "-o", str(out / "johannes_4x.png"),
@@ -27,7 +27,7 @@ def register(suite):
         name="Upscale: johannes 2x",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "upscale",
+            "upscale",
             "--images", str(REF_IMAGE),
             "--model", "2x",
             "-o", str(out / "johannes_2x.png"),
@@ -39,7 +39,7 @@ def register(suite):
         name="Upscale: livingroom 4x",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "upscale",
+            "upscale",
             "--images", str(LIVINGROOM),
             "--model", "4x",
             "-o", str(out / "livingroom_4x.png"),
@@ -51,7 +51,7 @@ def register(suite):
         name="Upscale: johannes anime",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "upscale",
+            "upscale",
             "--images", str(REF_IMAGE),
             "--model", "anime",
             "-o", str(out / "johannes_anime.png"),

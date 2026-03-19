@@ -20,7 +20,7 @@ def register(suite):
         name="Sketch: HED extraction",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "sketch",
+            "sketch",
             "--images", str(REF_IMAGE),
             "-o", str(out / "sketch_hed.png"),
         ],
@@ -33,7 +33,7 @@ def register(suite):
         name="Sketch: generate man from HED",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "--controlnet", "sketch:" + str(out / "sketch_hed.png"),
             "-p", PROMPT_MAN,
@@ -48,7 +48,7 @@ def register(suite):
         name="Sketch: generate woman from HED",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "--controlnet", "sketch:" + str(out / "sketch_hed.png"),
             "-p", PROMPT_WOMAN,
@@ -63,7 +63,7 @@ def register(suite):
         name="Sketch: generate monster from HED",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "--controlnet", "sketch:" + str(out / "sketch_hed.png"),
             "-p", PROMPT_MONSTER,

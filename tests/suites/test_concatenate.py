@@ -28,7 +28,7 @@ def register(suite):
         suite.add(
             name=f"Prep: dialog snippet {i+1} ({voice})",
             cmd=[
-                sys.executable, "generate.py", "voice", "--engine", "ai-tts",
+                sys.executable, "generate.py", "voice", "ai-tts",
                 "-v", voice, "--language", "de",
                 "--text", text,
                 "-o", str(snippet),
@@ -55,7 +55,7 @@ def register(suite):
     suite.add(
         name="Concatenate jingle + dialog (pan, fades)",
         cmd=[
-            sys.executable, "generate.py", "output", "--engine", "audio-concatenate",
+            sys.executable, "generate.py", "output", "audio-concatenate",
             *all_files,
             *clip_args,
             "-o", str(out / "jingle_dialog.wav"),
@@ -68,7 +68,7 @@ def register(suite):
     suite.add(
         name="Concatenate simple (3 clips, fade-in/out)",
         cmd=[
-            sys.executable, "generate.py", "output", "--engine", "audio-concatenate",
+            sys.executable, "generate.py", "output", "audio-concatenate",
             *simple_files,
             "--clip", "0:fade-in=0.3",
             "--clip", "2:fade-out=0.5",

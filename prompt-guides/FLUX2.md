@@ -167,13 +167,13 @@ Transfer the artistic style of one image onto the content of another. **Image or
 
 ```bash
 # Oil painting style transfer
-python generate.py image --engine flux.2 \
+python generate.py image flux.2 \
   --images content.png style_painting.png \
   -p "turn image 1 into a painting like image 2" \
   -o styled.png
 
 # Watercolor style transfer
-python generate.py image --engine flux.2 \
+python generate.py image flux.2 \
   --images photo.png watercolor_ref.png \
   -p "transform image 1 into a watercolor artwork in the style of image 2" \
   -o watercolor.png
@@ -197,15 +197,15 @@ Use the output of one edit as input for the next. Each step is a single-referenc
 
 ```bash
 # Step 1: Remove glasses
-python generate.py image --engine flux.2 \
+python generate.py image flux.2 \
   --images portrait.png -p "the same person without glasses" -o step1.png
 
 # Step 2: Change age
-python generate.py image --engine flux.2 \
+python generate.py image flux.2 \
   --images step1.png -p "turn this person to the age of 25 years" -o step2.png
 
 # Step 3: Change background
-python generate.py image --engine flux.2 \
+python generate.py image flux.2 \
   --images step2.png -p "the same person standing on a mountain top at sunset" -o final.png
 ```
 
@@ -228,17 +228,17 @@ FLUX.2 understands hex color codes directly in prompts. No special parameters ne
 
 ```bash
 # Specific colors via hex
-python generate.py image --engine flux.2 \
+python generate.py image flux.2 \
   -p "a sunset landscape, sky color #FF6B35, mountains #2C3E50, lake #1ABC9C" \
   -o sunset.png
 
 # Brand colors
-python generate.py image --engine flux.2 \
+python generate.py image flux.2 \
   -p "minimalist logo on a #1A1A2E background with #E94560 accent color" \
   -o logo.png
 
 # Color harmony
-python generate.py image --engine flux.2 \
+python generate.py image flux.2 \
   -p "abstract geometric art using only #264653, #2A9D8F, #E9C46A, #F4A261, #E76F51" \
   -o palette.png
 ```

@@ -38,7 +38,7 @@ def register(suite):
     suite.add(
         name="Prep: generate 60s song (ACE-Step)",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "ace-step",
+            sys.executable, "generate.py", "audio", "ace-step",
             "--model", "turbo",
             "-l", PREP_LYRICS,
             "-t", "indie rock,drums,bass,guitar,vocal,warm",
@@ -52,7 +52,7 @@ def register(suite):
     suite.add(
         name="Prep: demucs separation",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "demucs",
+            sys.executable, "generate.py", "audio", "demucs",
             str(prep_song),
             "-o", str(stems_dir),
         ],
@@ -65,7 +65,7 @@ def register(suite):
     suite.add(
         name="Prep: enhance vocals",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "enhance",
+            sys.executable, "generate.py", "audio", "enhance",
             str(vocals_stem),
             "-o", str(enhanced_dir),
         ],
@@ -83,7 +83,7 @@ def register(suite):
     suite.add(
         name="Mucs stereo remix (4 stems, pan + volume)",
         cmd=[
-            sys.executable, "generate.py", "output", "--engine", "audio-mucs",
+            sys.executable, "generate.py", "output", "audio-mucs",
             str(enhanced_vocals), str(drums), str(bass), str(other),
             "--clip", "0:pan=-0.2,volume=0.9",   # vocals slightly left
             "--clip", "1:pan=0.3,volume=0.6",     # drums right

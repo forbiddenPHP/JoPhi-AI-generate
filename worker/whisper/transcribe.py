@@ -142,14 +142,17 @@ FORMAT_WRITERS = {
 }
 
 
-def save_output(entry: dict, out_dir: Path, stem: str, formats: list[str]):
-    """Save transcript in requested formats."""
+def save_output(entry: dict, out_dir: Path, stem: str, formats: list[str]) -> list[str]:
+    """Save transcript in requested formats. Returns list of saved paths."""
     out_dir.mkdir(parents=True, exist_ok=True)
+    saved = []
     for fmt in formats:
         writer = FORMAT_WRITERS[fmt]
         out_path = out_dir / f"{stem}.{fmt}"
         writer(entry, out_path)
         print(f"  Saved: {out_path}", file=sys.stderr)
+        saved.append(str(out_path))
+    return saved
 
 
 def main():
@@ -182,7 +185,7 @@ def main():
             sys.exit(1)
         formats = [fmt]
 
-    results = []
+    output_paths = []
 
     for input_file in args.input:
         input_path = Path(input_file)
@@ -227,18 +230,17 @@ def main():
                     ]
                 entry["segments"].append(segment)
 
-            results.append(entry)
-
             # Save to files if output dir specified
             if args.output:
-                save_output(entry, Path(args.output), input_path.stem, formats)
+                saved = save_output(entry, Path(args.output), input_path.stem, formats)
+                output_paths.extend(saved)
 
         except Exception as e:
             print(f"ERROR: {input_path.name}: {e}", file=sys.stderr)
             sys.exit(1)
 
-    # Always output JSON on stdout (for revoicer.py to parse)
-    print(json.dumps(results, indent=2, ensure_ascii=False))
+    # Final output: array of saved file paths
+    print(json.dumps(output_paths))
 
 
 if __name__ == "__main__":

@@ -4,71 +4,73 @@ generate — Unified media generation toolkit.
 
 Usage:
   python generate.py ps                                                Show available models & status
-  python generate.py voice --engine ai-tts --text "Hello world" -o demos/ Neural TTS (Qwen3-TTS)
-  python generate.py voice --engine ai-tts -v Serena --text "Hello"       TTS with preset voice
-  python generate.py voice --engine ai-tts -v Aiden -t "dramatic" --text "Silence."  TTS with style
-  python generate.py voice --engine ai-tts --tts-model small --text "Hi"  Smaller model (0.6B)
-  python generate.py voice --engine ai-tts --text "[Aiden: excited] Hi! [Serena: calm] Hello."  Per-segment style
-  python generate.py voice --engine ai-tts --prompt-file demos/speech.txt -o demos/  From sidecar
-  python generate.py voice --engine ai-tts --list-voices                  Show available voices
-  python generate.py voice --engine say --text "Hello world" -o demos/    macOS TTS
-  python generate.py voice --engine say -v Anna --text "Hallo" -o demos/  TTS with specific voice
-  python generate.py voice --engine say --model my-voice --text "Hallo"   TTS + RVC voice conversion
-  python generate.py voice --engine rvc --model my-voice input.wav       Voice conversion
-  python generate.py voice --engine rvc --model my-voice input.wav --pitch 12
-  python generate.py voice --engine rvc --model my-voice input.wav --target-hz 280
-  python generate.py voice --engine rvc --model my-voice input.wav --decoder crepe
-  python generate.py voice --engine clone-tts --text "Hello" -o out.wav           Voice cloning (default ref)
-  python generate.py voice --engine clone-tts --reference ref.wav --text "Hello"  Voice cloning (custom ref)
-  python generate.py audio --engine enhance input.wav                  Denoise + enhance audio
-  python generate.py audio --engine enhance input.wav --denoise-only   Denoise only (faster)
-  python generate.py audio --engine enhance input.wav --enhance-only   Super-resolution only
-  python generate.py audio --engine demucs input.wav                   Separate into stems
-  python generate.py audio --engine demucs input.wav --model htdemucs_ft
-  python generate.py audio --engine ace-step -l "lyrics" -t "disco,happy" -o out.mp3
-  python generate.py audio --engine ace-step --model sft -f lyrics.txt -t "cinematic"
-  python generate.py audio --engine heartmula -l "lyrics" -t "disco,happy" -o out.mp3
-  python generate.py audio --engine diarize interview.wav              Split dialogue by speaker
-  python generate.py audio --engine diarize interview.wav --speakers 3
-  python generate.py audio --engine diarize interview.wav --verify
-  python generate.py audio --engine sfx --text "a dog barking" -o sfx.wav      Sound effect generation
-  python generate.py audio --engine sfx --text "thunder and rain" -s 10 -o weather.wav
-  python generate.py audio --engine voice-removal song.mp3 -o karaoke/             Remove vocals
-  python generate.py text --engine whisper audio.wav                   Transcribe audio
-  python generate.py text --engine whisper audio.wav --model large-v3 --format srt
-  python generate.py text --engine whisper audio.wav --language de
-  python generate.py text --engine heartmula-transcribe song.mp3       Extract lyrics
-  python generate.py text --engine ollama --model qwen3.5:latest --endpoint chat --messages '[{"role":"user","content":"Hi"}]'
-  python generate.py text --engine ollama --model qwen3.5:latest --endpoint generate --prompt "Explain X"
-  python generate.py output --engine audio-concatenate a.wav b.mp3 -o out.wav  Concatenate audio files
-  python generate.py output --engine audio-concatenate a.wav b.wav --output-bitrate 320k -o out.mp3
-  python generate.py output --engine audio-concatenate a.wav b.wav c.mp3 --clip 0:fade-in=0.3 --clip 1:crossfade=0.5,volume=1.2 --clip 2:fade-out=0.5 -o out.mp3
-  python generate.py output --engine audio-mucs vocals.wav drums.wav -o mix.wav   Mix/overlay audio
-  python generate.py output --engine audio-mucs v.wav d.wav --clip 0:pan=-0.2,volume=0.8 -o mix.wav
-  python generate.py image --engine flux.2 -p "a cat on a cliff" -o cat.png       Image generation (FLUX.2)
-  python generate.py image --engine flux.2 --model 4b-distilled -p "a cat" -o cat.png
-  python generate.py image --engine flux.2 --controlnet depth:depth.png -p "cartoon" -o out.png  ControlNet conditioning
-  python generate.py image --engine sd1.5 -p "a warrior, studio lighting" -o out.png  Stable Diffusion 1.5
-  python generate.py image --engine openpose --images person.png -o pose.png      Pose estimation
-  python generate.py image --engine depth --images photo.png -o depth.png         Depth estimation
-  python generate.py image --engine lineart --images photo.png -o lines.png       Line art extraction
-  python generate.py image --engine normalmap --images photo.png -o normals.png   Normal map estimation
-  python generate.py image --engine sketch --images photo.png -o sketch.png       Sketch extraction
-  python generate.py image --engine upscale --images photo.png -o upscaled.png    Image upscaling
-  python generate.py image --engine segment --images photo.png -o transparent.png Background removal
-  python generate.py models list                                          List all models
-  python generate.py models --engine rvc list                              List RVC models
-  python generate.py models --engine rvc search "neutral male"             Search HuggingFace
-  python generate.py models --engine rvc install <id-or-url>               Download from HuggingFace or URL
-  python generate.py models --engine rvc remove <name>                     Remove a model
-  python generate.py models --engine rvc set-pitch <name> <hz>             Set target pitch manually
-  python generate.py models --engine rvc calibrate <name>                  Auto-detect target pitch
-  python generate.py models --engine ollama list                              List Ollama models
-  python generate.py models --engine ollama pull qwen3.5:latest               Pull Ollama model
-  python generate.py models --engine ollama remove <name>                     Remove Ollama model
-  python generate.py models --engine huggingface list                         List cached HF models
-  python generate.py models --engine huggingface search "qwen vision"         Search HuggingFace
-  python generate.py models --engine huggingface pull Org/Model               Download HF model
+  python generate.py voice ai-tts --text "Hello world" -o demos/         Neural TTS (Qwen3-TTS)
+  python generate.py voice ai-tts -v Serena --text "Hello"               TTS with preset voice
+  python generate.py voice ai-tts -v Aiden -t "dramatic" --text "Silence."  TTS with style
+  python generate.py voice ai-tts --tts-model small --text "Hi"          Smaller model (0.6B)
+  python generate.py voice ai-tts --text "[Aiden: excited] Hi! [Serena: calm] Hello."  Per-segment style
+  python generate.py voice ai-tts --prompt-file demos/speech.txt -o demos/  From sidecar
+  python generate.py voice ai-tts --list-voices                          Show available voices
+  python generate.py voice say --text "Hello world" -o demos/            macOS TTS
+  python generate.py voice say -v Anna --text "Hallo" -o demos/          TTS with specific voice
+  python generate.py voice say --model my-voice --text "Hallo"           TTS + RVC voice conversion
+  python generate.py voice rvc --model my-voice input.wav                Voice conversion
+  python generate.py voice rvc --model my-voice input.wav --pitch 12
+  python generate.py voice rvc --model my-voice input.wav --target-hz 280
+  python generate.py voice rvc --model my-voice input.wav --decoder crepe
+  python generate.py voice clone-tts --text "Hello" -o out.wav           Voice cloning (default ref)
+  python generate.py voice clone-tts --reference ref.wav --text "Hello"  Voice cloning (custom ref)
+  python generate.py audio enhance input.wav                             Denoise + enhance audio
+  python generate.py audio enhance input.wav --denoise-only              Denoise only (faster)
+  python generate.py audio enhance input.wav --enhance-only              Super-resolution only
+  python generate.py audio demucs input.wav                              Separate into stems
+  python generate.py audio demucs input.wav --model htdemucs_ft
+  python generate.py audio ace-step -l "lyrics" -t "disco,happy" -o out.mp3
+  python generate.py audio ace-step --model sft -f lyrics.txt -t "cinematic"
+  python generate.py audio heartmula -l "lyrics" -t "disco,happy" -o out.mp3
+  python generate.py audio diarize interview.wav                         Split dialogue by speaker
+  python generate.py audio diarize interview.wav --speakers 3
+  python generate.py audio diarize interview.wav --verify
+  python generate.py audio sfx --text "a dog barking" -o sfx.wav         Sound effect generation
+  python generate.py audio sfx --text "thunder and rain" -s 10 -o weather.wav
+  python generate.py audio voice-removal song.mp3 -o karaoke/            Remove vocals
+  python generate.py text whisper audio.wav                              Transcribe audio
+  python generate.py text whisper audio.wav --model large-v3 --format srt
+  python generate.py text whisper audio.wav --language de
+  python generate.py text heartmula-transcribe song.mp3                  Extract lyrics
+  python generate.py text ollama --model qwen3.5:latest --endpoint chat --messages '[{"role":"user","content":"Hi"}]'
+  python generate.py text ollama --model qwen3.5:latest --endpoint generate --prompt "Explain X"
+  python generate.py output audio-concatenate a.wav b.mp3 -o out.wav     Concatenate audio files
+  python generate.py output audio-concatenate a.wav b.wav --output-bitrate 320k -o out.mp3
+  python generate.py output audio-concatenate a.wav b.wav c.mp3 --clip 0:fade-in=0.3 --clip 1:crossfade=0.5,volume=1.2 --clip 2:fade-out=0.5 -o out.mp3
+  python generate.py output audio-mucs vocals.wav drums.wav -o mix.wav   Mix/overlay audio
+  python generate.py output audio-mucs v.wav d.wav --clip 0:pan=-0.2,volume=0.8 -o mix.wav
+  python generate.py image flux.2 -p "a cat on a cliff" -o cat.png       Image generation (FLUX.2)
+  python generate.py image flux.2 --model 4b-distilled -p "a cat" -o cat.png
+  python generate.py image flux.2 --controlnet depth:depth.png -p "cartoon" -o out.png  ControlNet conditioning
+  python generate.py image sd1.5 -p "a warrior, studio lighting" -o out.png  Stable Diffusion 1.5
+  python generate.py image openpose --images person.png -o pose.png      Pose estimation
+  python generate.py image depth --images photo.png -o depth.png         Depth estimation
+  python generate.py image lineart --images photo.png -o lines.png       Line art extraction
+  python generate.py image normalmap --images photo.png -o normals.png   Normal map estimation
+  python generate.py image sketch --images photo.png -o sketch.png       Sketch extraction
+  python generate.py image upscale --images photo.png -o upscaled.png    Image upscaling
+  python generate.py image segment --images photo.png -o transparent.png Background removal
+  python generate.py models list                                         List all models
+  python generate.py image models list                                   List image engine models
+  python generate.py image flux.2 models list                            List FLUX.2 models only
+  python generate.py models rvc list                                     List RVC models
+  python generate.py models rvc search "neutral male"                    Search HuggingFace
+  python generate.py models rvc install <id-or-url>                      Download from HuggingFace or URL
+  python generate.py models rvc remove <name>                            Remove a model
+  python generate.py models rvc set-pitch <name> <hz>                    Set target pitch manually
+  python generate.py models rvc calibrate <name>                         Auto-detect target pitch
+  python generate.py models ollama list                                  List Ollama models
+  python generate.py models ollama pull qwen3.5:latest                   Pull Ollama model
+  python generate.py models ollama remove <name>                         Remove Ollama model
+  python generate.py models huggingface list                             List cached HF models
+  python generate.py models huggingface search "qwen vision"             Search HuggingFace
+  python generate.py models huggingface pull Org/Model                   Download HF model
   python generate.py server start                          Start RVC worker
   python generate.py server stop                           Stop RVC worker
   python generate.py server status                         Check worker status
@@ -325,13 +327,13 @@ def cmd_server_status(args):
 # ── Models ───────────────────────────────────────────────────────────────────
 
 def cmd_models(args):
-    """Models dispatcher — enforce --engine for non-list subcommands."""
+    """Models dispatcher — enforce engine for non-list subcommands."""
     if not args.models_cmd:
         build_parser().parse_args(["models", "--help"])
         return
     if args.models_cmd != "list" and not args.engine:
-        _emit(f"ERROR: --engine required for 'models {args.models_cmd}'", "error")
-        _emit(f"  Example: python generate.py models --engine rvc {args.models_cmd} ...")
+        _emit(f"ERROR: engine required for 'models {args.models_cmd}'", "error")
+        _emit(f"  Example: python generate.py models rvc {args.models_cmd} ...")
         sys.exit(1)
 
     # Validate subcommand is valid for engine
@@ -352,8 +354,8 @@ def _models_list_rvc():
     models = data.get("models", [])
     if not models:
         _emit("No RVC models installed.")
-        _emit("  Search: python generate.py models --engine rvc search \"neutral male\"")
-        _emit("  Install: python generate.py models --engine rvc install <hf-model-id>")
+        _emit("  Search: python generate.py models rvc search \"neutral male\"")
+        _emit("  Install: python generate.py models rvc install <hf-model-id>")
         return
     _emit(f"RVC models ({len(models)}):\n")
     for m in models:
@@ -362,6 +364,96 @@ def _models_list_rvc():
         else:
             name = m.get("name", m.get("model_name", str(m)))
             _emit(f"  {name}")
+
+
+def _models_list_all(medium=None, engine=None):
+    """Print model listing table, optionally filtered by medium and/or engine."""
+    # Static registry: (modus, engine, model, notice)
+    # Workers with --list-models will extend this dynamically in the future.
+    rows = [
+        # voice
+        ("voice", "rvc", "", "use `models install` to add"),
+        ("voice", "ai-tts", "Aiden", ""),
+        ("voice", "ai-tts", "Serena", ""),
+        ("voice", "ai-tts", "Dylan", ""),
+        ("voice", "ai-tts", "Eric", ""),
+        ("voice", "ai-tts", "Ryan", ""),
+        ("voice", "ai-tts", "Vivian", ""),
+        ("voice", "ai-tts", "Uncle_Fu", ""),
+        ("voice", "ai-tts", "Ono_Anna", ""),
+        ("voice", "ai-tts", "Sohee", ""),
+        ("voice", "say", "", "macOS built-in voices"),
+        ("voice", "clone-tts", "", "clone any voice from audio"),
+        # audio
+        ("audio", "enhance", "", "single model"),
+        ("audio", "demucs", "htdemucs", "default"),
+        ("audio", "demucs", "htdemucs_ft", "fine-tuned"),
+        ("audio", "ace-step", "turbo", "default"),
+        ("audio", "ace-step", "base", ""),
+        ("audio", "ace-step", "sft", ""),
+        ("audio", "heartmula", "", "single model"),
+        ("audio", "sfx", "s3_xl", "default"),
+        ("audio", "sfx", "s3_l", "smaller"),
+        ("audio", "diarize", "", "single model"),
+        ("audio", "voice-removal", "", "demucs-based"),
+        # text
+        ("text", "whisper", "", "auto-detected model"),
+        ("text", "ollama", "", "use `models pull` to add"),
+        ("text", "heartmula-transcribe", "", "single model"),
+        # image
+        ("image", "flux.2", "4b-distilled", "default"),
+        ("image", "flux.2", "4b", ""),
+        ("image", "flux.2", "9b-distilled", ""),
+        ("image", "flux.2", "9b", ""),
+        ("image", "sd1.5", "mm", "default, LoRA: add_detail (1.2)"),
+        ("image", "sd1.5", "dreamshaper", ""),
+        ("image", "depth", "small", "default"),
+        ("image", "depth", "large", ""),
+        ("image", "lineart", "canny", "default"),
+        ("image", "lineart", "teed", "thicker lines"),
+        ("image", "normalmap", "", "single model"),
+        ("image", "sketch", "", "single model"),
+        ("image", "upscale", "4x", "default"),
+        ("image", "upscale", "2x", ""),
+        ("image", "upscale", "anime", ""),
+        ("image", "segment", "", "single model"),
+        ("image", "openpose", "", "single model"),
+        # output
+        ("output", "audio-concatenate", "", ""),
+        ("output", "audio-mucs", "", ""),
+    ]
+
+    # Filter
+    if medium:
+        rows = [r for r in rows if r[0] == medium]
+    if engine:
+        rows = [r for r in rows if r[1] == engine]
+
+    if not rows:
+        _emit(f"No models found for {medium or ''} {engine or ''}".strip(), "error")
+        return
+
+    # Column widths
+    w_mod = max(len(r[0]) for r in rows)
+    w_eng = max(len(r[1]) for r in rows)
+    w_mdl = max(len(r[2]) for r in rows) if any(r[2] for r in rows) else 5
+    w_mod = max(w_mod, 5)
+    w_eng = max(w_eng, 6)
+    w_mdl = max(w_mdl, 5)
+
+    # Header
+    hdr = f"  {'MODUS':<{w_mod}}  {'ENGINE':<{w_eng}}  {'MODEL':<{w_mdl}}  NOTICE"
+    sep = f"  {'-' * w_mod}  {'-' * w_eng}  {'-' * w_mdl}  ------"
+    print(hdr, file=sys.stderr)
+    print(sep, file=sys.stderr)
+
+    for modus, eng, model, notice in rows:
+        line = f"  {modus:<{w_mod}}  {eng:<{w_eng}}  {model:<{w_mdl}}"
+        if notice:
+            line += f"  {notice}"
+        print(line, file=sys.stderr)
+
+    print(file=sys.stderr)
 
 
 def cmd_models_list(args):
@@ -1595,18 +1687,20 @@ def _voice_clone_tts(args):
         transcribe_script = WHISPER_WORKER_DIR / "transcribe.py"
         if transcribe_script.exists():
             _emit("Transcribing reference audio …", "stage")
+            whisper_out = Path(tempfile.mkdtemp(prefix="whisper_clone_"))
             whisper_cmd = [
                 str(CONDA_BIN), "run", "--no-capture-output", "-n", WHISPER_ENV,
                 "python", str(transcribe_script),
                 str(ref_path), "--model", "large-v3-turbo",
+                "--format", "json",
+                "--output", str(whisper_out),
             ]
             whisper_result = run_worker(whisper_cmd, on_event=_event_handler)
             finish_progress()
-            if whisper_result.returncode == 0 and whisper_result.stdout.strip():
+            whisper_json_path = whisper_out / f"{ref_path.stem}.json"
+            if whisper_result.returncode == 0 and whisper_json_path.exists():
                 try:
-                    whisper_data = json.loads(whisper_result.stdout.strip())
-                    if isinstance(whisper_data, list) and whisper_data:
-                        whisper_data = whisper_data[0]
+                    whisper_data = json.loads(whisper_json_path.read_text(encoding="utf-8"))
                     segments = whisper_data.get("segments", [])
 
                     # Find last segment that ends within MAX_REF_SECONDS
@@ -2179,7 +2273,6 @@ def _audio_voice_removal(args):
 
         # 3. Cleanup
         shutil.rmtree(tmpdir, ignore_errors=True)
-        _emit(f"Output: {out_path}")
         outputs.append(str(out_path))
 
     print(json.dumps(outputs))
@@ -2480,7 +2573,7 @@ def cmd_text(args):
     elif engine == "ollama":
         _text_llm(args)
     else:
-        _emit(f"ERROR: Engine '{engine}' is currently not supported. Use --engine ollama.", "error")
+        _emit(f"ERROR: Engine '{engine}' is currently not supported. Use: text ollama", "error")
         sys.exit(1)
 
 
@@ -2717,7 +2810,6 @@ def _output_audio_concatenate(args):
         _emit(f"ERROR: ffmpeg failed:\n{result.stderr[-500:]}", "error")
         sys.exit(1)
 
-    _emit(f"Output: {out_path}")
 
 
 def _output_audio_mucs(args):
@@ -2804,7 +2896,6 @@ def _output_audio_mucs(args):
         _emit(f"ERROR: ffmpeg failed:\n{result.stderr[-500:]}", "error")
         sys.exit(1)
 
-    _emit(f"Output: {out_path}")
 
 
 # ── Image generation (FLUX.2 / SD 1.5) ──────────────────────────────────────
@@ -2896,7 +2987,6 @@ def _image_openpose(args):
     if result.stdout.strip():
         print(result.stdout.strip())
 
-    _emit(f"Output: {out_path}")
 
 
 def _image_depth(args):
@@ -2937,7 +3027,6 @@ def _image_depth(args):
     if result.stdout.strip():
         print(result.stdout.strip())
 
-    _emit(f"Output: {out_path}")
 
 
 def _image_sd15(args, cn_mode=None, cn_path=None):
@@ -3007,7 +3096,6 @@ def _image_sd15(args, cn_mode=None, cn_path=None):
     if result.stdout.strip():
         print(result.stdout.strip())
 
-    _emit(f"Output: {out_path}")
 
 
 def _parse_controlnet(spec):
@@ -3060,7 +3148,6 @@ def _image_lineart(args):
         sys.exit(1)
     if result.stdout.strip():
         print(result.stdout.strip())
-    _emit(f"Output: {out_path}")
 
 
 def _image_normalmap(args):
@@ -3098,7 +3185,6 @@ def _image_normalmap(args):
         sys.exit(1)
     if result.stdout.strip():
         print(result.stdout.strip())
-    _emit(f"Output: {out_path}")
 
 
 def _image_sketch(args):
@@ -3133,7 +3219,6 @@ def _image_sketch(args):
         sys.exit(1)
     if result.stdout.strip():
         print(result.stdout.strip())
-    _emit(f"Output: {out_path}")
 
 
 def _image_upscale(args):
@@ -3169,7 +3254,6 @@ def _image_upscale(args):
         sys.exit(1)
     if result.stdout.strip():
         print(result.stdout.strip())
-    _emit(f"Output: {out_path}")
 
 
 def _image_segment(args):
@@ -3206,7 +3290,6 @@ def _image_segment(args):
         sys.exit(1)
     if result.stdout.strip():
         print(result.stdout.strip())
-    _emit(f"Output: {out_path}")
 
 
 def cmd_image(args):
@@ -3314,7 +3397,6 @@ def cmd_image(args):
     if result.stdout.strip():
         print(result.stdout.strip())
 
-    _emit(f"Output: {out_path}")
 
 
 # ── Stub handler for future mediums ──────────────────────────────────────────
@@ -3344,9 +3426,10 @@ def build_parser():
 
     # ── voice ─────────────────────────────────────────────────────────────
     p_voice = sub.add_parser("voice", help="Voice conversion and TTS")
+    p_voice.add_argument("engine",
+                       choices=["rvc", "say", "ai-tts", "clone-tts"],
+                       help="Voice engine")
     p_voice.add_argument("input", nargs="*", help="[rvc] Input audio file(s)")
-    p_voice.add_argument("--engine", default="rvc", choices=["rvc", "say", "ai-tts", "clone-tts"],
-                       help="Voice engine (default: rvc)")
     p_voice.add_argument("--model", dest="voice", help="[rvc] Voice/RVC model name")
     p_voice.add_argument("-o", "--output", help="Output directory")
     # text input (say/ai-tts, shared alias with audio --lyrics)
@@ -3390,10 +3473,10 @@ def build_parser():
     # ── audio ─────────────────────────────────────────────────────────────
     p_audio = sub.add_parser("audio",
                              help="Audio processing and generation")
-    p_audio.add_argument("input", nargs="*", help="Input audio file(s)")
-    p_audio.add_argument("--engine", required=True,
+    p_audio.add_argument("engine",
                          choices=["enhance", "demucs", "ace-step", "heartmula", "diarize", "sfx", "voice-removal"],
                          help="Audio engine")
+    p_audio.add_argument("input", nargs="*", help="Input audio file(s)")
     p_audio.add_argument("--model", default=None,
                          help="Model variant: [demucs] htdemucs/htdemucs_ft, "
                               "[ace-step] turbo/sft/base")
@@ -3463,11 +3546,11 @@ def build_parser():
     # ── text ──────────────────────────────────────────────────────────────
     p_text = sub.add_parser("text",
                             help="Text extraction / LLM inference")
-    p_text.add_argument("input", nargs="*", help="Input audio file(s) [whisper]")
-    p_text.add_argument("--engine", required=True,
+    p_text.add_argument("engine",
                         choices=["whisper", "heartmula-transcribe",
                                  "ollama"],
                         help="Text engine")
+    p_text.add_argument("input", nargs="*", help="Input audio file(s) [whisper]")
     p_text.add_argument("--model", default=None,
                         help="Model name")
     p_text.add_argument("--language", default=None,
@@ -3524,10 +3607,10 @@ def build_parser():
     # ── output ────────────────────────────────────────────────────────────
     p_output = sub.add_parser("output",
                               help="Post-processing: concatenation, mixing")
-    p_output.add_argument("input", nargs="*", help="Input files")
-    p_output.add_argument("--engine", required=True,
+    p_output.add_argument("engine",
                           choices=["audio-concatenate", "audio-mucs"],
                           help="Output engine")
+    p_output.add_argument("input", nargs="*", help="Input files")
     p_output.add_argument("-o", "--output", help="Output file path")
     p_output.add_argument("--output-bitrate", default=None,
                           help="Audio bitrate (e.g. '192k', '320k')")
@@ -3539,7 +3622,7 @@ def build_parser():
     # ── Stubs for future mediums ──────────────────────────────────────────
     # ── image ─────────────────────────────────────────────────────────────
     p_image = sub.add_parser("image", help="Image generation & processing")
-    p_image.add_argument("--engine", required=True,
+    p_image.add_argument("engine",
                           choices=["flux.2", "openpose", "sd1.5", "depth",
                                    "lineart", "normalmap", "sketch",
                                    "upscale", "segment"],
@@ -3597,7 +3680,7 @@ def build_parser():
 
     # ── models ────────────────────────────────────────────────────────────
     p_models = sub.add_parser("models", help="Manage models")
-    p_models.add_argument("--engine",
+    p_models.add_argument("engine", nargs="?",
                           choices=["rvc", "ollama", "huggingface"],
                           default=None,
                           help="Engine (required for all except list)")
@@ -3666,6 +3749,15 @@ def main():
         if idx + 1 < len(argv) and argv[idx + 1] == "json":
             _event_handler = print_event_json
         argv[idx:idx + 2] = []
+
+    # ── Intercept "models list" at any position ──────────────────────────
+    if "models" in argv:
+        idx = argv.index("models")
+        if idx + 1 < len(argv) and argv[idx + 1] == "list":
+            medium = argv[0] if idx > 0 and argv[0] != "models" else None
+            engine = argv[1] if idx > 1 else None
+            _models_list_all(medium=medium, engine=engine)
+            return
 
     parser = build_parser()
     args = parser.parse_args(argv)

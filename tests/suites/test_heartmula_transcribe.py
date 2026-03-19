@@ -36,7 +36,7 @@ def register(suite):
     suite.add(
         name="Prep: generate 60s song (ACE-Step)",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "ace-step",
+            sys.executable, "generate.py", "audio", "ace-step",
             "--model", "turbo",
             "-l", PREP_LYRICS,
             "-t", "pop,vocal,english,clear vocals",
@@ -49,7 +49,7 @@ def register(suite):
     suite.add(
         name="HeartMuLa lyrics extraction",
         cmd=[
-            sys.executable, "generate.py", "text", "--engine", "heartmula-transcribe",
+            sys.executable, "generate.py", "text", "heartmula-transcribe",
             str(prep_song),
             "-o", str(out / "ace-song-lyrics.txt"),
         ],

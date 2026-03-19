@@ -530,6 +530,13 @@ def main():
     elif endpoint == "unload":
         cmd_unload(args, engine, client)
 
+    # Final output: array of saved file paths
+    output_path = getattr(args, "output", None)
+    if output_path and Path(output_path).exists():
+        print(json.dumps([str(output_path)]))
+    else:
+        print(json.dumps([]))
+
 
 if __name__ == "__main__":
     main()

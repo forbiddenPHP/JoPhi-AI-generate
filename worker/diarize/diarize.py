@@ -226,8 +226,9 @@ def verify_transcription(speaker_segments: dict[str, list[tuple[float, float]]],
 
 def diarize(input_path: Path, output_dir: Path,
             num_speakers: int | None = None, hf_token: str | None = None,
-            verify: bool = False):
-    """Run pyannote diarization, then split audio into speaker tracks."""
+            verify: bool = False) -> list[str]:
+    """Run pyannote diarization, then split audio into speaker tracks.
+    Returns list of all output file paths."""
 
     device = get_device()
     print(f"Diarizing audio …", file=sys.stderr)
@@ -311,6 +312,7 @@ def diarize(input_path: Path, output_dir: Path,
     print("Writing speaker tracks …", file=sys.stderr)
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = input_path.stem
+    output_paths = []
 
     for speaker in speakers:
         if is_stereo:
@@ -325,6 +327,7 @@ def diarize(input_path: Path, output_dir: Path,
 
         out_path = output_dir / f"{stem}_{speaker}.wav"
         sf.write(str(out_path), track, sr)
+        output_paths.append(str(out_path))
         print(f"✓ {out_path.name}", file=sys.stderr)
 
     # ── Save diarization JSON ─────────────────────────────────────────────
@@ -341,6 +344,7 @@ def diarize(input_path: Path, output_dir: Path,
         json.dumps(segments_json, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
+    output_paths.append(str(json_path))
     print(f"✓ {json_path.name}", file=sys.stderr)
 
     # ── Verify stats ──────────────────────────────────────────────────────
@@ -350,6 +354,7 @@ def diarize(input_path: Path, output_dir: Path,
                              output_dir, stem)
 
     print(f"Done — {len(speakers)} speaker tracks written to {output_dir}", file=sys.stderr)
+    return output_paths
 
 
 def main():
@@ -385,9 +390,10 @@ def main():
         print(f"ERROR: File not found: {args.input}", file=sys.stderr)
         sys.exit(1)
 
-    diarize(args.input, args.output,
-            num_speakers=args.speakers, hf_token=args.hf_token,
-            verify=args.verify)
+    output_paths = diarize(args.input, args.output,
+                           num_speakers=args.speakers, hf_token=args.hf_token,
+                           verify=args.verify)
+    print(json.dumps(output_paths))
 
 
 if __name__ == "__main__":

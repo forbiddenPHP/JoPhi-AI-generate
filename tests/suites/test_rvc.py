@@ -35,7 +35,7 @@ def register(suite):
     suite.add(
         name="Prep: generate Say input",
         cmd=[
-            sys.executable, "generate.py", "voice", "--engine", "say",
+            sys.executable, "generate.py", "voice", "say",
             "--text", "Das ist ein Test der RVC Stimmkonvertierung.",
             "-o", str(prep),
         ],
@@ -56,9 +56,9 @@ def register(suite):
         suite.add(
             name=f"RVC convert → {voice}",
             cmd=[
-                sys.executable, "generate.py", "voice", "--engine", "rvc",
-                "--model", voice,
+                sys.executable, "generate.py", "voice", "rvc",
                 str(prep_say),
+                "--model", voice,
                 "-o", str(out / "convert" / voice),
             ],
             output=out / "convert" / voice / prep_say_name,
@@ -68,7 +68,7 @@ def register(suite):
     suite.add(
         name=f"Say+RVC pipeline ({voices[0]})",
         cmd=[
-            sys.executable, "generate.py", "voice", "--engine", "say",
+            sys.executable, "generate.py", "voice", "say",
             "--model", voices[0],
             "--text", "Das ist ein Test der Say plus RVC Pipeline.",
             "-o", str(out),

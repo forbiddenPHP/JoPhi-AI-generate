@@ -13,7 +13,7 @@ def register(suite):
     suite.add(
         name="Diarize 3 speakers + verify",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "diarize",
+            sys.executable, "generate.py", "audio", "diarize",
             str(PODCAST),
             "--speakers", "3", "--verify",
             "-o", str(out / "3-speakers"),
@@ -24,7 +24,7 @@ def register(suite):
     suite.add(
         name="Diarize auto-detect speakers",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "diarize",
+            sys.executable, "generate.py", "audio", "diarize",
             str(PODCAST),
             "-o", str(out / "auto-speakers"),
         ],

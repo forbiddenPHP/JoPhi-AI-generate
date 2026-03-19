@@ -49,7 +49,7 @@ def register(suite):
     suite.add(
         name="ACE-Step turbo 120s synthwave",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "ace-step",
+            sys.executable, "generate.py", "audio", "ace-step",
             "--model", "turbo",
             "-l", LYRICS,
             "-t", "synthwave,electronic,upbeat,80s,energetic",
@@ -61,7 +61,7 @@ def register(suite):
     suite.add(
         name="ACE-Step SFT 30s cinematic",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "ace-step",
+            sys.executable, "generate.py", "audio", "ace-step",
             "--model", "sft",
             "-l", LYRICS,
             "-t", "cinematic,orchestral,epic,dramatic",
@@ -73,7 +73,7 @@ def register(suite):
     suite.add(
         name="ACE-Step Deutsch 60s pop",
         cmd=[
-            sys.executable, "generate.py", "audio", "--engine", "ace-step",
+            sys.executable, "generate.py", "audio", "ace-step",
             "-l", LYRICS_DE,
             "-t", "german pop,female vocal,upbeat,catchy",
             "--language", "de",

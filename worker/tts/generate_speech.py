@@ -280,11 +280,8 @@ def main():
     sf.write(str(output_path), final_audio, native_sr)
     print(f"Saved: {output_path} ({native_sr} Hz)", file=sys.stderr)
 
-    # JSON result on stdout
-    print(json.dumps({
-        "output": str(output_path),
-        "sample_rate": native_sr,
-    }))
+    # JSON result on stdout — array of output paths
+    print(json.dumps([str(output_path)]))
 
 
 if __name__ == "__main__":

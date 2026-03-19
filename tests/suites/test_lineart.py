@@ -20,7 +20,7 @@ def register(suite):
         name="Lineart: TEED extraction",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "lineart",
+            "lineart",
             "--images", str(REF_IMAGE),
             "-o", str(out / "lineart_teed.png"),
         ],
@@ -31,7 +31,7 @@ def register(suite):
         name="Lineart: Canny extraction",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "lineart",
+            "lineart",
             "--model", "canny",
             "--images", str(REF_IMAGE),
             "-o", str(out / "lineart_canny.png"),
@@ -45,7 +45,7 @@ def register(suite):
         name="Lineart: generate man from TEED",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "--controlnet", "lineart:" + str(out / "lineart_teed.png"),
             "-p", PROMPT_MAN,
@@ -60,7 +60,7 @@ def register(suite):
         name="Lineart: generate woman from TEED",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "--controlnet", "lineart:" + str(out / "lineart_teed.png"),
             "-p", PROMPT_WOMAN,
@@ -75,7 +75,7 @@ def register(suite):
         name="Lineart: generate monster from TEED",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "--controlnet", "lineart:" + str(out / "lineart_teed.png"),
             "-p", PROMPT_MONSTER,
@@ -92,7 +92,7 @@ def register(suite):
         name="Lineart: generate man from Canny",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "--controlnet", "lineart:" + str(out / "lineart_canny.png"),
             "-p", PROMPT_MAN,
@@ -107,7 +107,7 @@ def register(suite):
         name="Lineart: generate woman from Canny",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "--controlnet", "lineart:" + str(out / "lineart_canny.png"),
             "-p", PROMPT_WOMAN,
@@ -122,7 +122,7 @@ def register(suite):
         name="Lineart: generate monster from Canny",
         cmd=[
             sys.executable, "generate.py", "image",
-            "--engine", "flux.2",
+            "flux.2",
             "--model", "4b-distilled",
             "--controlnet", "lineart:" + str(out / "lineart_canny.png"),
             "-p", PROMPT_MONSTER,
