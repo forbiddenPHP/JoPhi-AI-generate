@@ -1,13 +1,11 @@
 # ABI-Konsistenz: README.md vs generate.py
 
-## Problem
-- `--prompt` hat bei `image` den Shortcut `-p`, bei `text` nicht
-- Usage-Header in generate.py möglicherweise veraltet
-- README.md Beispiele müssen mit tatsächlicher CLI übereinstimmen
+## Erledigt
+- [x] `-p` Konflikt gelöst: `-p`=`--prompt`, `-pf`=`--prompt-file`, `-pt`=`--port`
+- [x] `--timeout` aus README entfernt (darf nicht existieren)
+- [x] `--base-url`, `--api-key` in README nachgetragen
+- [x] Tests geprüft — nutzen korrekte Flags
+- [x] Usage-Header in generate.py geprüft — war bereits korrekt
 
-## Aufgaben
-- [ ] Alle Flags in generate.py extrahieren (pro Subparser)
-- [ ] Mit README.md Dokumentation vergleichen
-- [ ] Inkonsistenzen fixen (Shortcuts, Defaults, Beschreibungen)
-- [ ] Usage-Header in generate.py aktualisieren
-- [ ] Tests prüfen ob sie die korrekten Flags nutzen
+## Offen
+- [ ] USAGE-Docstring: einige Params fehlen als Beispiele (--word-timestamps, --thinking, --stream, --screen-log-format json) — nice-to-have, kein Blocker

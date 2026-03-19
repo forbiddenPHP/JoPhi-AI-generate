@@ -65,6 +65,11 @@ generate.py <medium> --engine <backend> [--model <variant>] [input] [options]
 | `image` | `sd1.5` | Image generation (Stable Diffusion 1.5, CivitAI models + LoRAs) |
 | `image` | `openpose` | Pose estimation via DWPose (body, hands, face) |
 | `image` | `depth` | Depth estimation via Depth Anything V2 (zero-shot) |
+| `image` | `lineart` | Line art extraction via TEED/AnyLine |
+| `image` | `normalmap` | Normal map estimation via Marigold-Normals |
+| `image` | `sketch` | Sketch/edge extraction via HED |
+| `image` | `upscale` | Image upscaling via Real-ESRGAN |
+| `image` | `segment` | Background removal / object segmentation |
 
 Future mediums (stubs): `video`, `translation`, `comparison`
 
@@ -555,7 +560,7 @@ python generate.py image --engine flux.2 -p "a sunset" --seed 42 -o sunset.png
 - `-W, --width` — Image width (default: 1360)
 - `-H, --height` — Image height (default: 768)
 - `--images` — Reference image path(s) for editing (up to 10)
-- `--depth` — Depth map image for structural conditioning (resized to output dimensions)
+- `--controlnet` — Conditioning: `mode:filepath` (e.g. `depth:depth.png`, `pose:pose.png`, `lineart:lines.png`, `normalmap:normals.png`, `sketch:sketch.png`)
 
 </details>
 
@@ -685,7 +690,7 @@ Use a depth map as structural reference for FLUX.2 image generation:
 ```bash
 # Extract depth, then generate with same structure
 python generate.py image --engine depth --images photo.png -o depth.png
-python generate.py image --engine flux.2 --model 4b-distilled --depth depth.png -p "turn image 1 into a cartoon character" -o cartoon.png
+python generate.py image --engine flux.2 --model 4b-distilled --controlnet depth:depth.png -p "turn image 1 into a cartoon character" -o cartoon.png
 ```
 
 ---
@@ -787,7 +792,7 @@ python generate.py text --engine ollama --model qwen3.5:latest --endpoint load
 python generate.py text --engine ollama --model qwen3.5:latest --endpoint unload
 ```
 
-Supported params: `--context-length`, `--max-tokens`, `--temperature`, `--top-p`, `--top-k`, `--repeat-penalty`, `--seed`, `--stop`, `--stream`, `--thinking`, `--images`.
+Supported params: `--context-length`, `--max-tokens`, `--temperature`, `--top-p`, `--top-k`, `--repeat-penalty`, `--seed`, `--stop`, `--stream`, `--thinking`, `--images`, `--base-url`, `--api-key`.
 
 ---
 

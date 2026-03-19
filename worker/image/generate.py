@@ -127,9 +127,11 @@ def main():
     parser.add_argument("--steps", type=int, default=None, help="Inference steps")
     parser.add_argument("--guidance", type=float, default=None, help="Guidance scale")
     parser.add_argument("--images", nargs="+", default=None, help="Reference image path(s)")
-    parser.add_argument("--depth", default=None, help="Depth map image for structural conditioning")
-    parser.add_argument("--depth-strength", type=float, default=0.5,
-                        help="Depth conditioning strength 0.0-1.0 (default: 0.5)")
+    parser.add_argument("--controlnet-image", default=None, dest="controlnet_image",
+                        help="ControlNet conditioning image path")
+    parser.add_argument("--controlnet-mode", default=None, dest="controlnet_mode",
+                        choices=["depth", "normalmap", "lineart", "sketch", "pose"],
+                        help="ControlNet mode (determines preprocessing)")
     args = parser.parse_args()
 
     model_name = args.model.lower()
@@ -166,16 +168,26 @@ def main():
     ae = load_ae(model_name, device=device)
     ae.eval()
 
-    # Step 2: Encode reference images (if any) — depth map is added as first reference
+    # Step 2: Encode reference images (if any)
+    # ControlNet pixel-aligned modes (depth, normalmap, lineart, sketch) are inserted
+    # at position 0 and Pan & Scan'd to output dimensions.
+    # ControlNet reference modes (pose) are added as normal reference images.
+    _PIXEL_ALIGNED_MODES = {"depth", "normalmap", "lineart", "sketch"}
     ref_tokens = None
     ref_ids = None
     all_images = list(args.images or [])
-    if args.depth:
-        all_images.insert(0, args.depth)
+    cn_pixel_aligned = False
+    if args.controlnet_image:
+        if args.controlnet_mode in _PIXEL_ALIGNED_MODES:
+            all_images.insert(0, args.controlnet_image)
+            cn_pixel_aligned = True
+        else:
+            # pose etc. → add as normal reference image
+            all_images.append(args.controlnet_image)
     if all_images:
         img_ctx = [Image.open(p) for p in all_images]
-        # Pan & Scan depth map to target aspect ratio + dimensions
-        if args.depth:
+        # Pan & Scan pixel-aligned controlnet image to target aspect ratio + dimensions
+        if cn_pixel_aligned:
             img_ctx[0] = _pan_and_scan(img_ctx[0], width, height)
         print(f"Encoding {len(img_ctx)} reference image(s) …", file=sys.stderr)
         with torch.no_grad():

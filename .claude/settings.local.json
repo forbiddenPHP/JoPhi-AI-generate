@@ -1,20 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ls /Users/jophi/tts-mist/example_*.json)",
-      "Bash(find /Users/jophi/tts-mist -maxdepth 2 -name example_*.json)",
-      "Bash(find /Users/jophi/tts-mist -maxdepth 3 -name example*.json)",
-      "WebFetch(domain:github.com)",
-      "Bash(/opt/miniconda3/bin/conda run:*)",
-      "Bash(python3 -c \"from demucs.apply import apply_model; import inspect; print\\(inspect.getsource\\(apply_model\\)\\)\")",
-      "Bash(grep -r tqdm /Users/jophi/tts-mist/ --include=*.py)",
-      "Read(//opt/miniconda3/bin/**)",
-      "Bash(/Users/jophi/tts-mist/worker/ace/ACE-Step-1.5/.venv/bin/pip freeze:*)",
-      "Bash(ls -d /Users/jophi/tts-mist/worker/*/)",
-      "Bash(find /Users/jophi/tts-mist/tests -maxdepth 2 -type f \\\\\\(-name *.py -o -name *.sh \\\\\\) ! -path */.venv/* ! -path */__pycache__/*)",
-      "WebFetch(domain:pypi.org)",
+      "Bash",
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
       "WebSearch",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch"
     ]
   }
 }

@@ -79,7 +79,7 @@ def register(suite):
         output=out / "portrait_monster.png",
     )
 
-    # ── Pose transfer: wholebody skeleton ────────────────────────────────────
+    # ── Pose transfer: wholebody skeleton via --controlnet ─────────────────
 
     suite.add(
         name="OpenPose: pose transfer woman (wholebody)",
@@ -87,8 +87,9 @@ def register(suite):
             sys.executable, "generate.py", "image",
             "--engine", "flux.2",
             "--model", "4b-distilled",
-            "-p", "change the pose and camera angle of the subject in image 2 to the pose and camera angle in image 1",
-            "--images", str(out / "pose_wholebody.png"), str(out / "portrait_woman.png"),
+            "-p", "change the pose and camera angle of the subject in image 1 to the pose and camera angle in the controlnet",
+            "--controlnet", "pose:" + str(out / "pose_wholebody.png"),
+            "--images", str(out / "portrait_woman.png"),
             "-W", "504", "-H", "504",
             "--seed", "42",
             "-o", str(out / "pose_transfer_woman_wholebody.png"),
@@ -102,8 +103,9 @@ def register(suite):
             sys.executable, "generate.py", "image",
             "--engine", "flux.2",
             "--model", "4b-distilled",
-            "-p", "change the pose and camera angle of the subject in image 2 to the pose and camera angle in image 1",
-            "--images", str(out / "pose_wholebody.png"), str(out / "portrait_man.png"),
+            "-p", "change the pose and camera angle of the subject in image 1 to the pose and camera angle in the controlnet",
+            "--controlnet", "pose:" + str(out / "pose_wholebody.png"),
+            "--images", str(out / "portrait_man.png"),
             "-W", "504", "-H", "504",
             "--seed", "73",
             "-o", str(out / "pose_transfer_man_wholebody.png"),
@@ -117,8 +119,9 @@ def register(suite):
             sys.executable, "generate.py", "image",
             "--engine", "flux.2",
             "--model", "4b-distilled",
-            "-p", "change the pose and camera angle of the subject in image 2 to the pose and camera angle in image 1",
-            "--images", str(out / "pose_wholebody.png"), str(out / "portrait_monster.png"),
+            "-p", "change the pose and camera angle of the subject in image 1 to the pose and camera angle in the controlnet",
+            "--controlnet", "pose:" + str(out / "pose_wholebody.png"),
+            "--images", str(out / "portrait_monster.png"),
             "-W", "504", "-H", "504",
             "--seed", "99",
             "-o", str(out / "pose_transfer_monster_wholebody.png"),
@@ -126,7 +129,7 @@ def register(suite):
         output=out / "pose_transfer_monster_wholebody.png",
     )
 
-    # ── Pose transfer: body-only skeleton ─────────────────────────────────────
+    # ── Pose transfer: body-only skeleton via --controlnet ─────────────────
 
     suite.add(
         name="OpenPose: pose transfer woman (body)",
@@ -134,8 +137,9 @@ def register(suite):
             sys.executable, "generate.py", "image",
             "--engine", "flux.2",
             "--model", "4b-distilled",
-            "-p", "change the pose and camera angle of the subject in image 2 to the pose and camera angle in image 1",
-            "--images", str(out / "pose_body.png"), str(out / "portrait_woman.png"),
+            "-p", "change the pose and camera angle of the subject in image 1 to the pose and camera angle in the controlnet",
+            "--controlnet", "pose:" + str(out / "pose_body.png"),
+            "--images", str(out / "portrait_woman.png"),
             "-W", "504", "-H", "504",
             "--seed", "42",
             "-o", str(out / "pose_transfer_woman_body.png"),
@@ -149,8 +153,9 @@ def register(suite):
             sys.executable, "generate.py", "image",
             "--engine", "flux.2",
             "--model", "4b-distilled",
-            "-p", "change the pose and camera angle of the subject in image 2 to the pose and camera angle in image 1",
-            "--images", str(out / "pose_body.png"), str(out / "portrait_man.png"),
+            "-p", "change the pose and camera angle of the subject in image 1 to the pose and camera angle in the controlnet",
+            "--controlnet", "pose:" + str(out / "pose_body.png"),
+            "--images", str(out / "portrait_man.png"),
             "-W", "504", "-H", "504",
             "--seed", "73",
             "-o", str(out / "pose_transfer_man_body.png"),
@@ -164,8 +169,9 @@ def register(suite):
             sys.executable, "generate.py", "image",
             "--engine", "flux.2",
             "--model", "4b-distilled",
-            "-p", "change the pose and camera angle of the subject in image 2 to the pose and camera angle in image 1",
-            "--images", str(out / "pose_body.png"), str(out / "portrait_monster.png"),
+            "-p", "change the pose and camera angle of the subject in image 1 to the pose and camera angle in the controlnet",
+            "--controlnet", "pose:" + str(out / "pose_body.png"),
+            "--images", str(out / "portrait_monster.png"),
             "-W", "504", "-H", "504",
             "--seed", "99",
             "-o", str(out / "pose_transfer_monster_body.png"),

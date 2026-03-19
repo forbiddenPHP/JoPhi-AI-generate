@@ -47,9 +47,15 @@ Usage:
   python generate.py output --engine audio-mucs v.wav d.wav --clip 0:pan=-0.2,volume=0.8 -o mix.wav
   python generate.py image --engine flux.2 -p "a cat on a cliff" -o cat.png       Image generation (FLUX.2)
   python generate.py image --engine flux.2 --model 4b-distilled -p "a cat" -o cat.png
+  python generate.py image --engine flux.2 --controlnet depth:depth.png -p "cartoon" -o out.png  ControlNet conditioning
   python generate.py image --engine sd1.5 -p "a warrior, studio lighting" -o out.png  Stable Diffusion 1.5
   python generate.py image --engine openpose --images person.png -o pose.png      Pose estimation
   python generate.py image --engine depth --images photo.png -o depth.png         Depth estimation
+  python generate.py image --engine lineart --images photo.png -o lines.png       Line art extraction
+  python generate.py image --engine normalmap --images photo.png -o normals.png   Normal map estimation
+  python generate.py image --engine sketch --images photo.png -o sketch.png       Sketch extraction
+  python generate.py image --engine upscale --images photo.png -o upscaled.png    Image upscaling
+  python generate.py image --engine segment --images photo.png -o transparent.png Background removal
   python generate.py models list                                          List all models
   python generate.py models --engine rvc list                              List RVC models
   python generate.py models --engine rvc search "neutral male"             Search HuggingFace
@@ -2816,6 +2822,26 @@ SD15_ENV = "sd15"
 DEPTH_WORKER_DIR = SCRIPT_DIR / "worker" / "depth"
 DEPTH_WORKER = DEPTH_WORKER_DIR / "generate.py"
 DEPTH_ENV = "depth"
+LINEART_WORKER_DIR = SCRIPT_DIR / "worker" / "lineart"
+LINEART_WORKER = LINEART_WORKER_DIR / "generate.py"
+LINEART_ENV = "lineart"
+NORMALMAP_WORKER_DIR = SCRIPT_DIR / "worker" / "normalmap"
+NORMALMAP_WORKER = NORMALMAP_WORKER_DIR / "generate.py"
+NORMALMAP_ENV = "normalmap"
+SKETCH_WORKER_DIR = SCRIPT_DIR / "worker" / "sketch"
+SKETCH_WORKER = SKETCH_WORKER_DIR / "generate.py"
+SKETCH_ENV = "sketch"
+UPSCALE_WORKER_DIR = SCRIPT_DIR / "worker" / "upscale"
+UPSCALE_WORKER = UPSCALE_WORKER_DIR / "generate.py"
+UPSCALE_ENV = "upscale"
+SEGMENT_WORKER_DIR = SCRIPT_DIR / "worker" / "segment"
+SEGMENT_WORKER = SEGMENT_WORKER_DIR / "generate.py"
+SEGMENT_ENV = "segment"
+
+# Valid controlnet modes and their behavior
+_CONTROLNET_PIXEL_ALIGNED = {"depth", "normalmap", "lineart", "sketch"}
+_CONTROLNET_REFERENCE = {"pose"}
+_CONTROLNET_MODES = _CONTROLNET_PIXEL_ALIGNED | _CONTROLNET_REFERENCE
 
 # Map user-facing model names to FLUX2_MODEL_INFO keys
 _IMAGE_MODEL_MAP = {
@@ -2914,7 +2940,7 @@ def _image_depth(args):
     _emit(f"Output: {out_path}")
 
 
-def _image_sd15(args):
+def _image_sd15(args, cn_mode=None, cn_path=None):
     """Run SD 1.5 image generation (maturemalemix etc.)."""
     if not SD15_WORKER.exists():
         _emit("ERROR: worker/sd15/generate.py not found", "error")
@@ -2966,6 +2992,10 @@ def _image_sd15(args):
     if getattr(args, "no_lora", False):
         cmd.append("--no-lora")
 
+    # ControlNet conditioning
+    if cn_mode and cn_path:
+        cmd.extend(["--controlnet-image", cn_path, "--controlnet-mode", cn_mode])
+
     _emit(f"Generating image (sd1.5/{model}) …", "stage")
 
     result = run_worker(cmd, on_event=_event_handler)
@@ -2980,22 +3010,239 @@ def _image_sd15(args):
     _emit(f"Output: {out_path}")
 
 
+def _parse_controlnet(spec):
+    """Parse 'mode:filepath' → (mode, filepath). Validates mode and file existence."""
+    if ":" not in spec:
+        _emit("ERROR: --controlnet must be mode:filepath (e.g. depth:depth.png)", "error")
+        sys.exit(1)
+    mode, filepath = spec.split(":", 1)
+    mode = mode.lower()
+    if mode not in _CONTROLNET_MODES:
+        valid = ", ".join(sorted(_CONTROLNET_MODES))
+        _emit(f"ERROR: Unknown controlnet mode '{mode}'. Valid: {valid}", "error")
+        sys.exit(1)
+    if not Path(filepath).exists():
+        _emit(f"ERROR: ControlNet image not found: {filepath}", "error")
+        sys.exit(1)
+    return mode, filepath
+
+
+def _image_lineart(args):
+    """Extract line art from images."""
+    images = getattr(args, "images", None)
+    if not images:
+        _emit("ERROR: --images required for lineart extraction", "error")
+        sys.exit(1)
+    for img in images:
+        if not Path(img).exists():
+            _emit(f"ERROR: File not found: {img}", "error")
+            sys.exit(1)
+    if not LINEART_WORKER.exists():
+        _emit("ERROR: worker/lineart/generate.py not found", "error")
+        _emit("  Run: bash worker/lineart/install.sh", "error")
+        sys.exit(1)
+
+    out_path = Path(args.output) if args.output else Path("lineart.png")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    model = getattr(args, "model", None) or "teed"
+    cmd = [
+        str(CONDA_BIN), "run", "--no-capture-output", "-n", LINEART_ENV,
+        "python", str(LINEART_WORKER),
+        "--images"] + list(images) + ["-o", str(out_path), "--model", model,
+    ]
+
+    _emit(f"Extracting lineart ({model}, {len(images)} image(s)) …", "stage")
+    result = run_worker(cmd, on_event=_event_handler)
+    finish_progress()
+    if result.returncode != 0:
+        _emit("ERROR: Lineart extraction failed.", "error")
+        sys.exit(1)
+    if result.stdout.strip():
+        print(result.stdout.strip())
+    _emit(f"Output: {out_path}")
+
+
+def _image_normalmap(args):
+    """Estimate surface normals from images."""
+    images = getattr(args, "images", None)
+    if not images:
+        _emit("ERROR: --images required for normalmap estimation", "error")
+        sys.exit(1)
+    for img in images:
+        if not Path(img).exists():
+            _emit(f"ERROR: File not found: {img}", "error")
+            sys.exit(1)
+    if not NORMALMAP_WORKER.exists():
+        _emit("ERROR: worker/normalmap/generate.py not found", "error")
+        _emit("  Run: bash worker/normalmap/install.sh", "error")
+        sys.exit(1)
+
+    out_path = Path(args.output) if args.output else Path("normalmap.png")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    cmd = [
+        str(CONDA_BIN), "run", "--no-capture-output", "-n", NORMALMAP_ENV,
+        "python", str(NORMALMAP_WORKER),
+        "--images"] + list(images) + ["-o", str(out_path),
+    ]
+    steps = getattr(args, "steps", None)
+    if steps is not None:
+        cmd.extend(["--steps", str(steps)])
+
+    _emit(f"Estimating normals ({len(images)} image(s)) …", "stage")
+    result = run_worker(cmd, on_event=_event_handler)
+    finish_progress()
+    if result.returncode != 0:
+        _emit("ERROR: Normal map estimation failed.", "error")
+        sys.exit(1)
+    if result.stdout.strip():
+        print(result.stdout.strip())
+    _emit(f"Output: {out_path}")
+
+
+def _image_sketch(args):
+    """Extract sketch/edges from images."""
+    images = getattr(args, "images", None)
+    if not images:
+        _emit("ERROR: --images required for sketch extraction", "error")
+        sys.exit(1)
+    for img in images:
+        if not Path(img).exists():
+            _emit(f"ERROR: File not found: {img}", "error")
+            sys.exit(1)
+    if not SKETCH_WORKER.exists():
+        _emit("ERROR: worker/sketch/generate.py not found", "error")
+        _emit("  Run: bash worker/sketch/install.sh", "error")
+        sys.exit(1)
+
+    out_path = Path(args.output) if args.output else Path("sketch.png")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    cmd = [
+        str(CONDA_BIN), "run", "--no-capture-output", "-n", SKETCH_ENV,
+        "python", str(SKETCH_WORKER),
+        "--images"] + list(images) + ["-o", str(out_path),
+    ]
+
+    _emit(f"Extracting sketch ({len(images)} image(s)) …", "stage")
+    result = run_worker(cmd, on_event=_event_handler)
+    finish_progress()
+    if result.returncode != 0:
+        _emit("ERROR: Sketch extraction failed.", "error")
+        sys.exit(1)
+    if result.stdout.strip():
+        print(result.stdout.strip())
+    _emit(f"Output: {out_path}")
+
+
+def _image_upscale(args):
+    """Upscale images using Real-ESRGAN."""
+    images = getattr(args, "images", None)
+    if not images:
+        _emit("ERROR: --images required for upscaling", "error")
+        sys.exit(1)
+    for img in images:
+        if not Path(img).exists():
+            _emit(f"ERROR: File not found: {img}", "error")
+            sys.exit(1)
+    if not UPSCALE_WORKER.exists():
+        _emit("ERROR: worker/upscale/generate.py not found", "error")
+        _emit("  Run: bash worker/upscale/install.sh", "error")
+        sys.exit(1)
+
+    out_path = Path(args.output) if args.output else Path("upscaled.png")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    model = getattr(args, "model", None) or "4x"
+    cmd = [
+        str(CONDA_BIN), "run", "--no-capture-output", "-n", UPSCALE_ENV,
+        "python", str(UPSCALE_WORKER),
+        "--images"] + list(images) + ["-o", str(out_path), "--model", model,
+    ]
+
+    _emit(f"Upscaling ({model}, {len(images)} image(s)) …", "stage")
+    result = run_worker(cmd, on_event=_event_handler)
+    finish_progress()
+    if result.returncode != 0:
+        _emit("ERROR: Upscaling failed.", "error")
+        sys.exit(1)
+    if result.stdout.strip():
+        print(result.stdout.strip())
+    _emit(f"Output: {out_path}")
+
+
+def _image_segment(args):
+    """Segment images (background removal / object isolation)."""
+    images = getattr(args, "images", None)
+    if not images:
+        _emit("ERROR: --images required for segmentation", "error")
+        sys.exit(1)
+    for img in images:
+        if not Path(img).exists():
+            _emit(f"ERROR: File not found: {img}", "error")
+            sys.exit(1)
+    if not SEGMENT_WORKER.exists():
+        _emit("ERROR: worker/segment/generate.py not found", "error")
+        _emit("  Run: bash worker/segment/install.sh", "error")
+        sys.exit(1)
+
+    out_path = Path(args.output) if args.output else Path("segment.png")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    model = getattr(args, "model", None) or "rmbg"
+    cmd = [
+        str(CONDA_BIN), "run", "--no-capture-output", "-n", SEGMENT_ENV,
+        "python", str(SEGMENT_WORKER),
+        "--images"] + list(images) + ["-o", str(out_path), "--model", model,
+    ]
+
+    _emit(f"Segmenting ({model}, {len(images)} image(s)) …", "stage")
+    result = run_worker(cmd, on_event=_event_handler)
+    finish_progress()
+    if result.returncode != 0:
+        _emit("ERROR: Segmentation failed.", "error")
+        sys.exit(1)
+    if result.stdout.strip():
+        print(result.stdout.strip())
+    _emit(f"Output: {out_path}")
+
+
 def cmd_image(args):
     """Generate or process images."""
     engine = args.engine
+
+    # ── Extraction engines ────────────────────────────────────────────────
     if engine == "openpose":
         return _image_openpose(args)
-
-    if engine == "sd1.5":
-        return _image_sd15(args)
-
     if engine == "depth":
         return _image_depth(args)
+    if engine == "lineart":
+        return _image_lineart(args)
+    if engine == "normalmap":
+        return _image_normalmap(args)
+    if engine == "sketch":
+        return _image_sketch(args)
+    if engine == "upscale":
+        return _image_upscale(args)
+    if engine == "segment":
+        return _image_segment(args)
+
+    # ── Parse --controlnet (shared by flux.2 and sd1.5) ───────────────────
+    cn_mode, cn_path = None, None
+    controlnet = getattr(args, "controlnet", None)
+    if controlnet:
+        cn_mode, cn_path = _parse_controlnet(controlnet)
+
+    # ── Generation engines ────────────────────────────────────────────────
+    if engine == "sd1.5":
+        return _image_sd15(args, cn_mode=cn_mode, cn_path=cn_path)
 
     if engine != "flux.2":
         _emit(f"ERROR: Unknown image engine '{engine}'", "error")
         sys.exit(1)
 
+    # ── FLUX.2 generation ─────────────────────────────────────────────────
     if not IMAGE_WORKER.exists():
         _emit("ERROR: worker/image/generate.py not found", "error")
         _emit("  Run: bash worker/image/install.sh", "error")
@@ -3051,12 +3298,9 @@ def cmd_image(args):
                 sys.exit(1)
         cmd.extend(["--images"] + images)
 
-    depth = getattr(args, "depth", None)
-    if depth:
-        if not Path(depth).exists():
-            _emit(f"ERROR: Depth map not found: {depth}", "error")
-            sys.exit(1)
-        cmd.extend(["--depth", depth])
+    # ControlNet conditioning → passed to worker as --controlnet-image/--controlnet-mode
+    if cn_mode and cn_path:
+        cmd.extend(["--controlnet-image", cn_path, "--controlnet-mode", cn_mode])
 
     _emit(f"Generating image (flux.2/{model_key}) …", "stage")
 
@@ -3294,7 +3538,10 @@ def build_parser():
     # ── Stubs for future mediums ──────────────────────────────────────────
     # ── image ─────────────────────────────────────────────────────────────
     p_image = sub.add_parser("image", help="Image generation & processing")
-    p_image.add_argument("--engine", required=True, choices=["flux.2", "openpose", "sd1.5", "depth"],
+    p_image.add_argument("--engine", required=True,
+                          choices=["flux.2", "openpose", "sd1.5", "depth",
+                                   "lineart", "normalmap", "sketch",
+                                   "upscale", "segment"],
                           help="Image engine")
     p_image.add_argument("--model", "-m", default=None,
                           help="Model: flux.2: 4b|4b-distilled|9b|9b-distilled; mm: mm (default)")
@@ -3311,8 +3558,8 @@ def build_parser():
     p_image.add_argument("--pose-mode", default=None, dest="pose_mode",
                           choices=["wholebody", "body", "bodyhand", "bodyface"],
                           help="[openpose] Detection mode (default: wholebody)")
-    p_image.add_argument("--depth", default=None,
-                          help="[flux.2] Depth map image for structural conditioning (uses empty latent)")
+    p_image.add_argument("--controlnet", default=None,
+                          help="[flux.2/sd1.5] Conditioning: mode:filepath (e.g. depth:depth.png, pose:pose.png, lineart:lines.png, normalmap:normals.png, sketch:sketch.png)")
     p_image.add_argument("--negative-prompt", default=None, dest="negative_prompt",
                           help="[sd1.5] Negative prompt")
     p_image.add_argument("--lora", action="append", default=None,
