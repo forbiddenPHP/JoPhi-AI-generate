@@ -643,6 +643,13 @@ python generate.py image --engine sd1.5 --lora add_detail:1.2 --lora style:0.8 -
 
 # Custom negative prompt
 python generate.py image --engine sd1.5 -p "a man" --negative-prompt "blurry, deformed" -o out.png
+
+# ControlNet conditioning (depth, lineart, sketch, normalmap, pose)
+python generate.py image --engine sd1.5 --controlnet depth:depth.png -p "a man standing in a room" -o out.png
+python generate.py image --engine sd1.5 --controlnet lineart:lines.png -p "detailed illustration" -o out.png
+python generate.py image --engine sd1.5 --controlnet sketch:sketch.png -p "anime character" -o out.png
+python generate.py image --engine sd1.5 --controlnet normalmap:normals.png -p "relit scene" -o out.png
+python generate.py image --engine sd1.5 --controlnet pose:pose.png -p "woman in red dress" -o out.png
 ```
 
 <details>
@@ -660,6 +667,7 @@ python generate.py image --engine sd1.5 -p "a man" --negative-prompt "blurry, de
 - `--seed` — Random seed (default: random)
 - `--lora` — LoRA: `name:intensity` (repeatable, e.g. `add_detail:1.2`)
 - `--no-lora` — Disable default LoRA(s)
+- `--controlnet` — Conditioning: `mode:filepath` (modes: `depth`, `lineart`, `sketch`, `normalmap`, `pose`)
 
 </details>
 
@@ -710,11 +718,11 @@ python generate.py image --engine flux.2 --model 4b-distilled --controlnet depth
 Extract line art from images using TEED (learned) or Canny (classical).
 
 ```bash
-# TEED (default, learned edge detection)
+# Canny (default, classical edge detection)
 python generate.py image --engine lineart --images photo.png -o lines.png
 
-# Canny (classical, no ML model)
-python generate.py image --engine lineart --model canny --images photo.png -o edges.png
+# TEED (learned, thicker lines)
+python generate.py image --engine lineart --model teed --images photo.png -o lines_teed.png
 
 # Use as ControlNet conditioning
 python generate.py image --engine flux.2 --controlnet lineart:lines.png -p "colorful illustration" -o out.png
@@ -725,7 +733,7 @@ python generate.py image --engine flux.2 --controlnet lineart:lines.png -p "colo
 
 - `--images` — Input image(s) (required)
 - `-o, --output` — Output file path (default: `lineart.png`)
-- `--model` — Extraction method: `teed` (default, learned), `canny` (classical)
+- `--model` — Extraction method: `canny` (default, classical), `teed` (learned, thicker lines)
 
 </details>
 

@@ -33,11 +33,6 @@ def _device():
     return "cpu"
 
 
-def _emit(msg, level="info"):
-    prefix = {"info": "●", "warning": "⚠", "error": "✗"}.get(level, "·")
-    print(f"\n  {prefix} {msg}", file=sys.stderr)
-
-
 def main():
     parser = argparse.ArgumentParser(description="Depth Anything V2 depth estimation")
     parser.add_argument("--images", nargs="+", required=True, help="Input image(s)")
@@ -49,7 +44,7 @@ def main():
     device = _device()
     model_id = _MODEL_MAP[args.model]
 
-    _emit(f"Loading Depth Anything V2 ({args.model}) …")
+    print(f"Loading Depth Anything V2 ({args.model}) …", file=sys.stderr)
     pipe = pipeline("depth-estimation", model=model_id, device=device)
 
     outputs = []
@@ -68,7 +63,7 @@ def main():
 
         out_path.parent.mkdir(parents=True, exist_ok=True)
         depth_image.save(str(out_path))
-        print(f"  · Saved: {out_path}", file=sys.stderr)
+        print(f"Saved: {out_path}", file=sys.stderr)
         outputs.append(str(out_path))
 
     print(json.dumps(outputs))

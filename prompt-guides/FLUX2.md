@@ -157,6 +157,97 @@ Reference specific images by number:
 
 **Color matching tip:** Include a solid color square as one of your reference images for exact color matching.
 
+### Style Transfer (Multi-Reference)
+
+Transfer the artistic style of one image onto the content of another. **Image order and prompt phrasing are critical.**
+
+**Setup:**
+- **Image 1** = Content (the photo you want to transform)
+- **Image 2** = Style reference (the painting/artwork whose style you want)
+
+```bash
+# Oil painting style transfer
+python generate.py image --engine flux.2 \
+  --images content.png style_painting.png \
+  -p "turn image 1 into a painting like image 2" \
+  -o styled.png
+
+# Watercolor style transfer
+python generate.py image --engine flux.2 \
+  --images photo.png watercolor_ref.png \
+  -p "transform image 1 into a watercolor artwork in the style of image 2" \
+  -o watercolor.png
+```
+
+**What works:**
+- `turn image 1 into a painting like image 2`
+- `transform image 1 into the art style of image 2`
+- `render image 1 as if painted in the style of image 2`
+
+**What doesn't work (common mistakes):**
+- Reversed image order (style as image 1, content as image 2) — produces wrong subject
+- `use the style of image 1 to create a new version of image 2` — causes face swaps
+- `transform image 2 into the art style of image 1` — remixes the scene instead of transferring style
+
+**Tip:** Generate a style reference with SD1.5 first (it has very distinctive artistic styles), then use it as image 2 for FLUX.2 style transfer.
+
+### Iterative Editing (Chained Edits)
+
+Use the output of one edit as input for the next. Each step is a single-reference edit:
+
+```bash
+# Step 1: Remove glasses
+python generate.py image --engine flux.2 \
+  --images portrait.png -p "the same person without glasses" -o step1.png
+
+# Step 2: Change age
+python generate.py image --engine flux.2 \
+  --images step1.png -p "turn this person to the age of 25 years" -o step2.png
+
+# Step 3: Change background
+python generate.py image --engine flux.2 \
+  --images step2.png -p "the same person standing on a mountain top at sunset" -o final.png
+```
+
+**Editing patterns that work well:**
+
+| Action | Prompt pattern |
+|--------|---------------|
+| Age change | `turn this N year old person to the age of X years` |
+| Remove accessory | `the same person without [glasses/hat/scarf]` |
+| Change skin | `change the skin to [darker/lighter/tanned/pale]` |
+| Swap object | `replace the [mug] on the table with a [vase of flowers]` |
+| Change wall art | `replace the painting on the wall with [a map of the world]` |
+| Swap furniture | `replace the [lamp] with a [bookshelf filled with books]` |
+
+---
+
+## Color Palette (Hex Codes in Prompts)
+
+FLUX.2 understands hex color codes directly in prompts. No special parameters needed.
+
+```bash
+# Specific colors via hex
+python generate.py image --engine flux.2 \
+  -p "a sunset landscape, sky color #FF6B35, mountains #2C3E50, lake #1ABC9C" \
+  -o sunset.png
+
+# Brand colors
+python generate.py image --engine flux.2 \
+  -p "minimalist logo on a #1A1A2E background with #E94560 accent color" \
+  -o logo.png
+
+# Color harmony
+python generate.py image --engine flux.2 \
+  -p "abstract geometric art using only #264653, #2A9D8F, #E9C46A, #F4A261, #E76F51" \
+  -o palette.png
+```
+
+**Tips:**
+- Place colors next to the element they apply to: `sky color #FF6B35`
+- Works best with 2-5 colors; more than that gets unreliable
+- Combine with a color swatch reference image for maximum accuracy (see Color matching tip above)
+
 ---
 
 ## Text in Images

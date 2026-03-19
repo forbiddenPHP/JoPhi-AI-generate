@@ -14,12 +14,21 @@ import sys
 from pathlib import Path
 
 import torch
-from diffusers import StableDiffusionPipeline
+from diffusers import ControlNetModel, StableDiffusionControlNetPipeline, StableDiffusionPipeline
 from PIL import Image
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _MODELS_DIR = _SCRIPT_DIR / "models"
 _LORAS_DIR = _SCRIPT_DIR / "loras"
+
+# ControlNet model registry: mode → HuggingFace repo ID
+CONTROLNET_REGISTRY = {
+    "depth":     "lllyasviel/control_v11f1p_sd15_depth",
+    "normalmap": "lllyasviel/control_v11p_sd15_normalbae",
+    "lineart":   "lllyasviel/control_v11p_sd15_lineart",
+    "sketch":    "lllyasviel/control_v11p_sd15_scribble",
+    "pose":      "lllyasviel/control_v11p_sd15_openpose",
+}
 
 # Model registry: --model name → checkpoint filename
 MODEL_REGISTRY = {
@@ -43,11 +52,6 @@ def _device():
     if torch.cuda.is_available():
         return torch.device("cuda")
     return torch.device("cpu")
-
-
-def _emit(msg, level="info"):
-    prefix = {"info": "●", "warning": "⚠", "error": "✗"}.get(level, "·")
-    print(f"\n  {prefix} {msg}", file=sys.stderr)
 
 
 def _parse_lora(spec):
@@ -84,6 +88,10 @@ def main():
     parser.add_argument("--lora", action="append", default=None,
                         help="LoRA to apply: name:intensity (e.g. add_detail:1.2). Can be repeated.")
     parser.add_argument("--no-lora", action="store_true", help="Disable default LoRA(s)")
+    parser.add_argument("--controlnet-image", default=None, help="ControlNet conditioning image path")
+    parser.add_argument("--controlnet-mode", default=None,
+                        choices=list(CONTROLNET_REGISTRY.keys()),
+                        help="ControlNet mode (depth, normalmap, lineart, sketch, pose)")
     args = parser.parse_args()
 
     info = MODEL_REGISTRY[args.model]
@@ -109,25 +117,48 @@ def main():
         lora_specs = list(info.get("default_loras", []))
 
     # Header
-    _emit(f"Generating image (sd1.5/{args.model}) …")
-    print(f"  · Model: {info['filename']}", file=sys.stderr)
-    print(f"  · Device: {device}", file=sys.stderr)
-    print(f"  · Seed: {seed}", file=sys.stderr)
-    print(f"    Steps: {args.steps}, CFG: {args.cfg}", file=sys.stderr)
-    print(f"    Dimensions: {args.width}x{args.height}", file=sys.stderr)
+    print(f"Generating image (sd1.5/{args.model}) …", file=sys.stderr)
+    print(f"Model: {info['filename']}", file=sys.stderr)
+    print(f"Device: {device}", file=sys.stderr)
+    print(f"Seed: {seed}", file=sys.stderr)
+    print(f"Steps: {args.steps}, CFG: {args.cfg}", file=sys.stderr)
+    print(f"Dimensions: {args.width}x{args.height}", file=sys.stderr)
 
     # Load checkpoint
     checkpoint_path = _MODELS_DIR / info["filename"]
     if not checkpoint_path.exists():
-        print(f"  ✗ ERROR: Checkpoint not found: {checkpoint_path}", file=sys.stderr)
+        print(f"ERROR: Checkpoint not found: {checkpoint_path}", file=sys.stderr)
         sys.exit(1)
 
-    _emit("Loading checkpoint …")
-    pipe = StableDiffusionPipeline.from_single_file(
-        str(checkpoint_path),
-        torch_dtype=dtype,
-        local_files_only=True,
-    ).to(device)
+    # ControlNet setup
+    cn_image = None
+    controlnet = None
+    if args.controlnet_image and args.controlnet_mode:
+        cn_repo = CONTROLNET_REGISTRY[args.controlnet_mode]
+        cn_cache = _MODELS_DIR / "controlnet" / args.controlnet_mode
+        print(f"Loading ControlNet ({args.controlnet_mode}) …", file=sys.stderr)
+        controlnet = ControlNetModel.from_pretrained(
+            cn_repo,
+            torch_dtype=dtype,
+            cache_dir=str(cn_cache),
+        ).to(device)
+        cn_image = Image.open(args.controlnet_image).convert("RGB")
+        cn_image = cn_image.resize((args.width, args.height), Image.LANCZOS)
+
+    print("Loading checkpoint …", file=sys.stderr)
+    if controlnet is not None:
+        pipe = StableDiffusionControlNetPipeline.from_single_file(
+            str(checkpoint_path),
+            controlnet=controlnet,
+            torch_dtype=dtype,
+            local_files_only=True,
+        ).to(device)
+    else:
+        pipe = StableDiffusionPipeline.from_single_file(
+            str(checkpoint_path),
+            torch_dtype=dtype,
+            local_files_only=True,
+        ).to(device)
 
     pipe.enable_attention_slicing()
 
@@ -137,11 +168,11 @@ def main():
         lora_path = _resolve_lora_path(name)
         if lora_path:
             adapter_name = name.replace(".", "_")
-            _emit(f"Loading LoRA: {name} (intensity: {intensity}) …")
+            print(f"Loading LoRA: {name} (intensity: {intensity}) …", file=sys.stderr)
             pipe.load_lora_weights(str(lora_path), adapter_name=adapter_name)
             loaded_loras.append((adapter_name, intensity))
         else:
-            print(f"  ⚠ WARNING: LoRA not found: {name}", file=sys.stderr)
+            print(f"WARNING: LoRA not found: {name}", file=sys.stderr)
 
     # Set adapter weights if multiple LoRAs
     if len(loaded_loras) > 1:
@@ -155,9 +186,9 @@ def main():
         cross_attention_kwargs = None
 
     # Generate
-    _emit("Generating …")
+    print("Generating …", file=sys.stderr)
 
-    result = pipe(
+    pipe_kwargs = dict(
         prompt=args.prompt,
         negative_prompt=negative_prompt,
         width=args.width,
@@ -167,6 +198,10 @@ def main():
         generator=generator,
         cross_attention_kwargs=cross_attention_kwargs,
     )
+    if cn_image is not None:
+        pipe_kwargs["image"] = cn_image
+
+    result = pipe(**pipe_kwargs)
 
     image = result.images[0]
 
@@ -174,7 +209,7 @@ def main():
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     image.save(str(out_path))
-    print(f"  · Saved: {out_path}", file=sys.stderr)
+    print(f"Saved: {out_path}", file=sys.stderr)
 
     print(json.dumps([str(out_path)]))
 

@@ -40,8 +40,8 @@ def main():
     parser = argparse.ArgumentParser(description="Line art extraction")
     parser.add_argument("--images", nargs="+", required=True, help="Input image(s)")
     parser.add_argument("-o", "--output", default="lineart.png", help="Output file path")
-    parser.add_argument("--model", default="teed", choices=["teed", "canny"],
-                        help="Extraction method: teed (default, learned), canny (classical)")
+    parser.add_argument("--model", default="canny", choices=["canny", "teed"],
+                        help="Extraction method: canny (default, classical), teed (learned, thicker lines)")
     args = parser.parse_args()
 
     from PIL import Image
