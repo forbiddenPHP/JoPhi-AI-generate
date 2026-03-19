@@ -186,7 +186,7 @@ Language is auto-detected if `--language` is not set (via langdetect).
 
 - `--text`, `-l` — Inline text to speak
 - `--text-file`, `-f` — Path to text file
-- `--prompt-file`, `-p` — Load text + params from prompt sidecar (.txt)
+- `--prompt-file`, `-pf` — Load text + params from prompt sidecar (.txt)
 - `-v`, `--voice` — Preset voice (Aiden, Serena, ...)
 - `-t`, `--tags` — Style instructions for refine mode ("dramatic, slow, whispering")
 - `--tts-model` — Model size: `large` (default, 1.7B) or `small` (0.6B)
@@ -733,7 +733,6 @@ python generate.py text --engine whisper audio.wav --model large-v3
 - `--word-timestamps` — Word-level timing
 - `--format` — Output: `json` (default), `txt`, `srt`, `vtt`, `tsv`, `all`
 - `-o, --output` — Output directory
-- `--timeout` — Timeout in seconds (default: 600)
 
 </details>
 
@@ -953,7 +952,7 @@ The RVC worker runs as a background API server on port 5100.
 
 ```bash
 python generate.py server start              # default port 5100
-python generate.py server start -p 5200      # custom port
+python generate.py server start -pt 5200     # custom port
 python generate.py server status
 python generate.py server stop
 ```

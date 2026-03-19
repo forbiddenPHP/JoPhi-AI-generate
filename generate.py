@@ -3111,7 +3111,7 @@ def build_parser():
     voice_text_grp.add_argument("--text-file", "--lyrics-file", "-f",
                                 dest="text_file",
                                 help="[say/ai-tts] Path to text file")
-    voice_text_grp.add_argument("--prompt-file", "-p", dest="prompt_file",
+    voice_text_grp.add_argument("--prompt-file", "-pf", dest="prompt_file",
                                 help="[ai-tts] Load text + params from prompt sidecar (.txt)")
     # say/ai-tts shared
     p_voice.add_argument("-v", "--voice", dest="say_voice", default=None,
@@ -3335,7 +3335,7 @@ def build_parser():
     s_sub = p_server.add_subparsers(dest="server_cmd")
 
     p_ss = s_sub.add_parser("start", help="Start RVC worker")
-    p_ss.add_argument("-p", "--port", type=int, default=5100)
+    p_ss.add_argument("-pt", "--port", type=int, default=5100)
     p_ss.set_defaults(func=cmd_server_start)
 
     p_st = s_sub.add_parser("stop", help="Stop RVC worker")
