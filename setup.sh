@@ -169,109 +169,113 @@ echo -e "${GREEN}✓${NC} Prerequisites OK"
 # ── Step 1: RVC Worker Env ───────────────────────────────────────────────────
 
 echo ""
-echo "── Step 1/20: RVC Worker ──"
+echo "── Step 1/21: RVC Worker ──"
 bash "$SCRIPT_DIR/worker/rvc/install.sh"
 
 # ── Step 2: Enhance Worker Env ───────────────────────────────────────────────
 
 echo ""
-echo "── Step 2/20: Enhance Worker ──"
+echo "── Step 2/21: Enhance Worker ──"
 bash "$SCRIPT_DIR/worker/enhance/install.sh"
 
 # ── Step 3: HeartMuLa Music Worker Env ───────────────────────────────────────
 
 echo ""
-echo "── Step 3/20: HeartMuLa Music Worker ──"
+echo "── Step 3/21: HeartMuLa Music Worker ──"
 bash "$SCRIPT_DIR/worker/music/install.sh"
 
 # ── Step 4: ACE-Step Music Worker (uv) ───────────────────────────────────────
 
 echo ""
-echo "── Step 4/20: ACE-Step Music Worker ──"
+echo "── Step 4/21: ACE-Step Music Worker ──"
 bash "$SCRIPT_DIR/worker/ace/install.sh"
 
 # ── Step 5: Whisper Worker Env ────────────────────────────────────────────────
 
 echo ""
-echo "── Step 5/20: Whisper Worker ──"
+echo "── Step 5/21: Whisper Worker ──"
 bash "$SCRIPT_DIR/worker/whisper/install.sh"
 
 # ── Step 6: Diarize Worker Env ───────────────────────────────────────────────
 
 echo ""
-echo "── Step 6/20: Diarize Worker ──"
+echo "── Step 6/21: Diarize Worker ──"
 bash "$SCRIPT_DIR/worker/diarize/install.sh"
 
 # ── Step 7: Separate Worker Env ──────────────────────────────────────────────
 
 echo ""
-echo "── Step 7/20: Separate Worker ──"
+echo "── Step 7/21: Separate Worker ──"
 bash "$SCRIPT_DIR/worker/separate/install.sh"
 
 # ── Step 8: AI-TTS Worker Env ────────────────────────────────────────────────
 
 echo ""
-echo "── Step 8/20: AI-TTS Worker ──"
+echo "── Step 8/21: AI-TTS Worker ──"
 bash "$SCRIPT_DIR/worker/tts/install.sh"
 
 # ── Step 9: Language Detect Worker Env ───────────────────────────────────────
 
 echo ""
-echo "── Step 9/20: Language Detect Worker ──"
+echo "── Step 9/21: Language Detect Worker ──"
 bash "$SCRIPT_DIR/worker/langdetect/install.sh"
 
 # ── Step 10: SFX Worker Env ─────────────────────────────────────────────────
 
 echo ""
-echo "── Step 10/20: SFX Worker (EzAudio) ──"
+echo "── Step 10/21: SFX Worker (EzAudio) ──"
 bash "$SCRIPT_DIR/worker/sfx/install.sh"
 
 # ── Step 11: Text Worker Env ─────────────────────────────────────────────────
 
 echo ""
-echo "── Step 11/20: Text Worker ──"
+echo "── Step 11/21: Text Worker ──"
 bash "$SCRIPT_DIR/worker/text/install.sh"
 
-# ── Step 12/20: Image Worker (FLUX.2) ─────────────────────────────────────
+# ── Step 12/21: Image Worker (FLUX.2) ─────────────────────────────────────
 
 echo ""
-echo "── Step 12/20: Image Worker (FLUX.2) ──"
+echo "── Step 12/21: Image Worker (FLUX.2) ──"
 bash "$SCRIPT_DIR/worker/image/install.sh"
 
-# ── Step 13/20: Pose Worker (DWPose/OpenPose) ─────────────────────────────
+# ── Step 13/21: Pose Worker (DWPose/OpenPose) ─────────────────────────────
 
 echo ""
-echo "── Step 13/20: Pose Worker (DWPose) ──"
+echo "── Step 13/21: Pose Worker (DWPose) ──"
 bash "$SCRIPT_DIR/worker/pose/install.sh"
 
 echo ""
-echo "── Step 14/20: SD 1.5 Worker (MatureMaleMix) ──"
+echo "── Step 14/21: SD 1.5 Worker (MatureMaleMix) ──"
 bash "$SCRIPT_DIR/worker/sd15/install.sh"
 
 echo ""
-echo "── Step 15/20: Depth Worker (Depth Anything V2) ──"
+echo "── Step 15/21: Depth Worker (Depth Anything V2) ──"
 bash "$SCRIPT_DIR/worker/depth/install.sh"
 
 echo ""
-echo "── Step 16/20: Lineart Worker (TEED / Canny) ──"
+echo "── Step 16/21: Lineart Worker (TEED / Canny) ──"
 bash "$SCRIPT_DIR/worker/lineart/install.sh"
 
 echo ""
-echo "── Step 17/20: NormalMap Worker (Marigold-Normals) ──"
+echo "── Step 17/21: NormalMap Worker (Marigold-Normals) ──"
 bash "$SCRIPT_DIR/worker/normalmap/install.sh"
 
 echo ""
-echo "── Step 18/20: Sketch Worker (HED / OpenCV DNN) ──"
+echo "── Step 18/21: Sketch Worker (HED / OpenCV DNN) ──"
 bash "$SCRIPT_DIR/worker/sketch/install.sh"
 
 echo ""
-echo "── Step 19/20: Upscale Worker (Real-ESRGAN) ──"
+echo "── Step 19/21: Upscale Worker (Real-ESRGAN) ──"
 bash "$SCRIPT_DIR/worker/upscale/install.sh"
 
-# ── Step 20/20: Main App Env ────────────────────────────────────────────────
+echo ""
+echo "── Step 20/21: Segment Worker (BiRefNet / rembg) ──"
+bash "$SCRIPT_DIR/worker/segment/install.sh"
+
+# ── Step 21/21: Main App Env ────────────────────────────────────────────────
 
 echo ""
-echo "── Step 20/20: Main App (tts-mist) ──"
+echo "── Step 21/21: Main App (tts-mist) ──"
 
 ENV_NAME="tts-mist"
 
@@ -421,6 +425,13 @@ if [ -d "$MODELS_DIR" ]; then
         mkdir -p "$SCRIPT_DIR/worker/upscale/models"
         cp -a "$MODELS_DIR/upscale_models/." "$SCRIPT_DIR/worker/upscale/models/"
         echo -e "  ${GREEN}✓${NC} Upscale models restored"
+    fi
+
+    # Segment models (rembg/BiRefNet) → ~/.u2net/
+    if [ -d "$MODELS_DIR/segment_u2net" ]; then
+        mkdir -p "$HOME/.u2net"
+        cp -a "$MODELS_DIR/segment_u2net/." "$HOME/.u2net/"
+        echo -e "  ${GREEN}✓${NC} Segment models restored"
     fi
 
     echo -e "  ${GREEN}✓${NC} Model restore complete"

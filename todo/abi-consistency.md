@@ -9,3 +9,9 @@
 
 ## Offen
 - [ ] USAGE-Docstring: einige Params fehlen als Beispiele (--word-timestamps, --thinking, --stream, --screen-log-format json) — nice-to-have, kein Blocker
+
+## Offen: Model-Listing per Engine
+- [ ] `generate.py models list` — alle Modelle gruppiert nach Medium und Engine
+- [ ] `generate.py image models` — alle Image-Modelle
+- [ ] `generate.py image --engine $engine models` — Modelle für diese Engine
+- [ ] Granulare Auflistung: welche --model Werte pro Engine verfügbar sind

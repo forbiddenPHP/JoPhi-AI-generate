@@ -224,6 +224,17 @@ else
     echo "  ── Upscale models: not found, skipping"
 fi
 
+# ── Segment models (rembg/BiRefNet, ~/.u2net/) ───────────────────────────────
+
+U2NET_DIR="$HOME/.u2net"
+if [ -d "$U2NET_DIR" ] && [ "$(ls -A "$U2NET_DIR" 2>/dev/null)" ]; then
+    echo "  Backing up Segment models (rembg) …"
+    cp -rL "$U2NET_DIR" "$MODELS_DIR/segment_u2net"
+    echo -e "  ${GREEN}✓${NC} Segment models ($(du -sh "$MODELS_DIR/segment_u2net" | cut -f1))"
+else
+    echo "  ── Segment models: not found, skipping"
+fi
+
 # ── Text worker configs (LLM default overrides) ─────────────────────────────
 
 TEXT_CONFIGS="$SCRIPT_DIR/worker/text/models"

@@ -803,6 +803,32 @@ python generate.py image --engine upscale --images img1.png img2.png img3.png -o
 
 ---
 
+### Image Segmentation (`image --engine segment`)
+
+Separate foreground from background using BiRefNet (MIT license). Outputs transparent RGBA PNG.
+
+```bash
+# Foreground only (default)
+python generate.py image --engine segment --images photo.png -o foreground.png
+
+# Background only
+python generate.py image --engine segment --output-layer background --images photo.png -o background.png
+
+# Both (foreground + background in a directory)
+python generate.py image --engine segment --output-layer both --images photo.png -o output/
+```
+
+<details>
+<summary>Options</summary>
+
+- `--images` — Input image(s) (required)
+- `-o, --output` — Output file path or directory
+- `--output-layer` — What to output: `foreground` (default), `background`, `both`
+
+</details>
+
+---
+
 ### Speaker Diarization (`audio --engine diarize`)
 
 Split dialogue audio into separate tracks per speaker using pyannote.audio (MPS).
@@ -1111,6 +1137,7 @@ Shows installed models, target pitch settings, server status, and supported form
 | `normalmap` | 3.12 | conda | Marigold-Normals v1.1 surface normal estimation |
 | `sketch` | 3.12 | conda | HED edge extraction (OpenCV DNN, no PyTorch) |
 | `upscale` | 3.12 | conda | Real-ESRGAN image upscaling (PyTorch MPS) |
+| `segment` | 3.12 | conda | BiRefNet foreground/background separation (rembg, CoreML) |
 | `ace` (uv) | 3.11+ | uv | ACE-Step 1.5 music generation |
 
 </details>

@@ -3190,14 +3190,15 @@ def _image_segment(args):
     out_path = Path(args.output) if args.output else Path("segment.png")
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    model = getattr(args, "model", None) or "rmbg"
+    output_layer = getattr(args, "output_layer", None) or "foreground"
     cmd = [
         str(CONDA_BIN), "run", "--no-capture-output", "-n", SEGMENT_ENV,
         "python", str(SEGMENT_WORKER),
-        "--images"] + list(images) + ["-o", str(out_path), "--model", model,
+        "--images"] + list(images) + ["-o", str(out_path),
+        "--output-layer", output_layer,
     ]
 
-    _emit(f"Segmenting ({model}, {len(images)} image(s)) …", "stage")
+    _emit(f"Segmenting ({output_layer}, {len(images)} image(s)) …", "stage")
     result = run_worker(cmd, on_event=_event_handler)
     finish_progress()
     if result.returncode != 0:
@@ -3558,6 +3559,9 @@ def build_parser():
     p_image.add_argument("--pose-mode", default=None, dest="pose_mode",
                           choices=["wholebody", "body", "bodyhand", "bodyface"],
                           help="[openpose] Detection mode (default: wholebody)")
+    p_image.add_argument("--output-layer", default=None, dest="output_layer",
+                          choices=["foreground", "background", "both"],
+                          help="[segment] Output layer: foreground (default), background, both")
     p_image.add_argument("--controlnet", default=None,
                           help="[flux.2/sd1.5] Conditioning: mode:filepath (e.g. depth:depth.png, pose:pose.png, lineart:lines.png, normalmap:normals.png, sketch:sketch.png)")
     p_image.add_argument("--negative-prompt", default=None, dest="negative_prompt",
