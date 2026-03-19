@@ -117,6 +117,26 @@ def _auto_chunk_dimensions(width: int, height: int, dtype: torch.dtype):
 
 
 def main():
+    # ── Fast path: --list-models ──────────────────────────────────────────
+    if "--list-models" in sys.argv:
+        import json as _json
+        # Reverse map: internal name → user-facing short name
+        _INTERNAL_TO_SHORT = {
+            "flux.2-klein-4b": "4b-distilled",
+            "flux.2-klein-9b": "9b-distilled",
+            "flux.2-klein-9b-kv": "9b-kv",
+            "flux.2-klein-base-4b": "4b",
+            "flux.2-klein-base-9b": "9b",
+            "flux.2-dev": "dev",
+        }
+        models = []
+        for name, info in FLUX2_MODEL_INFO.items():
+            short = _INTERNAL_TO_SHORT.get(name, name)
+            notice = "default" if name == "flux.2-klein-4b" else ""
+            models.append({"model": short, "notice": notice})
+        print(_json.dumps(models))
+        return
+
     parser = argparse.ArgumentParser(description="FLUX.2 image generation")
     parser.add_argument("--model", required=True, help="Model name (e.g. flux.2-klein-4b)")
     parser.add_argument("--prompt", "-p", required=True, help="Text prompt")

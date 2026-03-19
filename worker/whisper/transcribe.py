@@ -156,6 +156,12 @@ def save_output(entry: dict, out_dir: Path, stem: str, formats: list[str]) -> li
 
 
 def main():
+    if "--list-models" in sys.argv:
+        models = [{"model": k, "notice": "default" if k == "large-v3-turbo" else ""}
+                  for k in MODEL_MAP]
+        print(json.dumps(models))
+        return
+
     parser = argparse.ArgumentParser(
         description="Transcribe audio files using mlx-whisper")
     parser.add_argument("input", nargs="+", help="Input audio file(s)")

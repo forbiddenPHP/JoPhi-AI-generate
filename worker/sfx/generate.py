@@ -42,6 +42,14 @@ def main():
     # EzAudio expects CWD = worker dir (ckpts/ paths are relative)
     os.chdir(WORKER_DIR)
 
+    if "--list-models" in sys.argv:
+        import json as _json
+        print(_json.dumps([
+            {"model": "s3_xl", "notice": "default"},
+            {"model": "s3_l", "notice": "smaller"},
+        ]))
+        return
+
     parser = argparse.ArgumentParser(description="EzAudio SFX generation")
     parser.add_argument("--text", required=True, help="Text prompt for audio generation")
     parser.add_argument("-o", "--output", required=True, help="Output WAV path")

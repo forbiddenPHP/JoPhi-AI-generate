@@ -367,79 +367,113 @@ def _models_list_rvc():
             _emit(f"  {name}")
 
 
-def _models_list_all(medium=None, engine=None):
-    """Print model listing table, optionally filtered by medium and/or engine."""
-    # Static registry: (modus, engine, model, notice)
-    # Workers with --list-models will extend this dynamically in the future.
-    rows = [
-        # voice
-        ("voice", "rvc", "", "use `models install` to add"),
-        ("voice", "ai-tts", "Aiden", ""),
-        ("voice", "ai-tts", "Serena", ""),
-        ("voice", "ai-tts", "Dylan", ""),
-        ("voice", "ai-tts", "Eric", ""),
-        ("voice", "ai-tts", "Ryan", ""),
-        ("voice", "ai-tts", "Vivian", ""),
-        ("voice", "ai-tts", "Uncle_Fu", ""),
-        ("voice", "ai-tts", "Ono_Anna", ""),
-        ("voice", "ai-tts", "Sohee", ""),
-        ("voice", "say", "", "macOS built-in voices"),
-        ("voice", "clone-tts", "", "clone any voice from audio"),
-        # audio
-        ("audio", "enhance", "", "single model"),
-        ("audio", "demucs", "htdemucs", "default"),
-        ("audio", "demucs", "htdemucs_ft", "fine-tuned"),
-        ("audio", "ace-step", "turbo", "default"),
-        ("audio", "ace-step", "base", ""),
-        ("audio", "ace-step", "sft", ""),
-        ("audio", "heartmula", "", "single model"),
-        ("audio", "sfx", "s3_xl", "default"),
-        ("audio", "sfx", "s3_l", "smaller"),
-        ("audio", "diarize", "", "single model"),
-        ("audio", "voice-removal", "", "demucs-based"),
-        # text
-        ("text", "whisper", "", "auto-detected model"),
-        ("text", "ollama", "", "use `models pull` to add"),
-        ("text", "heartmula-transcribe", "", "single model"),
-        # image
-        ("image", "flux.2", "4b-distilled", "default"),
-        ("image", "flux.2", "4b", ""),
-        ("image", "flux.2", "9b-distilled", ""),
-        ("image", "flux.2", "9b", ""),
-        ("image", "sd1.5", "mm", "default, LoRA: add_detail (1.2)"),
-        ("image", "sd1.5", "dreamshaper", ""),
-        ("image", "depth", "small", "default"),
-        ("image", "depth", "large", ""),
-        ("image", "lineart", "canny", "default"),
-        ("image", "lineart", "teed", "thicker lines"),
-        ("image", "normalmap", "", "single model"),
-        ("image", "sketch", "", "single model"),
-        ("image", "upscale", "4x", "default"),
-        ("image", "upscale", "2x", ""),
-        ("image", "upscale", "anime", ""),
-        ("image", "segment", "", "single model"),
-        ("image", "openpose", "", "single model"),
-        # output
-        ("output", "audio-concatenate", "", ""),
-        ("output", "audio-mucs", "", ""),
-    ]
+def _query_worker_models(env: str, worker_script: str, runner: str = "conda") -> list[dict]:
+    """Call a worker with --list-models and return parsed JSON, or [] on failure."""
+    try:
+        if runner == "uv":
+            # ACE-Step uses uv run --project
+            project_dir = str(Path(worker_script).resolve().parent / "ACE-Step-1.5")
+            cmd = [str(UV_BIN), "run", "--project", project_dir,
+                   "python", worker_script, "--list-models"]
+        else:
+            cmd = [str(CONDA_BIN), "run", "--no-capture-output", "-n", env,
+                   "python", worker_script, "--list-models"]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        if result.returncode == 0 and result.stdout.strip():
+            return json.loads(result.stdout.strip())
+    except Exception:
+        pass
+    return []
 
-    # Filter
-    if medium:
-        rows = [r for r in rows if r[0] == medium]
-    if engine:
-        rows = [r for r in rows if r[1] == engine]
+
+# Worker registry: (modus, engine_name, conda_env, worker_script)
+# Workers without a script (say, clone-tts, output engines) use static entries.
+_WORKER_REGISTRY = []  # populated lazily
+
+
+def _get_worker_registry():
+    """Build the worker registry once, referencing the module-level constants."""
+    if _WORKER_REGISTRY:
+        return _WORKER_REGISTRY
+    _WORKER_REGISTRY.extend([
+        # voice
+        ("voice", "ai-tts",             TTS_ENV,       str(TTS_WORKER_DIR / "generate_speech.py")),
+        ("voice", "rvc",                RVC_ENV,       str(RVC_WORKER_DIR / "list_models.py")),
+        # audio
+        ("audio", "enhance",            ENHANCE_ENV,   str(SCRIPT_DIR / "worker" / "enhance" / "enhance.py")),
+        ("audio", "demucs",             SEPARATE_ENV,  str(SEPARATE_WORKER_DIR / "separate.py")),
+        ("audio", "ace-step",           "acestep",     str(ACESTEP_WORKER), "uv"),
+        ("audio", "heartmula",          HEARTMULA_ENV, str(MUSIC_WORKER_DIR / "generate.py")),
+        ("audio", "sfx",               SFX_ENV,       str(SFX_WORKER_DIR / "generate.py")),
+        ("audio", "diarize",            DIARIZE_ENV,   str(DIARIZE_WORKER_DIR / "diarize.py")),
+        # text
+        ("text",  "whisper",            WHISPER_ENV,   str(WHISPER_WORKER_DIR / "transcribe.py")),
+        ("text",  "ollama",             TEXT_ENV,      str(TEXT_WORKER_DIR / "inference.py")),
+        ("text",  "heartmula-transcribe", HEARTMULA_ENV, str(MUSIC_WORKER_DIR / "transcribe.py")),
+        # image
+        ("image", "flux.2",             FLUX2_ENV,     str(IMAGE_WORKER)),
+        ("image", "sd1.5",              SD15_ENV,      str(SD15_WORKER)),
+        ("image", "depth",              DEPTH_ENV,     str(DEPTH_WORKER)),
+        ("image", "lineart",            LINEART_ENV,   str(LINEART_WORKER)),
+        ("image", "normalmap",          NORMALMAP_ENV, str(NORMALMAP_WORKER)),
+        ("image", "sketch",             SKETCH_ENV,    str(SKETCH_WORKER)),
+        ("image", "upscale",            UPSCALE_ENV,   str(UPSCALE_WORKER)),
+        ("image", "segment",            SEGMENT_ENV,   str(SEGMENT_WORKER)),
+        ("image", "openpose",           POSE_ENV,      str(POSE_WORKER)),
+    ])
+    return _WORKER_REGISTRY
+
+
+# Static entries for engines that don't have a worker with --list-models
+_STATIC_MODELS = [
+    ("voice", "say",               "",  "macOS built-in voices"),
+    ("voice", "clone-tts",         "",  "clone any voice from audio"),
+    ("audio", "voice-removal",     "",  "demucs-based"),
+    ("output", "audio-concatenate", "", ""),
+    ("output", "audio-mucs",       "",  ""),
+]
+
+
+def _models_list_all(medium=None, engine=None):
+    """Query all workers for their models and display the result."""
+    rows = []
+
+    # Static entries first
+    for modus, eng, model, notice in _STATIC_MODELS:
+        if medium and modus != medium:
+            continue
+        if engine and eng != engine:
+            continue
+        rows.append((modus, eng, model, notice))
+
+    # Dynamic entries from workers
+    for entry in _get_worker_registry():
+        modus, eng, env, script = entry[:4]
+        runner = entry[4] if len(entry) > 4 else "conda"
+        if medium and modus != medium:
+            continue
+        if engine and eng != engine:
+            continue
+        models = _query_worker_models(env, script, runner=runner)
+        if models:
+            for m in models:
+                rows.append((modus, eng, m.get("model", ""), m.get("notice", "")))
+        else:
+            rows.append((modus, eng, "", "unavailable"))
 
     if not rows:
         _emit(f"No models found for {medium or ''} {engine or ''}".strip(), "error")
         return
 
+    # Sort: voice → audio → text → image → output, then by engine
+    _ORDER = {"voice": 0, "audio": 1, "text": 2, "image": 3, "output": 4}
+    rows.sort(key=lambda r: (_ORDER.get(r[0], 99), r[1], r[2]))
+
     # JSON output
     if _event_handler is print_event_json:
-        import json as _json
         out = [{"modus": m, "engine": e, "model": mdl, "notice": n}
                for m, e, mdl, n in rows]
-        print(_json.dumps(out, indent=2))
+        print(json.dumps(out, indent=2))
         return
 
     # Column widths

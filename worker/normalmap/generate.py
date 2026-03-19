@@ -28,6 +28,10 @@ def _device():
 
 
 def main():
+    if "--list-models" in sys.argv:
+        print(json.dumps([{"model": "", "notice": "single model"}]))
+        return
+
     parser = argparse.ArgumentParser(description="Marigold normal map estimation")
     parser.add_argument("--images", nargs="+", required=True, help="Input image(s)")
     parser.add_argument("-o", "--output", default="normalmap.png", help="Output file path")

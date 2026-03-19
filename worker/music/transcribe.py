@@ -87,6 +87,10 @@ def transcribe(
 
 
 def main():
+    if "--list-models" in sys.argv:
+        print(json.dumps([{"model": "", "notice": "single model"}]))
+        return
+
     parser = argparse.ArgumentParser(
         description="Transcribe lyrics from audio using HeartTranscriptor")
 

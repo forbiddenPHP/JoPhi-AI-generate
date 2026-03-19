@@ -181,6 +181,11 @@ def parse_dialog(text: str, default_voice: str | None) -> list[tuple[str, str | 
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
+    if "--list-models" in sys.argv:
+        models = [{"model": v, "notice": ""} for v in sorted(VALID_VOICES)]
+        print(json.dumps(models))
+        return
+
     parser = argparse.ArgumentParser(description="AI-TTS Worker (Qwen3-TTS)")
     parser.add_argument("--text", required=True, help="Text to speak")
     parser.add_argument("--voice", default=None, help="Preset voice name")

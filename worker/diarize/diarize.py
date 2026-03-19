@@ -358,6 +358,10 @@ def diarize(input_path: Path, output_dir: Path,
 
 
 def main():
+    if "--list-models" in sys.argv:
+        print(json.dumps([{"model": "", "notice": "single model"}]))
+        return
+
     parser = argparse.ArgumentParser(description="Split dialogue into speaker tracks")
     parser.add_argument("input", type=Path, help="Input audio file")
     parser.add_argument("-o", "--output", type=Path, required=True,

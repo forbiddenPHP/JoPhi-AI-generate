@@ -120,6 +120,11 @@ def process_file(
 
 
 def main():
+    if "--list-models" in sys.argv:
+        import json
+        print(json.dumps([{"model": "", "notice": "single model"}]))
+        return
+
     parser = argparse.ArgumentParser(
         description="Enhance audio files (denoise + super-resolution)")
     parser.add_argument("input", nargs="+", help="Input audio file(s)")

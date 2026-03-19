@@ -502,6 +502,17 @@ def build_parser():
 
 
 def main():
+    if "--list-models" in sys.argv:
+        # Query ollama for installed models
+        try:
+            client = Client()
+            tags = client.list()
+            models = [{"model": m.model, "notice": ""} for m in tags.models]
+        except Exception:
+            models = []
+        print(json.dumps(models))
+        return
+
     args = build_parser().parse_args()
     engine = args.engine
 

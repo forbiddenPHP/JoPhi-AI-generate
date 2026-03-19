@@ -20,6 +20,18 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 _MODELS_DIR = _SCRIPT_DIR / "models"
 _MODELS_DIR.mkdir(exist_ok=True)
 
+def _list_models():
+    """Output available models as JSON and exit."""
+    import json as _json
+    models = [
+        {"model": "4x", "notice": "default"},
+        {"model": "2x", "notice": ""},
+        {"model": "anime", "notice": ""},
+    ]
+    print(_json.dumps(models))
+    sys.exit(0)
+
+
 _MODEL_INFO = {
     "4x": {
         "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
@@ -178,6 +190,9 @@ def _upscale_image(img_np, model_path, scale, num_block, device):
 
 
 def main():
+    if "--list-models" in sys.argv:
+        _list_models()
+
     parser = argparse.ArgumentParser(description="Real-ESRGAN image upscaling")
     parser.add_argument("--images", nargs="+", required=True, help="Input image(s)")
     parser.add_argument("-o", "--output", default="upscaled.png", help="Output file path")

@@ -34,6 +34,13 @@ def _device():
 
 
 def main():
+    if "--list-models" in sys.argv:
+        print(json.dumps([
+            {"model": "small", "notice": "default"},
+            {"model": "large", "notice": ""},
+        ]))
+        return
+
     parser = argparse.ArgumentParser(description="Depth Anything V2 depth estimation")
     parser.add_argument("--images", nargs="+", required=True, help="Input image(s)")
     parser.add_argument("-o", "--output", default="depth.png", help="Output file path")

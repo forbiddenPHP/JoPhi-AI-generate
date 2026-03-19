@@ -21,6 +21,21 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 _MODELS_DIR = _SCRIPT_DIR / "models"
 _LORAS_DIR = _SCRIPT_DIR / "loras"
 
+
+def _list_models():
+    """Output available models as JSON and exit."""
+    models = []
+    for name, info in MODEL_REGISTRY.items():
+        notice_parts = []
+        if name == "mm":
+            notice_parts.append("default")
+        if "default_loras" in info:
+            for lora_name, lora_weight in info["default_loras"]:
+                notice_parts.append(f"LoRA: {lora_name} ({lora_weight})")
+        models.append({"model": name, "notice": ", ".join(notice_parts)})
+    print(json.dumps(models))
+    sys.exit(0)
+
 # ControlNet model registry: mode → HuggingFace repo ID
 CONTROLNET_REGISTRY = {
     "depth":     "lllyasviel/control_v11f1p_sd15_depth",
@@ -74,6 +89,9 @@ def _resolve_lora_path(name):
 
 
 def main():
+    if "--list-models" in sys.argv:
+        _list_models()
+
     parser = argparse.ArgumentParser(description="SD 1.5 image generation")
     parser.add_argument("--model", default="mm", choices=list(MODEL_REGISTRY.keys()),
                         help="Checkpoint to use (default: mm)")

@@ -70,6 +70,14 @@ def separate(input_path: Path, output_dir: Path, model_name: str = "htdemucs"):
 
 
 def main():
+    if "--list-models" in sys.argv:
+        import json
+        print(json.dumps([
+            {"model": "htdemucs", "notice": "default"},
+            {"model": "htdemucs_ft", "notice": "fine-tuned"},
+        ]))
+        return
+
     parser = argparse.ArgumentParser(description="Split audio into stems (demucs)")
     parser.add_argument("input", type=Path, help="Input audio file")
     parser.add_argument("-o", "--output", type=Path, required=True,

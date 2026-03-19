@@ -37,6 +37,13 @@ def _extract_canny(img, low=100, high=200):
 
 
 def main():
+    if "--list-models" in sys.argv:
+        print(json.dumps([
+            {"model": "canny", "notice": "default"},
+            {"model": "teed", "notice": "thicker lines"},
+        ]))
+        return
+
     parser = argparse.ArgumentParser(description="Line art extraction")
     parser.add_argument("--images", nargs="+", required=True, help="Input image(s)")
     parser.add_argument("-o", "--output", default="lineart.png", help="Output file path")

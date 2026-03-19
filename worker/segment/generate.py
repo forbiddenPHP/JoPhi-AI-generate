@@ -43,6 +43,10 @@ def _segment(img):
 
 
 def main():
+    if "--list-models" in sys.argv:
+        print(json.dumps([{"model": "", "notice": "single model"}]))
+        return
+
     parser = argparse.ArgumentParser(description="Image segmentation (foreground/background)")
     parser.add_argument("--images", nargs="+", required=True, help="Input image(s)")
     parser.add_argument("-o", "--output", default="segment.png", help="Output file path or directory")

@@ -62,6 +62,11 @@ def _ensure_model():
 
 
 def main():
+    if "--list-models" in sys.argv:
+        import json
+        print(json.dumps([{"model": "", "notice": "single model"}]))
+        return
+
     parser = argparse.ArgumentParser(description="HED sketch/edge extraction")
     parser.add_argument("--images", nargs="+", required=True, help="Input image(s)")
     parser.add_argument("-o", "--output", default="sketch.png", help="Output file path")

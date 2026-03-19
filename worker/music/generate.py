@@ -121,6 +121,10 @@ def generate(
 
 
 def main():
+    if "--list-models" in sys.argv:
+        print(json.dumps([{"model": "", "notice": "single model"}]))
+        return
+
     parser = argparse.ArgumentParser(
         description="Generate music from lyrics and tags using HeartMuLa")
 

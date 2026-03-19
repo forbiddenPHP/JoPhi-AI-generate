@@ -201,6 +201,14 @@ def generate(
 
 
 def main():
+    if "--list-models" in sys.argv:
+        print(json.dumps([
+            {"model": "turbo", "notice": "default"},
+            {"model": "base", "notice": ""},
+            {"model": "sft", "notice": ""},
+        ]))
+        return
+
     parser = argparse.ArgumentParser(
         description="Generate music from lyrics and caption using ACE-Step 1.5")
 

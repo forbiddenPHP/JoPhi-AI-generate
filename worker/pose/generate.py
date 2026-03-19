@@ -54,6 +54,11 @@ def _load_detector():
 
 
 def main():
+    if "--list-models" in sys.argv:
+        import json
+        print(json.dumps([{"model": "", "notice": "single model"}]))
+        return
+
     parser = argparse.ArgumentParser(description="DWPose pose estimation")
     parser.add_argument("--images", nargs="+", required=True, help="Input image(s)")
     parser.add_argument("-o", "--output", default="pose.png", help="Output file path")
