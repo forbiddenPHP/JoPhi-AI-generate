@@ -213,6 +213,17 @@ else
     echo "  ── Sketch models: not found, skipping"
 fi
 
+# ── Upscale models (worker/upscale/models/) ──────────────────────────────────
+
+UPSCALE_MODELS="$SCRIPT_DIR/worker/upscale/models"
+if [ -d "$UPSCALE_MODELS" ] && [ "$(ls -A "$UPSCALE_MODELS" 2>/dev/null)" ]; then
+    echo "  Backing up Upscale models …"
+    cp -rL "$UPSCALE_MODELS" "$MODELS_DIR/upscale_models"
+    echo -e "  ${GREEN}✓${NC} Upscale models ($(du -sh "$MODELS_DIR/upscale_models" | cut -f1))"
+else
+    echo "  ── Upscale models: not found, skipping"
+fi
+
 # ── Text worker configs (LLM default overrides) ─────────────────────────────
 
 TEXT_CONFIGS="$SCRIPT_DIR/worker/text/models"

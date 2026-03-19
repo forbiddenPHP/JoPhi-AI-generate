@@ -57,18 +57,19 @@ def register(suite):
         output=out / "edit_no_person.png",
     )
 
-    suite.add(
-        name="Edit: turn to age 20",
-        cmd=[
-            sys.executable, "generate.py", "image",
-            "--engine", "flux.2", "--model", "4b-distilled",
-            "--images", str(JOHANNES),
-            "-p", "turn this man to the age of 20",
-            "-W", "512", "-H", "512", "--seed", "42",
-            "-o", str(out / "edit_age20.png"),
-        ],
-        output=out / "edit_age20.png",
-    )
+    for age in [10, 20, 30, 40, 50, 60, 70, 80]:
+        suite.add(
+            name=f"Edit: turn to age {age}",
+            cmd=[
+                sys.executable, "generate.py", "image",
+                "--engine", "flux.2", "--model", "4b-distilled",
+                "--images", str(JOHANNES),
+                "-p", f"turn this 47 year old man to the age of {age} years",
+                "-W", "512", "-H", "512", "--seed", "42",
+                "-o", str(out / f"edit_age{age}.png"),
+            ],
+            output=out / f"edit_age{age}.png",
+        )
 
     # ── Livingroom edits ──────────────────────────────────────────────────
 

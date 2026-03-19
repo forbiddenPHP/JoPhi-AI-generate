@@ -114,5 +114,12 @@ Jeder Worker bekommt ein eigenes conda env.
 
 → Details: `todo/research/lineart-worker.md`, `normalmap-worker.md`, `sketch-worker.md`
 
+## SD1.5 ControlNet-Integration (bestehende Modes)
+- [ ] SD1.5 Worker auf `StableDiffusionControlNetPipeline` erweitern
+- [ ] ControlNet-Modelle: depth (`lllyasviel/control_v11p_sd15_depth`), pose (`lllyasviel/control_v11p_sd15_openpose`)
+- [ ] `--controlnet depth:` und `--controlnet pose:` auch auf `--engine sd1.5` funktionsfähig machen
+- [ ] Später auch: lineart, sketch, normalmap ControlNets für SD1.5
+
 ## Erledigt
 - ~~Posen & ControlNet~~ (OpenPose/DWPose + Depth Anything V2)
+- ~~`--controlnet mode:file` ABI~~ (Phase 1: depth + pose auf FLUX.2, Tests 18/18 grün)

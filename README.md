@@ -774,6 +774,35 @@ python generate.py image --engine flux.2 --controlnet sketch:sketch.png -p "fant
 
 ---
 
+### Image Upscaling (`image --engine upscale`)
+
+Upscale images using Real-ESRGAN. Standalone RRDBNet architecture with MPS acceleration.
+
+```bash
+# 4x upscale (default)
+python generate.py image --engine upscale --images photo.png -o upscaled.png
+
+# 2x upscale
+python generate.py image --engine upscale --images photo.png --model 2x -o upscaled.png
+
+# Anime-optimized 4x
+python generate.py image --engine upscale --images photo.png --model anime -o upscaled.png
+
+# Batch upscale
+python generate.py image --engine upscale --images img1.png img2.png img3.png -o upscaled/
+```
+
+<details>
+<summary>Options</summary>
+
+- `--images` — Input image(s) (required)
+- `-o, --output` — Output file path or directory
+- `--model` — Model: `4x` (default), `2x`, `anime`
+
+</details>
+
+---
+
 ### Speaker Diarization (`audio --engine diarize`)
 
 Split dialogue audio into separate tracks per speaker using pyannote.audio (MPS).
@@ -1081,6 +1110,7 @@ Shows installed models, target pitch settings, server status, and supported form
 | `lineart` | 3.12 | conda | TEED/AnyLine line art extraction (controlnet-aux) |
 | `normalmap` | 3.12 | conda | Marigold-Normals v1.1 surface normal estimation |
 | `sketch` | 3.12 | conda | HED edge extraction (OpenCV DNN, no PyTorch) |
+| `upscale` | 3.12 | conda | Real-ESRGAN image upscaling (PyTorch MPS) |
 | `ace` (uv) | 3.11+ | uv | ACE-Step 1.5 music generation |
 
 </details>
