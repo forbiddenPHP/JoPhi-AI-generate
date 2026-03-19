@@ -533,7 +533,17 @@ python generate.py image --engine flux.2 -p "a wide cinematic landscape" -W 1360
 
 # Reproducible output
 python generate.py image --engine flux.2 -p "a sunset" --seed 42 -o sunset.png
+
+# Image editing (no mask needed — FLUX.2 Klein is a native edit model)
+python generate.py image --engine flux.2 --images photo.png -p "remove the glasses" -o no_glasses.png
+python generate.py image --engine flux.2 --images photo.png -p "add a painting on the wall" -o with_painting.png
+
+# Iterative editing (output of step 1 → input of step 2)
+python generate.py image --engine flux.2 --images scene.png -p "remove the lamp" -o step1.png
+python generate.py image --engine flux.2 --images step1.png -p "add a bookshelf where the lamp was" -o step2.png
 ```
+
+**Image editing:** FLUX.2 Klein is a native edit model — no inpainting masks needed. Just describe what to change. For complex edits, use iterative steps: remove first, then add.
 
 <details>
 <summary>Models</summary>

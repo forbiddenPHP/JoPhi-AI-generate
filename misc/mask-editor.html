@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mask Editor</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a1a; color: #eee; font-family: system-ui, sans-serif; display: flex; flex-direction: column; height: 100vh; }
+.toolbar { padding: 10px 16px; background: #2a2a2a; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.toolbar label { font-size: 13px; }
+.toolbar button { padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.toolbar button.primary { background: #4a9eff; color: #fff; }
+.toolbar button.danger { background: #ff4a4a; color: #fff; }
+.toolbar button.neutral { background: #555; color: #fff; }
+.toolbar input[type="range"] { width: 120px; }
+.toolbar input[type="file"] { display: none; }
+.canvas-area { flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; position: relative; }
+canvas { cursor: crosshair; }
+.hint { position: absolute; bottom: 10px; right: 16px; font-size: 12px; color: #888; }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+    <button class="primary" onclick="document.getElementById('fileInput').click()">Load Image</button>
+    <input type="file" id="fileInput" accept="image/*">
+    <label>Brush: <input type="range" id="brushSize" min="2" max="150" value="25"><span id="brushLabel">25</span></label>
+    <label><input type="checkbox" id="eraseMode"> Erase</label>
+    <button class="danger" onclick="clearMask()">Clear Mask</button>
+    <button class="primary" onclick="saveMask()">Save Mask (PNG)</button>
+    <button class="neutral" onclick="saveOverlay()">Save Overlay (Preview)</button>
+    <span id="info" style="font-size: 12px; color: #888;"></span>
+</div>
+
+<div class="canvas-area">
+    <canvas id="canvas"></canvas>
+    <div class="hint">Left click = paint | Right click = erase | Scroll = brush size</div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const brushSlider = document.getElementById('brushSize');
+const brushLabel = document.getElementById('brushLabel');
+const eraseCheckbox = document.getElementById('eraseMode');
+const info = document.getElementById('info');
+
+let baseImage = null;
+let maskCanvas = null;
+let maskCtx = null;
+let drawing = false;
+let lastX = -1, lastY = -1;
+
+function getBrush() { return parseInt(brushSlider.value); }
+function isErasing() { return eraseCheckbox.checked; }
+
+brushSlider.addEventListener('input', () => { brushLabel.textContent = brushSlider.value; });
+
+document.getElementById('fileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const img = new Image();
+    img.onload = () => {
+        baseImage = img;
+        canvas.width = img.width;
+        canvas.height = img.height;
+
+        maskCanvas = document.createElement('canvas');
+        maskCanvas.width = img.width;
+        maskCanvas.height = img.height;
+        maskCtx = maskCanvas.getContext('2d');
+        maskCtx.fillStyle = '#000';
+        maskCtx.fillRect(0, 0, img.width, img.height);
+
+        render();
+        info.textContent = `${img.width}x${img.height} — ${file.name}`;
+    };
+    img.src = URL.createObjectURL(file);
+});
+
+function render() {
+    if (!baseImage) return;
+    ctx.drawImage(baseImage, 0, 0);
+    // Overlay mask as semi-transparent red
+    ctx.globalAlpha = 0.4;
+    ctx.drawImage(maskCanvas, 0, 0);
+    ctx.globalAlpha = 1.0;
+}
+
+function paint(x, y) {
+    if (!maskCtx) return;
+    const r = getBrush();
+    if (isErasing()) {
+        maskCtx.globalCompositeOperation = 'source-over';
+        maskCtx.fillStyle = '#000';
+    } else {
+        maskCtx.globalCompositeOperation = 'source-over';
+        maskCtx.fillStyle = '#ff0000';
+    }
+    maskCtx.beginPath();
+    maskCtx.arc(x, y, r, 0, Math.PI * 2);
+    maskCtx.fill();
+
+    // Connect with last point for smooth strokes
+    if (lastX >= 0 && lastY >= 0) {
+        maskCtx.lineWidth = r * 2;
+        maskCtx.lineCap = 'round';
+        maskCtx.strokeStyle = isErasing() ? '#000' : '#ff0000';
+        maskCtx.beginPath();
+        maskCtx.moveTo(lastX, lastY);
+        maskCtx.lineTo(x, y);
+        maskCtx.stroke();
+    }
+    lastX = x; lastY = y;
+    render();
+}
+
+canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 2) eraseCheckbox.checked = true;
+    drawing = true;
+    lastX = -1; lastY = -1;
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    paint((e.clientX - rect.left) * sx, (e.clientY - rect.top) * sy);
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    if (!drawing) return;
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    paint((e.clientX - rect.left) * sx, (e.clientY - rect.top) * sy);
+});
+
+canvas.addEventListener('mouseup', (e) => {
+    drawing = false;
+    lastX = -1; lastY = -1;
+    if (e.button === 2) eraseCheckbox.checked = false;
+});
+
+canvas.addEventListener('mouseleave', () => {
+    drawing = false;
+    lastX = -1; lastY = -1;
+});
+
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    let v = parseInt(brushSlider.value);
+    v += e.deltaY < 0 ? 3 : -3;
+    v = Math.max(2, Math.min(150, v));
+    brushSlider.value = v;
+    brushLabel.textContent = v;
+});
+
+function clearMask() {
+    if (!maskCtx) return;
+    maskCtx.fillStyle = '#000';
+    maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+    render();
+}
+
+function saveMask() {
+    if (!maskCtx) return;
+    // Convert red mask to white-on-black
+    const out = document.createElement('canvas');
+    out.width = maskCanvas.width;
+    out.height = maskCanvas.height;
+    const outCtx = out.getContext('2d');
+    const imgData = maskCtx.getImageData(0, 0, out.width, out.height);
+    const data = imgData.data;
+    for (let i = 0; i < data.length; i += 4) {
+        const isWhite = data[i] > 128; // red channel > 128 = masked
+        data[i] = data[i+1] = data[i+2] = isWhite ? 255 : 0;
+        data[i+3] = 255;
+    }
+    outCtx.putImageData(imgData, 0, 0);
+
+    const link = document.createElement('a');
+    link.download = 'mask.png';
+    link.href = out.toDataURL('image/png');
+    link.click();
+}
+
+function saveOverlay() {
+    if (!baseImage) return;
+    const link = document.createElement('a');
+    link.download = 'mask_preview.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+}
+</script>
+</body>
+</html>

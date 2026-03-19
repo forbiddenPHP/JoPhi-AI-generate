@@ -376,6 +376,7 @@ def denoise_cached(
 
         img = img + (t_prev - t_curr) * pred
 
+
     return img
 
 
