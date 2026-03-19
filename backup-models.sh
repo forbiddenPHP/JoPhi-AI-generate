@@ -180,6 +180,39 @@ else
     echo "  ── Depth Anything V2 models: not found, skipping"
 fi
 
+# ── Lineart models (worker/lineart/models/) ──────────────────────────────────
+
+LINEART_MODELS="$SCRIPT_DIR/worker/lineart/models"
+if [ -d "$LINEART_MODELS" ] && [ "$(ls -A "$LINEART_MODELS" 2>/dev/null)" ]; then
+    echo "  Backing up Lineart models …"
+    cp -rL "$LINEART_MODELS" "$MODELS_DIR/lineart_models"
+    echo -e "  ${GREEN}✓${NC} Lineart models ($(du -sh "$MODELS_DIR/lineart_models" | cut -f1))"
+else
+    echo "  ── Lineart models: not found, skipping"
+fi
+
+# ── NormalMap models (worker/normalmap/models/) ──────────────────────────────
+
+NORMALMAP_MODELS="$SCRIPT_DIR/worker/normalmap/models"
+if [ -d "$NORMALMAP_MODELS" ] && [ "$(ls -A "$NORMALMAP_MODELS" 2>/dev/null)" ]; then
+    echo "  Backing up NormalMap models …"
+    cp -rL "$NORMALMAP_MODELS" "$MODELS_DIR/normalmap_models"
+    echo -e "  ${GREEN}✓${NC} NormalMap models ($(du -sh "$MODELS_DIR/normalmap_models" | cut -f1))"
+else
+    echo "  ── NormalMap models: not found, skipping"
+fi
+
+# ── Sketch models (worker/sketch/models/) ────────────────────────────────────
+
+SKETCH_MODELS="$SCRIPT_DIR/worker/sketch/models"
+if [ -d "$SKETCH_MODELS" ] && [ "$(ls -A "$SKETCH_MODELS" 2>/dev/null)" ]; then
+    echo "  Backing up Sketch models …"
+    cp -rL "$SKETCH_MODELS" "$MODELS_DIR/sketch_models"
+    echo -e "  ${GREEN}✓${NC} Sketch models ($(du -sh "$MODELS_DIR/sketch_models" | cut -f1))"
+else
+    echo "  ── Sketch models: not found, skipping"
+fi
+
 # ── Text worker configs (LLM default overrides) ─────────────────────────────
 
 TEXT_CONFIGS="$SCRIPT_DIR/worker/text/models"

@@ -391,6 +391,27 @@ if [ -d "$MODELS_DIR" ]; then
         echo -e "  ${GREEN}✓${NC} Depth Anything V2 models restored"
     fi
 
+    # Lineart models → worker/lineart/models/
+    if [ -d "$MODELS_DIR/lineart_models" ]; then
+        mkdir -p "$SCRIPT_DIR/worker/lineart/models"
+        cp -a "$MODELS_DIR/lineart_models/." "$SCRIPT_DIR/worker/lineart/models/"
+        echo -e "  ${GREEN}✓${NC} Lineart models restored"
+    fi
+
+    # NormalMap models → worker/normalmap/models/
+    if [ -d "$MODELS_DIR/normalmap_models" ]; then
+        mkdir -p "$SCRIPT_DIR/worker/normalmap/models"
+        cp -a "$MODELS_DIR/normalmap_models/." "$SCRIPT_DIR/worker/normalmap/models/"
+        echo -e "  ${GREEN}✓${NC} NormalMap models restored"
+    fi
+
+    # Sketch models → worker/sketch/models/
+    if [ -d "$MODELS_DIR/sketch_models" ]; then
+        mkdir -p "$SCRIPT_DIR/worker/sketch/models"
+        cp -a "$MODELS_DIR/sketch_models/." "$SCRIPT_DIR/worker/sketch/models/"
+        echo -e "  ${GREEN}✓${NC} Sketch models restored"
+    fi
+
     echo -e "  ${GREEN}✓${NC} Model restore complete"
 
 else
