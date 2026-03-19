@@ -943,8 +943,18 @@ Supported params: `--context-length`, `--max-tokens`, `--temperature`, `--top-p`
 Per-engine model management.
 
 ```bash
-# List all engines
+# List all models across all engines
 python generate.py models list
+
+# List by medium (voice, audio, text, image)
+python generate.py voice models list
+python generate.py audio models list
+python generate.py image models list
+
+# List by specific engine
+python generate.py voice rvc models list
+python generate.py image flux.2 models list
+python generate.py text whisper models list
 
 # Ollama
 python generate.py models ollama list
@@ -1060,7 +1070,8 @@ All inputs are normalized to 44100 Hz stereo. Output is passed through `alimiter
 
 ```bash
 python generate.py models list                                          # all engines
-python generate.py models rvc list                                      # RVC only
+python generate.py voice models list                                    # all voice engines
+python generate.py voice rvc models list                                # RVC only
 python generate.py models rvc search "female singer"
 python generate.py models rvc search "anime" --limit 50
 python generate.py models rvc install User/ModelRepo
