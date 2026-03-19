@@ -436,6 +436,8 @@ _STATIC_MODELS = [
 
 def _models_list_all(medium=None, engine=None):
     """Query all workers for their models and display the result."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     rows = []
 
     # Static entries first
@@ -446,7 +448,8 @@ def _models_list_all(medium=None, engine=None):
             continue
         rows.append((modus, eng, model, notice))
 
-    # Dynamic entries from workers
+    # Dynamic entries from workers — query all in parallel
+    filtered = []
     for entry in _get_worker_registry():
         modus, eng, env, script = entry[:4]
         runner = entry[4] if len(entry) > 4 else "conda"
@@ -454,12 +457,21 @@ def _models_list_all(medium=None, engine=None):
             continue
         if engine and eng != engine:
             continue
-        models = _query_worker_models(env, script, runner=runner)
-        if models:
-            for m in models:
-                rows.append((modus, eng, m.get("model", ""), m.get("notice", "")))
-        else:
-            rows.append((modus, eng, "", "unavailable"))
+        filtered.append((modus, eng, env, script, runner))
+
+    with ThreadPoolExecutor(max_workers=len(filtered) or 1) as pool:
+        futures = {
+            pool.submit(_query_worker_models, env, script, runner=runner): (modus, eng)
+            for modus, eng, env, script, runner in filtered
+        }
+        for future in as_completed(futures):
+            modus, eng = futures[future]
+            models = future.result()
+            if models:
+                for m in models:
+                    rows.append((modus, eng, m.get("model", ""), m.get("notice", "")))
+            else:
+                rows.append((modus, eng, "", "unavailable"))
 
     if not rows:
         _emit(f"No models found for {medium or ''} {engine or ''}".strip(), "error")
