@@ -74,6 +74,7 @@ Usage:
   python generate.py server start                          Start RVC worker
   python generate.py server stop                           Stop RVC worker
   python generate.py server status                         Check worker status
+  python generate.py <any command> --screen-log-format json JSON output (for automation)
 """
 
 from __future__ import annotations
@@ -431,6 +432,14 @@ def _models_list_all(medium=None, engine=None):
 
     if not rows:
         _emit(f"No models found for {medium or ''} {engine or ''}".strip(), "error")
+        return
+
+    # JSON output
+    if _event_handler is print_event_json:
+        import json as _json
+        out = [{"modus": m, "engine": e, "model": mdl, "notice": n}
+               for m, e, mdl, n in rows]
+        print(_json.dumps(out, indent=2))
         return
 
     # Column widths
