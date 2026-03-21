@@ -42,8 +42,8 @@ class ProgressEvent:
                             # | "inference_gotcha" | "inference_mode" | "inference_token" | "inference_result"
     message: str            # raw line or parsed message
     percent: float | None = None
-    current: int | None = None    # counter: current step
-    total: int | None = None      # counter: total steps
+    current: float | None = None    # counter: current step (or bytes in display unit)
+    total: float | None = None      # counter: total steps (or bytes in display unit)
     stage: str | None = None
     chunk: int | None = None      # chunk index (1-based), set when progress resets
     data: dict | None = None      # structured payload for @inference: events
@@ -81,7 +81,8 @@ class ProgressEvent:
 _TQDM_RE = re.compile(
     r"(\d+)%\|"           # percent
     r"[^|]*\|\s*"         # bar
-    r"([\d.]+)/([\d.]+)"  # current/total
+    r"([\d.]+\s*[kMGTBi]*)"   # current (with optional unit like M, G, GiB)
+    r"/([\d.]+\s*[kMGTBi]*)"  # total
 )
 
 # Simpler tqdm: "100%|██████████| 5/5"
@@ -182,6 +183,46 @@ def _is_info(line: str) -> bool:
     return False
 
 
+_BYTE_UNITS = {"k": 1e3, "m": 1e6, "g": 1e9, "t": 1e12}
+
+
+def _parse_byte_value(s: str) -> float | None:
+    """Parse '469M' or '46.1G' or '0.00' into bytes. None if no unit found."""
+    m = re.match(r"([\d.]+)\s*([kKmMgGtT])?[iI]?[bB]?$", s)
+    if not m:
+        return None
+    val = float(m.group(1))
+    unit = m.group(2)
+    if unit:
+        return val * _BYTE_UNITS.get(unit.lower(), 1)
+    return None  # plain number, no unit
+
+
+def _parse_tqdm_counter(raw_cur: str, raw_tot: str) -> tuple[int | None, int | None]:
+    """Parse tqdm current/total into display values.
+
+    Plain integers (5/8) → pass through.
+    Byte values (469M/46.1G) → convert to same unit, return as int in that unit.
+    """
+    cur_bytes = _parse_byte_value(raw_cur)
+    tot_bytes = _parse_byte_value(raw_tot)
+    # If total has a unit, treat unitless current as 0 bytes
+    if cur_bytes is None and tot_bytes is not None:
+        cur_bytes = float(re.sub(r"[^\d.]", "", raw_cur) or "0")
+    if cur_bytes is not None and tot_bytes is not None:
+        # Both have units → pick the best display unit from total
+        for label, scale in (("T", 1e12), ("G", 1e9), ("M", 1e6), ("k", 1e3)):
+            if tot_bytes >= scale:
+                return round(cur_bytes / scale, 1), round(tot_bytes / scale, 1)
+        return round(cur_bytes, 1), round(tot_bytes, 1)
+    # Plain integer counters (5/8, 100/100)
+    cur_s = re.sub(r"[^\d.]", "", raw_cur)
+    tot_s = re.sub(r"[^\d.]", "", raw_tot)
+    cur = int(float(cur_s)) if cur_s else 0
+    tot = int(float(tot_s)) if tot_s else 0
+    return cur, tot
+
+
 def parse_stderr_line(line: str, duration_s: float = 0.0) -> ProgressEvent:
     """Parse a single stderr line into a ProgressEvent.
 
@@ -216,8 +257,8 @@ def parse_stderr_line(line: str, duration_s: float = 0.0) -> ProgressEvent:
     m = _TQDM_RE.search(stripped)
     if m:
         pct = float(m.group(1))
-        cur = int(float(m.group(2)))
-        tot = int(float(m.group(3)))
+        raw_cur, raw_tot = m.group(2).strip(), m.group(3).strip()
+        cur, tot = _parse_tqdm_counter(raw_cur, raw_tot)
         # Extract tqdm description (text before "XX%|")
         desc = stripped[:m.start()].strip().rstrip(":").strip() or None
         return ProgressEvent(type="progress", message=stripped, percent=pct,
@@ -447,8 +488,8 @@ _MARKER_ERROR   = "✗"
 _MARKER_DONE    = "✓"
 
 
-def _format_bar(percent: float, current: int | None = None,
-                total: int | None = None, label: str = "") -> str:
+def _format_bar(percent: float, current: float | None = None,
+                total: float | None = None, label: str = "") -> str:
     """Build a unified progress bar line: Label  x/n  ██████  %"""
     bar_width = 30
     filled = int(bar_width * percent / 100)
@@ -458,7 +499,10 @@ def _format_bar(percent: float, current: int | None = None,
     if label:
         parts.append(label)
     if current is not None and total is not None:
-        parts.append(f"{current}/{total}")
+        if isinstance(current, float) or isinstance(total, float):
+            parts.append(f"{current:.1f}/{total:.1f}")
+        else:
+            parts.append(f"{current}/{total}")
     parts.append(bar)
     parts.append(f"{percent:5.1f}%")
 

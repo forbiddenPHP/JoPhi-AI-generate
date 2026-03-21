@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ── Revoicer — Master Installer ─────────────────────────────────────────────
-# Creates eleven conda environments + one uv project:
+# Creates twelve conda environments + one uv project:
 #   1. rvc        — Python 3.10 + pip<=23.3 for RVC voice conversion worker
 #   2. enhance    — Python 3.12 for resemble-enhance (audio post-processing, MPS)
 #   3. heartmula  — Python 3.10 for HeartMuLa music generation
@@ -11,7 +11,8 @@
 #   8. ai-tts     — Python 3.11 for Qwen3-TTS (mlx-audio, Apple Silicon)
 #   9. lang-detect — Python 3.11 for language detection (langdetect)
 #  10. ezaudio    — Python 3.10 for EzAudio SFX generation (text-to-audio)
-#  11. tts-mist   — Python 3.11 for CLI + Web-App
+#  11. ltx2       — Python 3.12 for LTX-2.3 video generation (MPS)
+#  12. tts-mist   — Python 3.11 for CLI + Web-App
 #
 # Why separate envs?
 #   RVC depends on omegaconf 2.0.6 and fairseq 0.12.2 (broken metadata,
@@ -169,113 +170,117 @@ echo -e "${GREEN}✓${NC} Prerequisites OK"
 # ── Step 1: RVC Worker Env ───────────────────────────────────────────────────
 
 echo ""
-echo "── Step 1/21: RVC Worker ──"
+echo "── Step 1/22: RVC Worker ──"
 bash "$SCRIPT_DIR/worker/rvc/install.sh"
 
 # ── Step 2: Enhance Worker Env ───────────────────────────────────────────────
 
 echo ""
-echo "── Step 2/21: Enhance Worker ──"
+echo "── Step 2/22: Enhance Worker ──"
 bash "$SCRIPT_DIR/worker/enhance/install.sh"
 
 # ── Step 3: HeartMuLa Music Worker Env ───────────────────────────────────────
 
 echo ""
-echo "── Step 3/21: HeartMuLa Music Worker ──"
+echo "── Step 3/22: HeartMuLa Music Worker ──"
 bash "$SCRIPT_DIR/worker/music/install.sh"
 
 # ── Step 4: ACE-Step Music Worker (uv) ───────────────────────────────────────
 
 echo ""
-echo "── Step 4/21: ACE-Step Music Worker ──"
+echo "── Step 4/22: ACE-Step Music Worker ──"
 bash "$SCRIPT_DIR/worker/ace/install.sh"
 
 # ── Step 5: Whisper Worker Env ────────────────────────────────────────────────
 
 echo ""
-echo "── Step 5/21: Whisper Worker ──"
+echo "── Step 5/22: Whisper Worker ──"
 bash "$SCRIPT_DIR/worker/whisper/install.sh"
 
 # ── Step 6: Diarize Worker Env ───────────────────────────────────────────────
 
 echo ""
-echo "── Step 6/21: Diarize Worker ──"
+echo "── Step 6/22: Diarize Worker ──"
 bash "$SCRIPT_DIR/worker/diarize/install.sh"
 
 # ── Step 7: Separate Worker Env ──────────────────────────────────────────────
 
 echo ""
-echo "── Step 7/21: Separate Worker ──"
+echo "── Step 7/22: Separate Worker ──"
 bash "$SCRIPT_DIR/worker/separate/install.sh"
 
 # ── Step 8: AI-TTS Worker Env ────────────────────────────────────────────────
 
 echo ""
-echo "── Step 8/21: AI-TTS Worker ──"
+echo "── Step 8/22: AI-TTS Worker ──"
 bash "$SCRIPT_DIR/worker/tts/install.sh"
 
 # ── Step 9: Language Detect Worker Env ───────────────────────────────────────
 
 echo ""
-echo "── Step 9/21: Language Detect Worker ──"
+echo "── Step 9/22: Language Detect Worker ──"
 bash "$SCRIPT_DIR/worker/langdetect/install.sh"
 
 # ── Step 10: SFX Worker Env ─────────────────────────────────────────────────
 
 echo ""
-echo "── Step 10/21: SFX Worker (EzAudio) ──"
+echo "── Step 10/22: SFX Worker (EzAudio) ──"
 bash "$SCRIPT_DIR/worker/sfx/install.sh"
 
 # ── Step 11: Text Worker Env ─────────────────────────────────────────────────
 
 echo ""
-echo "── Step 11/21: Text Worker ──"
+echo "── Step 11/22: Text Worker ──"
 bash "$SCRIPT_DIR/worker/text/install.sh"
 
-# ── Step 12/21: Image Worker (FLUX.2) ─────────────────────────────────────
+# ── Step 12/22: Image Worker (FLUX.2) ─────────────────────────────────────
 
 echo ""
-echo "── Step 12/21: Image Worker (FLUX.2) ──"
+echo "── Step 12/22: Image Worker (FLUX.2) ──"
 bash "$SCRIPT_DIR/worker/image/install.sh"
 
-# ── Step 13/21: Pose Worker (DWPose/OpenPose) ─────────────────────────────
+# ── Step 13/22: Pose Worker (DWPose/OpenPose) ─────────────────────────────
 
 echo ""
-echo "── Step 13/21: Pose Worker (DWPose) ──"
+echo "── Step 13/22: Pose Worker (DWPose) ──"
 bash "$SCRIPT_DIR/worker/pose/install.sh"
 
 echo ""
-echo "── Step 14/21: SD 1.5 Worker (MatureMaleMix) ──"
+echo "── Step 14/22: SD 1.5 Worker (MatureMaleMix) ──"
 bash "$SCRIPT_DIR/worker/sd15/install.sh"
 
 echo ""
-echo "── Step 15/21: Depth Worker (Depth Anything V2) ──"
+echo "── Step 15/22: Depth Worker (Depth Anything V2) ──"
 bash "$SCRIPT_DIR/worker/depth/install.sh"
 
 echo ""
-echo "── Step 16/21: Lineart Worker (TEED / Canny) ──"
+echo "── Step 16/22: Lineart Worker (TEED / Canny) ──"
 bash "$SCRIPT_DIR/worker/lineart/install.sh"
 
 echo ""
-echo "── Step 17/21: NormalMap Worker (Marigold-Normals) ──"
+echo "── Step 17/22: NormalMap Worker (Marigold-Normals) ──"
 bash "$SCRIPT_DIR/worker/normalmap/install.sh"
 
 echo ""
-echo "── Step 18/21: Sketch Worker (HED / OpenCV DNN) ──"
+echo "── Step 18/22: Sketch Worker (HED / OpenCV DNN) ──"
 bash "$SCRIPT_DIR/worker/sketch/install.sh"
 
 echo ""
-echo "── Step 19/21: Upscale Worker (Real-ESRGAN) ──"
+echo "── Step 19/22: Upscale Worker (Real-ESRGAN) ──"
 bash "$SCRIPT_DIR/worker/upscale/install.sh"
 
 echo ""
-echo "── Step 20/21: Segment Worker (BiRefNet / rembg) ──"
+echo "── Step 20/22: Segment Worker (BiRefNet / rembg) ──"
 bash "$SCRIPT_DIR/worker/segment/install.sh"
 
-# ── Step 21/21: Main App Env ────────────────────────────────────────────────
+echo ""
+echo "── Step 21/22: Video Worker (LTX-2.3) ──"
+bash "$SCRIPT_DIR/worker/ltx2/install.sh"
+
+# ── Step 22/22: Main App Env ────────────────────────────────────────────────
 
 echo ""
-echo "── Step 21/21: Main App (tts-mist) ──"
+echo "── Step 22/22: Main App (tts-mist) ──"
 
 ENV_NAME="tts-mist"
 
@@ -432,6 +437,13 @@ if [ -d "$MODELS_DIR" ]; then
         mkdir -p "$HOME/.u2net"
         cp -a "$MODELS_DIR/segment_u2net/." "$HOME/.u2net/"
         echo -e "  ${GREEN}✓${NC} Segment models restored"
+    fi
+
+    # LTX-2.3 models → worker/ltx2/models/
+    if [ -d "$MODELS_DIR/ltx2_models" ]; then
+        mkdir -p "$SCRIPT_DIR/worker/ltx2/models"
+        cp -a "$MODELS_DIR/ltx2_models/." "$SCRIPT_DIR/worker/ltx2/models/"
+        echo -e "  ${GREEN}✓${NC} LTX-2.3 models restored"
     fi
 
     echo -e "  ${GREEN}✓${NC} Model restore complete"
@@ -654,6 +666,31 @@ print('  Done')
     }
 
     echo -e "${GREEN}✓${NC} Depth Anything V2 models downloaded"
+
+    # ── LTX-2.3 models ────────────────────────────────────────────────
+    LTX2_MODELS_DIR="$SCRIPT_DIR/worker/ltx2/models"
+    mkdir -p "$LTX2_MODELS_DIR"
+    echo ""
+    echo "── LTX-2.3 models ──"
+    "$CONDA_BIN" run -n ltx2 python -c "
+import os
+os.environ['HF_HOME'] = '$LTX2_MODELS_DIR'
+from huggingface_hub import hf_hub_download, snapshot_download
+
+for fn in [
+    'ltx-2.3-22b-distilled.safetensors',
+    'ltx-2.3-22b-dev.safetensors',
+    'ltx-2.3-spatial-upscaler-x2-1.1.safetensors',
+    'ltx-2.3-22b-distilled-lora-384.safetensors',
+]:
+    print(f'  Downloading {fn} ...')
+    hf_hub_download(repo_id='Lightricks/LTX-2.3', filename=fn, local_dir='$LTX2_MODELS_DIR')
+
+print('  Downloading Gemma 3 12B (text encoder) ...')
+snapshot_download('google/gemma-3-12b-it', local_dir='$LTX2_MODELS_DIR/gemma-3-12b-it')
+print('  Done')
+"
+    echo -e "${GREEN}✓${NC} LTX-2.3 models downloaded"
 
     echo ""
     echo -e "${GREEN}✓${NC} All model downloads complete"

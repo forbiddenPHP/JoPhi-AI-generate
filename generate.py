@@ -48,6 +48,7 @@ Usage:
   python generate.py image flux.2 -p "a cat on a cliff" -o cat.png       Image generation (FLUX.2)
   python generate.py image flux.2 --model 4b-distilled -p "a cat" -o cat.png
   python generate.py image flux.2 --controlnet depth:depth.png -p "cartoon" -o out.png  ControlNet conditioning
+  python generate.py image flux.2 --images ref.png -p "edit this" --no-rescale -o out.png  Keep ref original size
   python generate.py image sd1.5 -p "a warrior, studio lighting" -o out.png  Stable Diffusion 1.5
   python generate.py image openpose --images person.png -o pose.png      Pose estimation
   python generate.py image depth --images photo.png -o depth.png         Depth estimation
@@ -56,6 +57,13 @@ Usage:
   python generate.py image sketch --images photo.png -o sketch.png       Sketch extraction
   python generate.py image upscale --images photo.png -o upscaled.png    Image upscaling
   python generate.py image segment --images photo.png -o transparent.png Background removal
+  python generate.py video ltx2.3 -p "A cat running" --ratio 16:9 --quality 480p -o cat.mp4  Text-to-video (distilled)
+  python generate.py video ltx2.3 --model dev -p "Sunset over ocean" --ratio 16:9 --quality 480p -o sunset.mp4  Text-to-video (dev)
+  python generate.py video ltx2.3 -p "He smiles" --image-first photo.png --ratio 1:1 --quality 480p -o anim.mp4  Image-to-video
+  python generate.py video ltx2.3 -p "Two people talking" --audio dialog.wav --ratio 16:9 --quality 240p -o a2v.mp4  Audio-to-video
+  python generate.py video ltx2.3 --model dev -p "He says: hello" --extend video.mp4 5 --ratio 16:9 --quality 240p -o ext.mp4  Extend video (+5s)
+  python generate.py video ltx2.3 --model dev -p "Full scene with change" --retake video.mp4 3.5 5.0 --ratio 16:9 --quality 240p -o ret.mp4  Retake passage
+  python generate.py audio ltx2.3 -p "Oktoberfest crowd cheering" --ratio 1:1 --quality 240p -o crowd.wav  Audio-only (virtual)
   python generate.py models list                                         List all models
   python generate.py image models list                                   List image engine models
   python generate.py image flux.2 models list                            List FLUX.2 models only
@@ -375,6 +383,10 @@ def _query_worker_models(env: str, worker_script: str, runner: str = "conda") ->
             project_dir = str(Path(worker_script).resolve().parent / "ACE-Step-1.5")
             cmd = [str(UV_BIN), "run", "--project", project_dir,
                    "python", worker_script, "--list-models"]
+        elif runner == "venv":
+            # Worker with local .venv (e.g. MLX worker)
+            venv_python = str(Path(worker_script).resolve().parent / ".venv" / "bin" / "python")
+            cmd = [venv_python, worker_script, "--list-models"]
         elif runner == "native":
             # No conda env needed (e.g. say voices)
             cmd = [sys.executable, worker_script, "--list-models"]
@@ -424,6 +436,8 @@ def _get_worker_registry():
         ("image", "upscale",            UPSCALE_ENV,   str(UPSCALE_WORKER)),
         ("image", "segment",            SEGMENT_ENV,   str(SEGMENT_WORKER)),
         ("image", "openpose",           POSE_ENV,      str(POSE_WORKER)),
+        # video
+        ("video", "ltx2.3",             LTX2_ENV,      str(LTX2_WORKER)),
     ])
     return _WORKER_REGISTRY
 
@@ -432,6 +446,7 @@ def _get_worker_registry():
 _STATIC_MODELS = [
     ("voice", "clone-tts",         "",  "clone any voice from audio"),
     ("audio", "voice-removal",     "",  "demucs-based"),
+    ("audio", "ltx2.3",            "",  "audio from video engine (virtual)"),
     ("output", "audio-concatenate", "", ""),
     ("output", "audio-mucs",       "",  ""),
 ]
@@ -1721,7 +1736,7 @@ def _voice_clone_tts(args):
     text = _re.sub(r"\[.*?\]", "", text, flags=_re.DOTALL).strip()
 
     # Reference audio — --reference flag(s), fallback to default
-    DEFAULT_REF = SCRIPT_DIR / "voice" / "default-reference.m4a"
+    DEFAULT_REF = SCRIPT_DIR / "worker" / "tts" / "default-reference.m4a"
     ref_flags = getattr(args, "reference", None) or []
     ref_paths = [Path(p) for p in ref_flags]
     if not ref_paths:
@@ -2336,6 +2351,106 @@ def _audio_voice_removal(args):
     print(json.dumps(outputs))
 
 
+def _audio_ltx2(args):
+    """Generate audio using LTX-2.3 video engine (virtual audio worker).
+
+    Generates a minimal-resolution video (128x128) and extracts only the audio track.
+    Useful for generating ambient sounds, scene audio, or dialog that matches a visual prompt.
+    """
+    if not LTX2_WORKER.exists():
+        _emit("ERROR: worker/ltx2/generate.py not found", "error")
+        _emit("  Run: bash worker/ltx2/install.sh", "error")
+        sys.exit(1)
+
+    prompt = getattr(args, "text", None) or getattr(args, "prompt", None)
+    if not prompt:
+        _emit("ERROR: --prompt or --text required for LTX audio generation", "error")
+        sys.exit(1)
+
+    # Output path — user decides format (.wav, .mp3, etc.)
+    out_path = Path(args.output) if args.output else Path("audio_ltx.wav")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Minimal video resolution (128x128) — overridden by --ratio/--quality or -W/-H
+    ratio = getattr(args, "ratio", None)
+    quality = getattr(args, "quality", None)
+    if ratio and quality:
+        width, height = _resolve_video_dims(ratio, quality)
+    elif hasattr(args, "width") and args.width and args.width != 768:
+        width = args.width
+        height = getattr(args, "height", 128) or 128
+    else:
+        width, height = 192, 192
+
+    # Duration from --seconds (default 5s)
+    seconds = getattr(args, "seconds", 5) or 5
+    fps = 24
+    raw_frames = int(seconds * fps)
+    num_frames = ((raw_frames // 8) * 8) + 1
+
+    # Build worker command — reuse video pipeline
+    model = getattr(args, "model", None) or "distilled"
+    import tempfile
+    tmp_video = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+    tmp_video.close()
+
+    cmd = [
+        str(CONDA_BIN), "run", "--no-capture-output", "-n", LTX2_ENV,
+        "python", str(LTX2_WORKER),
+        "--model", model,
+        "--prompt", prompt,
+        "-o", tmp_video.name,
+        "-W", str(width),
+        "-H", str(height),
+        "--frame-rate", str(fps),
+        "--num-frames", str(num_frames),
+    ]
+
+    seed = getattr(args, "seed", None)
+    if seed is not None:
+        cmd.extend(["--seed", str(seed)])
+
+    # Image conditioning (scene reference)
+    image_first = getattr(args, "image_first", None)
+    if image_first:
+        if not Path(image_first).exists():
+            _emit(f"ERROR: Image not found: {image_first}", "error")
+            sys.exit(1)
+        cmd.extend(["--image-first", image_first])
+
+    if getattr(args, "enhance_prompt", False):
+        cmd.append("--enhance-prompt")
+
+    _emit(f"Generating audio via LTX-2.3 ({model}, {seconds}s, {width}x{height}) …", "stage")
+
+    result = run_worker(cmd, on_event=_event_handler)
+    finish_progress()
+    if result.returncode != 0:
+        _emit("ERROR: Audio generation failed.", "error")
+        try:
+            os.unlink(tmp_video.name)
+        except OSError:
+            pass
+        sys.exit(1)
+
+    # Extract audio from temp video → target format
+    _emit("Extracting audio …", "stage")
+    extract = subprocess.run(
+        ["ffmpeg", "-y", "-i", tmp_video.name, "-vn", "-map", "a", str(out_path)],
+        capture_output=True, text=True,
+    )
+    try:
+        os.unlink(tmp_video.name)
+    except OSError:
+        pass
+
+    if extract.returncode != 0:
+        _emit(f"ERROR: ffmpeg audio extraction failed:\n{extract.stderr[-500:]}", "error")
+        sys.exit(1)
+
+    print(json.dumps([str(out_path)]))
+
+
 def cmd_audio(args):
     """Audio processing — dispatch by engine."""
     engine = args.engine
@@ -2353,6 +2468,8 @@ def cmd_audio(args):
         _audio_sfx(args)
     elif engine == "voice-removal":
         _audio_voice_removal(args)
+    elif engine == "ltx2.3":
+        _audio_ltx2(args)
     else:
         _emit(f"ERROR: Unknown audio engine: {engine}", "error")
         sys.exit(1)
@@ -2987,6 +3104,14 @@ SEGMENT_WORKER_DIR = SCRIPT_DIR / "worker" / "segment"
 SEGMENT_WORKER = SEGMENT_WORKER_DIR / "generate.py"
 SEGMENT_ENV = "segment"
 
+
+# ── Video generation (LTX-2.3) ───────────────────────────────────────────────
+
+LTX2_WORKER_DIR = SCRIPT_DIR / "worker" / "ltx2"
+LTX2_WORKER = LTX2_WORKER_DIR / "generate.py"
+LTX2_ENV = "ltx2"
+
+
 # Valid controlnet modes and their behavior
 _CONTROLNET_PIXEL_ALIGNED = {"depth", "normalmap", "lineart", "sketch"}
 _CONTROLNET_REFERENCE = {"pose"}
@@ -3444,6 +3569,9 @@ def cmd_image(args):
     if cn_mode and cn_path:
         cmd.extend(["--controlnet-image", cn_path, "--controlnet-mode", cn_mode])
 
+    if getattr(args, "no_rescale", False):
+        cmd.append("--no-rescale")
+
     _emit(f"Generating image (flux.2/{model_key}) …", "stage")
 
     result = run_worker(cmd, on_event=_event_handler)
@@ -3455,6 +3583,231 @@ def cmd_image(args):
     if result.stdout.strip():
         print(result.stdout.strip())
 
+
+
+# ── Video: dimension lookup ──────────────────────────────────────────────────
+
+_VIDEO_ALIGN = 64  # Both dimensions must be multiples of this
+
+_VIDEO_RATIOS = {
+    "16:9": (16, 9), "9:16": (9, 16),
+    "21:9": (21, 9), "9:21": (9, 21),
+    "3:2": (3, 2), "2:3": (2, 3),
+    "4:3": (4, 3), "3:4": (3, 4),
+    "4:5": (4, 5), "5:4": (5, 4),
+    "1:1": (1, 1), "1:2": (1, 2), "2:1": (2, 1),
+}
+
+_VIDEO_QUALITY = {
+    "240p": 448, "360p": 576, "480p": 640, "720p": 1280,
+    "1080p": 1920, "1440p": 2560, "2160p": 3840, "4k": 4096,
+}
+
+
+def _resolve_video_dims(ratio_str: str, quality_str: str) -> tuple[int, int]:
+    """Resolve --ratio + --quality to (width, height), both multiples of 64."""
+    if ratio_str not in _VIDEO_RATIOS:
+        _emit(f"ERROR: Unknown ratio '{ratio_str}'. "
+              f"Available: {', '.join(_VIDEO_RATIOS)}", "error")
+        sys.exit(1)
+    if quality_str not in _VIDEO_QUALITY:
+        _emit(f"ERROR: Unknown quality '{quality_str}'. "
+              f"Available: {', '.join(_VIDEO_QUALITY)}", "error")
+        sys.exit(1)
+    rw, rh = _VIDEO_RATIOS[ratio_str]
+    ratio = rw / rh
+    max_dim = _VIDEO_QUALITY[quality_str]
+    # Find largest (w, h) where both are multiples of ALIGN, max(w,h) <= max_dim
+    best = None
+    for w in range(_VIDEO_ALIGN, max_dim + 1, _VIDEO_ALIGN):
+        h_raw = w / ratio
+        h = round(h_raw / _VIDEO_ALIGN) * _VIDEO_ALIGN
+        if h < _VIDEO_ALIGN or h > max_dim:
+            continue
+        deviation = abs(w / h - ratio) / ratio
+        if deviation < 0.05:
+            best = (w, h)
+    if best is None:
+        _emit(f"ERROR: No valid dimensions for {ratio_str} at {quality_str}", "error")
+        sys.exit(1)
+    return best
+
+
+# ── Video generation ──────────────────────────────────────────────────────────
+
+def cmd_video(args):
+    """Generate video with LTX-2.3."""
+    engine = getattr(args, "engine", "ltx2.3")
+
+    if engine != "ltx2.3":
+        _emit(f"ERROR: Unknown video engine '{engine}'", "error")
+        sys.exit(1)
+
+    if not LTX2_WORKER.exists():
+        _emit("ERROR: worker/ltx2/generate.py not found", "error")
+        _emit("  Run: bash worker/ltx2/install.sh", "error")
+        sys.exit(1)
+
+    prompt = getattr(args, "prompt", None)
+    if not prompt:
+        _emit("ERROR: --prompt required for video generation", "error")
+        sys.exit(1)
+
+    # Resolve dimensions: --ratio + --quality override -W/-H
+    ratio = getattr(args, "ratio", None)
+    quality = getattr(args, "quality", None)
+    if ratio and quality:
+        width, height = _resolve_video_dims(ratio, quality)
+    elif ratio or quality:
+        _emit("ERROR: --ratio and --quality must be used together", "error")
+        sys.exit(1)
+    else:
+        width = getattr(args, "width", 768)
+        height = getattr(args, "height", 512)
+
+    # Output path
+    out_path = Path(args.output) if args.output else Path("video.mp4")
+    if out_path.is_dir() or str(out_path).endswith("/"):
+        out_path = out_path / f"video_{int(time.time())}.mp4"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Override num_frames from audio length if --audio is set
+    audio_path = getattr(args, "audio", None)
+    num_frames = getattr(args, "num_frames", 121)
+    if audio_path and num_frames == 121:
+        import subprocess as _sp, json as _json
+        _probe = _sp.run(
+            ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams", audio_path],
+            capture_output=True, text=True,
+        )
+        for _s in _json.loads(_probe.stdout).get("streams", []):
+            if _s.get("codec_type") == "audio":
+                _dur = float(_s["duration"])
+                _fps = getattr(args, "frame_rate", 24)
+                _raw = int(_dur * _fps)
+                num_frames = ((_raw // 8) * 8) + 1
+                break
+
+    # Build command
+    model = getattr(args, "model", None) or "distilled"
+    engine = getattr(args, "engine", "ltx2.3")
+
+    cmd = [
+            str(CONDA_BIN), "run", "--no-capture-output", "-n", LTX2_ENV,
+            "python", str(LTX2_WORKER),
+            "--model", model,
+            "--prompt", prompt,
+            "-o", str(out_path),
+            "-W", str(width),
+            "-H", str(height),
+            "--frame-rate", str(getattr(args, "frame_rate", 24)),
+        ]
+
+    cmd.extend(["--num-frames", str(num_frames)])
+
+    seed = getattr(args, "seed", None)
+    if seed is not None:
+        cmd.extend(["--seed", str(seed)])
+
+    steps = getattr(args, "steps", None)
+    if steps is not None:
+        cmd.extend(["--steps", str(steps)])
+
+    cfg_scale = getattr(args, "cfg_scale", None)
+    if cfg_scale is not None:
+        cmd.extend(["--cfg-scale", str(cfg_scale)])
+
+    negative_prompt = getattr(args, "negative_prompt", None)
+    if negative_prompt is not None:
+        cmd.extend(["--negative-prompt", negative_prompt])
+
+    # Image conditioning: flexible --image PATH FRAME_IDX STRENGTH
+    images = getattr(args, "images", None)
+    if images:
+        for img_args in images:
+            path, frame_idx, strength = img_args
+            if not Path(path).exists():
+                _emit(f"ERROR: Image not found: {path}", "error")
+                sys.exit(1)
+            cmd.extend(["--image", path, frame_idx, strength])
+
+    # Convenience shortcuts
+    image_first = getattr(args, "image_first", None)
+    if image_first:
+        if not Path(image_first).exists():
+            _emit(f"ERROR: Image not found: {image_first}", "error")
+            sys.exit(1)
+        cmd.extend(["--image-first", image_first])
+
+    image_mid = getattr(args, "image_mid", None)
+    if image_mid:
+        if not Path(image_mid).exists():
+            _emit(f"ERROR: Image not found: {image_mid}", "error")
+            sys.exit(1)
+        cmd.extend(["--image-mid", image_mid])
+
+    image_last = getattr(args, "image_last", None)
+    if image_last:
+        if not Path(image_last).exists():
+            _emit(f"ERROR: Image not found: {image_last}", "error")
+            sys.exit(1)
+        cmd.extend(["--image-last", image_last])
+
+    # LoRA
+    loras = getattr(args, "lora", None)
+    if loras:
+        for lora_args in loras:
+            lora_path = lora_args[0]
+            if not Path(lora_path).exists():
+                _emit(f"ERROR: LoRA not found: {lora_path}", "error")
+                sys.exit(1)
+            cmd.extend(["--lora"] + lora_args)
+
+    # Audio input (A2V pipeline)
+    audio = getattr(args, "audio", None)
+    if audio:
+        if not Path(audio).exists():
+            _emit(f"ERROR: Audio file not found: {audio}", "error")
+            sys.exit(1)
+        cmd.extend(["--audio", audio])
+
+    if getattr(args, "enhance_prompt", False):
+        cmd.append("--enhance-prompt")
+
+
+    # Extend / Retake modes
+    extend = getattr(args, "extend", None)
+    retake = getattr(args, "retake", None)
+    if extend:
+        video_file, seconds = extend
+        if not Path(video_file).exists():
+            _emit(f"ERROR: Video not found: {video_file}", "error")
+            sys.exit(1)
+        cmd.extend(["--extend", video_file, seconds])
+        ref_seconds = getattr(args, "ref_seconds", 2.0)
+        cmd.extend(["--ref-seconds", str(ref_seconds)])
+    if retake:
+        video_file, start, end = retake
+        if not Path(video_file).exists():
+            _emit(f"ERROR: Video not found: {video_file}", "error")
+            sys.exit(1)
+        cmd.extend(["--retake", video_file, start, end])
+
+    if extend:
+        _emit(f"Extending video by {extend[1]}s (ltx2.3/{model}) …", "stage")
+    elif retake:
+        _emit(f"Retaking {retake[1]}s–{retake[2]}s (ltx2.3/{model}) …", "stage")
+    else:
+        _emit(f"Generating video (ltx2.3/{model}) …", "stage")
+
+    result = run_worker(cmd, on_event=_event_handler)
+    finish_progress()
+    if result.returncode != 0:
+        _emit("ERROR: Video generation failed.", "error")
+        sys.exit(1)
+
+    if result.stdout.strip():
+        print(result.stdout.strip())
 
 
 # ── Stub handler for future mediums ──────────────────────────────────────────
@@ -3532,7 +3885,7 @@ def build_parser():
     p_audio = sub.add_parser("audio",
                              help="Audio processing and generation")
     p_audio.add_argument("engine",
-                         choices=["enhance", "demucs", "ace-step", "heartmula", "diarize", "sfx", "voice-removal"],
+                         choices=["enhance", "demucs", "ace-step", "heartmula", "diarize", "sfx", "voice-removal", "ltx2.3"],
                          help="Audio engine")
     p_audio.add_argument("input", nargs="*", help="Input audio file(s)")
     p_audio.add_argument("--model", default=None,
@@ -3711,10 +4064,67 @@ def build_parser():
                           help="[sd1.5] LoRA: name:intensity (e.g. add_detail:1.2). Repeatable.")
     p_image.add_argument("--no-lora", action="store_true", dest="no_lora",
                           help="[sd1.5] Disable default LoRA")
+    p_image.add_argument("--no-rescale", action="store_true", dest="no_rescale",
+                          help="[flux.2] Pass reference images in original resolution (skip Pan & Scan)")
     p_image.set_defaults(func=cmd_image)
 
+    # ── video ──────────────────────────────────────────────────────────────
+    p_video = sub.add_parser("video", help="Video generation")
+    p_video.add_argument("engine", nargs="?", default="ltx2.3",
+                          choices=["ltx2.3"],
+                          help="Video engine (default: ltx2.3)")
+    p_video.add_argument("--model", "-m", default=None,
+                          help="Model variant: distilled (default), dev")
+    p_video.add_argument("--prompt", "-p", default=None, help="Text prompt")
+    p_video.add_argument("-o", "--output", default=None, help="Output file path")
+    p_video.add_argument("--seed", type=int, default=None, help="Random seed")
+    p_video.add_argument("--steps", type=int, default=None, help="Inference steps")
+    p_video.add_argument("--cfg-scale", type=float, default=None, dest="cfg_scale",
+                          help="Video CFG guidance scale")
+    p_video.add_argument("-W", "--width", type=int, default=768,
+                          help="Video width (default: 768)")
+    p_video.add_argument("-H", "--height", type=int, default=512,
+                          help="Video height (default: 512)")
+    p_video.add_argument("--ratio", default=None,
+                          choices=list(_VIDEO_RATIOS),
+                          help="Aspect ratio (e.g. 16:9, 1:1). Requires --quality")
+    p_video.add_argument("--quality", default=None,
+                          choices=list(_VIDEO_QUALITY),
+                          help="Quality tier (e.g. 480p, 720p). Requires --ratio")
+    p_video.add_argument("--num-frames", type=int, default=121, dest="num_frames",
+                          help="Frames, must be 8k+1 (default: 121 = ~5s at 24fps)")
+    p_video.add_argument("--frame-rate", type=int, default=24, dest="frame_rate",
+                          help="FPS (default: 24)")
+    p_video.add_argument("--negative-prompt", default=None, dest="negative_prompt",
+                          help="Negative prompt")
+    p_video.add_argument("--image", dest="images", action="append", nargs=3,
+                          metavar=("PATH", "FRAME_IDX", "STRENGTH"),
+                          help="Image conditioning: PATH FRAME_IDX STRENGTH (repeatable)")
+    p_video.add_argument("--image-first", dest="image_first", default=None,
+                          help="Conditioning image for first frame (strength 1.0)")
+    p_video.add_argument("--image-mid", dest="image_mid", default=None,
+                          help="Conditioning image for middle frame (strength 1.0)")
+    p_video.add_argument("--image-last", dest="image_last", default=None,
+                          help="Conditioning image for last frame (strength 1.0)")
+    p_video.add_argument("--lora", action="append", nargs="+",
+                          metavar=("PATH", "STRENGTH"),
+                          help="LoRA: PATH [STRENGTH] (repeatable)")
+    p_video.add_argument("--audio", default=None,
+                          help="Audio file for audio-to-video generation")
+    p_video.add_argument("--enhance-prompt", action="store_true", dest="enhance_prompt",
+                          help="Auto-enhance prompt via Gemma")
+    p_video.add_argument("--extend", nargs=2, metavar=("VIDEO", "SECONDS"),
+                          help="Extend an existing video by N seconds")
+    p_video.add_argument("--retake", nargs=3, metavar=("VIDEO", "START", "END"),
+                          help="Retake a time region (start/end in seconds)")
+    p_video.add_argument("--ref-seconds", type=float, default=2.0, dest="ref_seconds",
+                          help="Context seconds from source for extend (default: 2)")
+    p_video.add_argument("--fp16", action="store_true",
+                          help="[MLX] Use FP16 precision (~50%% less memory)")
+    p_video.set_defaults(func=cmd_video)
+
     # ── Stubs for future mediums ──────────────────────────────────────────
-    for stub_name in ["video", "translation", "comparison"]:
+    for stub_name in ["translation", "comparison"]:
         p_stub = sub.add_parser(stub_name, help=f"{stub_name.title()} (coming soon)")
         p_stub.set_defaults(func=_stub_medium, medium=stub_name)
 

@@ -51,6 +51,7 @@ generate.py <medium> <engine> [--model <variant>] [input] [options]
 | `audio` | `heartmula` | AI music generation (alt engine) |
 | `audio` | `sfx` | Sound effects generation (EzAudio) |
 | `audio` | `voice-removal` | Remove vocals (demucs → remix) |
+| `audio` | `ltx2.3` | Audio generation via LTX-2.3 video engine (virtual) |
 | `audio` | `diarize` | Speaker diarization |
 | `text` | `whisper` | Audio transcription |
 | `text` | `heartmula-transcribe` | Lyrics extraction |
@@ -70,8 +71,9 @@ generate.py <medium> <engine> [--model <variant>] [input] [options]
 | `image` | `sketch` | Sketch/edge extraction via HED |
 | `image` | `upscale` | Image upscaling via Real-ESRGAN |
 | `image` | `segment` | Background removal / object segmentation |
+| `video` | `ltx2.3` | Video generation (LTX-2.3, 22B, T2V/I2V/A2V/Extend/Retake, PyTorch MPS) |
 
-Future mediums (stubs): `video`, `translation`, `comparison`
+Future mediums (stubs): `translation`, `comparison`
 
 **Planned:** `video-vision` — video input for Ollama vision models (blocked by upstream Ollama bug)
 
@@ -508,6 +510,89 @@ python generate.py audio sfx --text "waves crashing on a rocky shore" --seed 42 
 
 ---
 
+### Video Generation (`video ltx2.3`)
+
+Generate video using LTX-2.3 (Lightricks, 22B). Runs locally on Apple Silicon via PyTorch MPS.
+
+```bash
+# Text-to-video (distilled model, default, 8 steps, fast)
+python generate.py video ltx2.3 -p "a cat running through a meadow" --ratio 16:9 --quality 480p -o cat.mp4
+
+# Dev model (30+3 steps, two-stage, higher quality)
+python generate.py video ltx2.3 --model dev -p "a cat running through a meadow" --ratio 16:9 --quality 480p -o cat.mp4
+
+# Image-to-video (first frame conditioning)
+python generate.py video ltx2.3 -p "animate this scene" --image-first start.jpg -o anim.mp4
+
+# First + last frame (interpolation)
+python generate.py video ltx2.3 -p "transition between scenes" --image-first a.jpg --image-last b.jpg -o interp.mp4
+
+# Flexible keyframe conditioning (any frame, any strength)
+python generate.py video ltx2.3 -p "..." --image photo.jpg 30 0.8 -o keyframe.mp4
+
+# Custom dimensions and duration
+python generate.py video ltx2.3 -p "a sunset" -W 768 -H 512 --num-frames 121 --frame-rate 24 -o sunset.mp4
+
+# Audio-to-video
+python generate.py video ltx2.3 -p "..." --audio music.wav -o music_video.mp4
+
+# Video-only output (no audio)
+python generate.py video ltx2.3 -p "a sunset" -o sunset.mp4v
+
+# Audio-only output
+python generate.py video ltx2.3 -p "ocean waves" -o waves.mp4a
+
+# Split output (video + audio as separate files)
+python generate.py video ltx2.3 -p "a sunset" -o sunset
+# → sunset.mp4v + sunset.mp4a
+```
+
+| Parameter | Short | Default | Description |
+|-----------|-------|---------|-------------|
+| `--model` | `-m` | `distilled` | Model: `distilled` (8 steps), `dev` (40 steps) |
+| `--prompt` | `-p` | required | Text prompt |
+| `--output` | `-o` | `video.mp4` | Output path (.mp4, .mp4v, .mp4a, or no ext for split) |
+| `--seed` | | random | Random seed |
+| `--steps` | | model default | Inference steps |
+| `--cfg-scale` | | model default | CFG guidance scale |
+| `--ratio` | | | Aspect ratio (16:9, 9:16, 21:9, 4:3, 1:1, etc.) |
+| `--quality` | | | Quality tier (240p, 360p, 480p, 720p, 1080p, etc.) |
+| `--width` | `-W` | 768 | Video width (override, must be multiple of 64) |
+| `--height` | `-H` | 512 | Video height (override, must be multiple of 64) |
+| `--num-frames` | | 121 | Frame count (must be 8k+1, auto from audio) |
+| `--frame-rate` | | 24 | FPS |
+| `--image` | | | `PATH FRAME_IDX STRENGTH` (repeatable) |
+| `--image-first` | | | First frame image (strength 1.0) |
+| `--image-mid` | | | Middle frame image (strength 1.0) |
+| `--image-last` | | | Last frame image (strength 1.0) |
+| `--audio` | | | Audio file for A2V pipeline |
+| `--lora` | | | LoRA: `PATH [STRENGTH]` (repeatable) |
+| `--negative-prompt` | | | Negative prompt |
+| `--enhance-prompt` | | | Auto-enhance prompt via Gemma |
+| `--extend` | | | `VIDEO SECONDS` — extend video by N seconds |
+| `--retake` | | | `VIDEO START END` — retake a time region (seconds) |
+| `--ref-seconds` | | 2.0 | Context seconds from source for extend |
+| `--no-rescale` | | | Keep reference images in original resolution |
+
+#### Extend & Retake
+
+Extend appends new content, retake replaces a time region. Both use the full original video as context.
+
+```bash
+# Extend a video by 5 seconds
+python generate.py video ltx2.3 --model dev -p "The man says: hello" --extend video.mp4 5 --ratio 16:9 --quality 240p -o extended.mp4
+
+# Retake a passage (replace 3.5s–5.0s with new content)
+python generate.py video ltx2.3 --model dev -p "Full scene description with changed dialog" --retake video.mp4 3.5 5.0 --ratio 16:9 --quality 240p -o retake.mp4
+
+# Extend with more context (default: 2s)
+python generate.py video ltx2.3 --model dev -p "..." --extend video.mp4 5 --ref-seconds 4 -o extended.mp4
+```
+
+**Extend** trims the source to the last `--ref-seconds` as context, generates context + new frames, then concatenates the original (minus context) with the full pipeline output. This keeps VRAM usage constant regardless of source video length.
+
+**Retake** loads the entire source video, applies a temporal mask to the specified time region, and regenerates only that region. The prompt should describe the **entire scene** with the change embedded — not just the changed part.
+
 ### Image Generation & Editing (`image flux.2`)
 
 Generate and edit images using FLUX.2 Klein (Black Forest Labs). Runs locally on Apple Silicon via PyTorch MPS.
@@ -569,8 +654,9 @@ python generate.py image flux.2 --images step1.png -p "add a bookshelf where the
 - `--cfg-scale` — Guidance scale
 - `-W, --width` — Image width (default: 1360)
 - `-H, --height` — Image height (default: 768)
-- `--images` — Reference image path(s) for editing (up to 10)
-- `--controlnet` — Conditioning: `mode:filepath` (e.g. `depth:depth.png`, `pose:pose.png`, `lineart:lines.png`, `normalmap:normals.png`, `sketch:sketch.png`)
+- `--images` — Reference image path(s) for editing (up to 10). Auto-rescaled to target dimensions via Pan & Scan.
+- `--no-rescale` — Pass reference images in original resolution (skip Pan & Scan)
+- `--controlnet` — Conditioning: `mode:filepath` (e.g. `depth:depth.png`, `pose:pose.png`, `lineart:lines.png`, `normalmap:normals.png`, `sketch:sketch.png`). Always rescaled.
 
 </details>
 

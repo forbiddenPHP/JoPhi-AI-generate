@@ -152,6 +152,8 @@ def main():
     parser.add_argument("--controlnet-mode", default=None, dest="controlnet_mode",
                         choices=["depth", "normalmap", "lineart", "sketch", "pose"],
                         help="ControlNet mode (determines preprocessing)")
+    parser.add_argument("--no-rescale", action="store_true", dest="no_rescale",
+                        help="Pass reference images in original resolution (skip Pan & Scan)")
     args = parser.parse_args()
 
     model_name = args.model.lower()
@@ -206,9 +208,14 @@ def main():
             all_images.append(args.controlnet_image)
     if all_images:
         img_ctx = [Image.open(p) for p in all_images]
-        # Pan & Scan pixel-aligned controlnet image to target aspect ratio + dimensions
+        # ControlNet pixel-aligned images: ALWAYS Pan & Scan (must match output dims)
         if cn_pixel_aligned:
             img_ctx[0] = _pan_and_scan(img_ctx[0], width, height)
+        # Reference images (--images): Pan & Scan unless --no-rescale
+        if not args.no_rescale:
+            start = 1 if cn_pixel_aligned else 0
+            for i in range(start, len(img_ctx)):
+                img_ctx[i] = _pan_and_scan(img_ctx[i], width, height)
         print(f"Encoding {len(img_ctx)} reference image(s) …", file=sys.stderr)
         with torch.no_grad():
             ref_tokens, ref_ids = encode_image_refs(ae, img_ctx)

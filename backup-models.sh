@@ -235,6 +235,22 @@ else
     echo "  ── Segment models: not found, skipping"
 fi
 
+# ── LTX-2.3 models (worker/ltx2/models/) ─────────────────────────────────────
+
+LTX2_MODELS="$SCRIPT_DIR/worker/ltx2/models"
+if [ -d "$LTX2_MODELS" ] && [ "$(find "$LTX2_MODELS" -maxdepth 1 -name '*.safetensors' 2>/dev/null | head -1)" ]; then
+    echo "  Backing up LTX-2.3 models …"
+    mkdir -p "$MODELS_DIR/ltx2_models"
+    # Only safetensors (flat) + gemma text encoder — skip .cache/ and hub/
+    find "$LTX2_MODELS" -maxdepth 1 -name '*.safetensors' -exec cp {} "$MODELS_DIR/ltx2_models/" \;
+    if [ -d "$LTX2_MODELS/gemma-3-12b-it" ]; then
+        cp -rL "$LTX2_MODELS/gemma-3-12b-it" "$MODELS_DIR/ltx2_models/gemma-3-12b-it"
+    fi
+    echo -e "  ${GREEN}✓${NC} LTX-2.3 models ($(du -sh "$MODELS_DIR/ltx2_models" | cut -f1))"
+else
+    echo "  ── LTX-2.3 models: not found, skipping"
+fi
+
 # ── Text worker configs (LLM default overrides) ─────────────────────────────
 
 TEXT_CONFIGS="$SCRIPT_DIR/worker/text/models"

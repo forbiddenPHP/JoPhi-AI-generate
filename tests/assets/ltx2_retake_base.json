@@ -1,0 +1,81 @@
+{
+  "file": "/Users/jophi/tts-mist/tests/assets/ltx2_retake_base.mp4",
+  "text": " Thank you, others. What do you say or ask inside of the...",
+  "language": "en",
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 0.86,
+      "text": " Thank you, others.",
+      "words": [
+        {
+          "word": " Thank",
+          "start": 0.0,
+          "end": 0.42
+        },
+        {
+          "word": " you,",
+          "start": 0.42,
+          "end": 0.58
+        },
+        {
+          "word": " others.",
+          "start": 0.68,
+          "end": 0.86
+        }
+      ]
+    },
+    {
+      "start": 3.48,
+      "end": 4.98,
+      "text": " What do you say or ask inside of the...",
+      "words": [
+        {
+          "word": " What",
+          "start": 3.48,
+          "end": 3.78
+        },
+        {
+          "word": " do",
+          "start": 3.78,
+          "end": 4.0
+        },
+        {
+          "word": " you",
+          "start": 4.0,
+          "end": 4.1
+        },
+        {
+          "word": " say",
+          "start": 4.1,
+          "end": 4.24
+        },
+        {
+          "word": " or",
+          "start": 4.24,
+          "end": 4.38
+        },
+        {
+          "word": " ask",
+          "start": 4.38,
+          "end": 4.52
+        },
+        {
+          "word": " inside",
+          "start": 4.52,
+          "end": 4.76
+        },
+        {
+          "word": " of",
+          "start": 4.76,
+          "end": 4.9
+        },
+        {
+          "word": " the...",
+          "start": 4.9,
+          "end": 4.98
+        }
+      ]
+    }
+  ]
+}

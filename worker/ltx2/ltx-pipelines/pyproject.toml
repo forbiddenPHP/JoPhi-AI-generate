@@ -1,0 +1,14 @@
+[project]
+name = "ltx-pipelines"
+version = "1.0.0"
+description = "Pipelines implementation for Lightricks' LTX-2 model"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["ltx-core", "av==17.0.0", "tqdm==4.67.3", "pillow==12.1.1"]
+
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

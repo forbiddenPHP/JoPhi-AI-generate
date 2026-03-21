@@ -7,6 +7,7 @@ worker/pose/models/
 worker/sd15/models/
 worker/sd15/loras/
 worker/depth/models/
+worker/ltx2/models/
 rvc_models/
 worker/enhance/resemble-enhance/
 
