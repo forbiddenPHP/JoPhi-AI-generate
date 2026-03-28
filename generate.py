@@ -62,6 +62,7 @@ Usage:
   python generate.py video ltx2.3 -p "He smiles" --image-first photo.png --ratio 1:1 --quality 480p -o anim.mp4  Image-to-video
   python generate.py video ltx2.3 -p "Two people talking" --audio dialog.wav --ratio 16:9 --quality 240p -o a2v.mp4  Audio-to-video
   python generate.py video ltx2.3 --model dev -p "He says: hello" --extend video.mp4 5 --ratio 16:9 --quality 240p -o ext.mp4  Extend video (+5s)
+  python generate.py video ltx2.3 --model dev -p "She says: hi" --clone ref.mp4 --ratio 16:9 --quality 720p -o clone.mp4  Clone (new video from reference)
   python generate.py video ltx2.3 --model dev -p "Full scene with change" --retake video.mp4 3.5 5.0 --ratio 16:9 --quality 240p -o ret.mp4  Retake passage
   python generate.py audio ltx2.3 -p "Oktoberfest crowd cheering" --ratio 1:1 --quality 240p -o crowd.wav  Audio-only (virtual)
   python generate.py models list                                         List all models
@@ -3587,50 +3588,131 @@ def cmd_image(args):
 
 # ── Video: dimension lookup ──────────────────────────────────────────────────
 
-_VIDEO_ALIGN = 64  # Both dimensions must be multiples of this
-
-_VIDEO_RATIOS = {
-    "16:9": (16, 9), "9:16": (9, 16),
-    "21:9": (21, 9), "9:21": (9, 21),
-    "3:2": (3, 2), "2:3": (2, 3),
-    "4:3": (4, 3), "3:4": (3, 4),
-    "4:5": (4, 5), "5:4": (5, 4),
-    "1:1": (1, 1), "1:2": (1, 2), "2:1": (2, 1),
+# Vorberechnete Dimensionen für alle ratio+quality Kombinationen.
+# Alle Werte sind /128-kompatibel (width//2 und height//2 jeweils /32 und gerade).
+# Gilt für alle Worker die --ratio/--quality akzeptieren.
+# Generiert von tests/values.py.
+# (width//2 und height//2 sind jeweils /32 teilbar und gerade — VAE-Anforderung)
+_VIDEO_DIMS: dict[tuple[str, str], tuple[int, int]] = {
+    ("16:9", "240p"): (256, 128),
+    ("9:16", "240p"): (128, 256),
+    ("21:9", "240p"): (256, 128),
+    ("9:21", "240p"): (128, 256),
+    ("3:2",  "240p"): (384, 256),
+    ("2:3",  "240p"): (256, 384),
+    ("4:3",  "240p"): (384, 256),
+    ("3:4",  "240p"): (256, 384),
+    ("4:5",  "240p"): (256, 384),
+    ("5:4",  "240p"): (384, 384),
+    ("1:1",  "240p"): (384, 384),
+    ("1:2",  "240p"): (128, 256),
+    ("2:1",  "240p"): (256, 128),
+    ("16:9", "360p"): (512, 256),
+    ("9:16", "360p"): (256, 512),
+    ("21:9", "360p"): (512, 256),
+    ("9:21", "360p"): (256, 512),
+    ("3:2",  "360p"): (384, 256),
+    ("2:3",  "360p"): (256, 384),
+    ("4:3",  "360p"): (512, 384),
+    ("3:4",  "360p"): (384, 512),
+    ("4:5",  "360p"): (384, 512),
+    ("5:4",  "360p"): (512, 384),
+    ("1:1",  "360p"): (512, 512),
+    ("1:2",  "360p"): (256, 512),
+    ("2:1",  "360p"): (512, 256),
+    ("16:9", "480p"): (640, 384),
+    ("9:16", "480p"): (384, 640),
+    ("21:9", "480p"): (640, 256),
+    ("9:21", "480p"): (256, 640),
+    ("3:2",  "480p"): (384, 256),
+    ("2:3",  "480p"): (256, 384),
+    ("4:3",  "480p"): (512, 384),
+    ("3:4",  "480p"): (384, 512),
+    ("4:5",  "480p"): (512, 640),
+    ("5:4",  "480p"): (640, 512),
+    ("1:1",  "480p"): (640, 640),
+    ("1:2",  "480p"): (256, 512),
+    ("2:1",  "480p"): (512, 256),
+    ("16:9", "720p"):  (1152, 640),
+    ("9:16", "720p"):  (640, 1152),
+    ("21:9", "720p"):  (896, 384),
+    ("9:21", "720p"):  (384, 896),
+    ("3:2",  "720p"):  (1152, 768),
+    ("2:3",  "720p"):  (768, 1152),
+    ("4:3",  "720p"):  (1024, 768),
+    ("3:4",  "720p"):  (768, 1024),
+    ("4:5",  "720p"):  (1024, 1280),
+    ("5:4",  "720p"):  (1280, 1024),
+    ("1:1",  "720p"):  (1280, 1280),
+    ("1:2",  "720p"):  (640, 1280),
+    ("2:1",  "720p"):  (1280, 640),
+    ("16:9", "1080p"): (1152, 640),
+    ("9:16", "1080p"): (640, 1152),
+    ("21:9", "1080p"): (1792, 768),
+    ("9:21", "1080p"): (768, 1792),
+    ("3:2",  "1080p"): (1920, 1280),
+    ("2:3",  "1080p"): (1280, 1920),
+    ("4:3",  "1080p"): (1536, 1152),
+    ("3:4",  "1080p"): (1152, 1536),
+    ("4:5",  "1080p"): (1536, 1920),
+    ("5:4",  "1080p"): (1920, 1536),
+    ("1:1",  "1080p"): (1920, 1920),
+    ("1:2",  "1080p"): (896, 1792),
+    ("2:1",  "1080p"): (1792, 896),
+    ("16:9", "1440p"): (2048, 1152),
+    ("9:16", "1440p"): (1152, 2048),
+    ("21:9", "1440p"): (1792, 768),
+    ("9:21", "1440p"): (768, 1792),
+    ("3:2",  "1440p"): (2304, 1536),
+    ("2:3",  "1440p"): (1536, 2304),
+    ("4:3",  "1440p"): (2560, 1920),
+    ("3:4",  "1440p"): (1920, 2560),
+    ("4:5",  "1440p"): (2048, 2560),
+    ("5:4",  "1440p"): (2560, 2048),
+    ("1:1",  "1440p"): (2560, 2560),
+    ("1:2",  "1440p"): (1280, 2560),
+    ("2:1",  "1440p"): (2560, 1280),
+    ("16:9", "2160p"): (2048, 1152),
+    ("9:16", "2160p"): (1152, 2048),
+    ("21:9", "2160p"): (3584, 1536),
+    ("9:21", "2160p"): (1536, 3584),
+    ("3:2",  "2160p"): (3840, 2560),
+    ("2:3",  "2160p"): (2560, 3840),
+    ("4:3",  "2160p"): (3584, 2688),
+    ("3:4",  "2160p"): (2688, 3584),
+    ("4:5",  "2160p"): (3072, 3840),
+    ("5:4",  "2160p"): (3840, 3072),
+    ("1:1",  "2160p"): (3840, 3840),
+    ("1:2",  "2160p"): (1920, 3840),
+    ("2:1",  "2160p"): (3840, 1920),
+    ("16:9", "4k"):    (4096, 2304),
+    ("9:16", "4k"):    (2304, 4096),
+    ("21:9", "4k"):    (3584, 1536),
+    ("9:21", "4k"):    (1536, 3584),
+    ("3:2",  "4k"):    (3840, 2560),
+    ("2:3",  "4k"):    (2560, 3840),
+    ("4:3",  "4k"):    (4096, 3072),
+    ("3:4",  "4k"):    (3072, 4096),
+    ("4:5",  "4k"):    (3072, 3840),
+    ("5:4",  "4k"):    (3840, 3072),
+    ("1:1",  "4k"):    (4096, 4096),
+    ("1:2",  "4k"):    (2048, 4096),
+    ("2:1",  "4k"):    (4096, 2048),
 }
 
-_VIDEO_QUALITY = {
-    "240p": 448, "360p": 576, "480p": 640, "720p": 1280,
-    "1080p": 1920, "1440p": 2560, "2160p": 3840, "4k": 4096,
-}
+
+_VIDEO_RATIOS = list(dict.fromkeys(r for r, _ in _VIDEO_DIMS))
+_VIDEO_QUALITIES = list(dict.fromkeys(q for _, q in _VIDEO_DIMS))
 
 
 def _resolve_video_dims(ratio_str: str, quality_str: str) -> tuple[int, int]:
-    """Resolve --ratio + --quality to (width, height), both multiples of 64."""
-    if ratio_str not in _VIDEO_RATIOS:
-        _emit(f"ERROR: Unknown ratio '{ratio_str}'. "
-              f"Available: {', '.join(_VIDEO_RATIOS)}", "error")
+    """Resolve --ratio + --quality to (width, height) via _VIDEO_DIMS lookup."""
+    if (ratio_str, quality_str) not in _VIDEO_DIMS:
+        _emit(f"ERROR: Unknown combination '{ratio_str}' + '{quality_str}'. "
+              f"Ratios: {', '.join(_VIDEO_RATIOS)}. "
+              f"Qualities: {', '.join(_VIDEO_QUALITIES)}", "error")
         sys.exit(1)
-    if quality_str not in _VIDEO_QUALITY:
-        _emit(f"ERROR: Unknown quality '{quality_str}'. "
-              f"Available: {', '.join(_VIDEO_QUALITY)}", "error")
-        sys.exit(1)
-    rw, rh = _VIDEO_RATIOS[ratio_str]
-    ratio = rw / rh
-    max_dim = _VIDEO_QUALITY[quality_str]
-    # Find largest (w, h) where both are multiples of ALIGN, max(w,h) <= max_dim
-    best = None
-    for w in range(_VIDEO_ALIGN, max_dim + 1, _VIDEO_ALIGN):
-        h_raw = w / ratio
-        h = round(h_raw / _VIDEO_ALIGN) * _VIDEO_ALIGN
-        if h < _VIDEO_ALIGN or h > max_dim:
-            continue
-        deviation = abs(w / h - ratio) / ratio
-        if deviation < 0.05:
-            best = (w, h)
-    if best is None:
-        _emit(f"ERROR: No valid dimensions for {ratio_str} at {quality_str}", "error")
-        sys.exit(1)
-    return best
+    return _VIDEO_DIMS[(ratio_str, quality_str)]
 
 
 # ── Video generation ──────────────────────────────────────────────────────────
@@ -3775,17 +3857,30 @@ def cmd_video(args):
         cmd.append("--enhance-prompt")
 
 
-    # Extend / Retake modes
+    # Extend / Retake / Clone modes
     extend = getattr(args, "extend", None)
     retake = getattr(args, "retake", None)
+    clone = getattr(args, "clone", None)
+
+    if clone:
+        if not Path(clone).exists():
+            _emit(f"ERROR: Video not found: {clone}", "error")
+            sys.exit(1)
+        clone_seconds = str(getattr(args, "seconds", 5.0) or 5.0)
+        cmd.extend(["--clone", clone, clone_seconds])
+        ref_seconds = getattr(args, "ref_seconds", None)
+        if ref_seconds is not None:
+            cmd.extend(["--ref-seconds", str(ref_seconds)])
+
     if extend:
         video_file, seconds = extend
         if not Path(video_file).exists():
             _emit(f"ERROR: Video not found: {video_file}", "error")
             sys.exit(1)
         cmd.extend(["--extend", video_file, seconds])
-        ref_seconds = getattr(args, "ref_seconds", 2.0)
-        cmd.extend(["--ref-seconds", str(ref_seconds)])
+        ref_seconds = getattr(args, "ref_seconds", None)
+        if ref_seconds is not None:
+            cmd.extend(["--ref-seconds", str(ref_seconds)])
     if retake:
         video_file, start, end = retake
         if not Path(video_file).exists():
@@ -3793,7 +3888,9 @@ def cmd_video(args):
             sys.exit(1)
         cmd.extend(["--retake", video_file, start, end])
 
-    if extend:
+    if clone:
+        _emit(f"Cloning video ({clone_seconds}s new, ltx2.3/{model}) …", "stage")
+    elif extend:
         _emit(f"Extending video by {extend[1]}s (ltx2.3/{model}) …", "stage")
     elif retake:
         _emit(f"Retaking {retake[1]}s–{retake[2]}s (ltx2.3/{model}) …", "stage")
@@ -4086,10 +4183,10 @@ def build_parser():
     p_video.add_argument("-H", "--height", type=int, default=512,
                           help="Video height (default: 512)")
     p_video.add_argument("--ratio", default=None,
-                          choices=list(_VIDEO_RATIOS),
+                          choices=_VIDEO_RATIOS,
                           help="Aspect ratio (e.g. 16:9, 1:1). Requires --quality")
     p_video.add_argument("--quality", default=None,
-                          choices=list(_VIDEO_QUALITY),
+                          choices=_VIDEO_QUALITIES,
                           help="Quality tier (e.g. 480p, 720p). Requires --ratio")
     p_video.add_argument("--num-frames", type=int, default=121, dest="num_frames",
                           help="Frames, must be 8k+1 (default: 121 = ~5s at 24fps)")
@@ -4115,10 +4212,14 @@ def build_parser():
                           help="Auto-enhance prompt via Gemma")
     p_video.add_argument("--extend", nargs=2, metavar=("VIDEO", "SECONDS"),
                           help="Extend an existing video by N seconds")
+    p_video.add_argument("--clone", metavar="VIDEO",
+                          help="Clone: generate new video using reference as visual context")
+    p_video.add_argument("--seconds", "-s", type=float, default=5.0,
+                          help="[clone] Output duration in seconds (default: 5)")
     p_video.add_argument("--retake", nargs=3, metavar=("VIDEO", "START", "END"),
                           help="Retake a time region (start/end in seconds)")
-    p_video.add_argument("--ref-seconds", type=float, default=2.0, dest="ref_seconds",
-                          help="Context seconds from source for extend (default: 2)")
+    p_video.add_argument("--ref-seconds", type=float, default=None, dest="ref_seconds",
+                          help="Context seconds from source (default: 2 for extend, 5 for clone)")
     p_video.add_argument("--fp16", action="store_true",
                           help="[MLX] Use FP16 precision (~50%% less memory)")
     p_video.set_defaults(func=cmd_video)

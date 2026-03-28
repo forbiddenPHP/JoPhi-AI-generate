@@ -55,7 +55,6 @@ def _load_detector():
 
 def main():
     if "--list-models" in sys.argv:
-        import json
         print(json.dumps([{"model": "", "notice": "single model"}]))
         return
 

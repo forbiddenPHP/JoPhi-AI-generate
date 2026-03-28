@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frame-picker",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["frame-picker.py"],
+      "port": 8777
+    },
+    {
+      "name": "frame-picker-2",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["frame-picker-2.py"],
+      "port": 8777
+    }
+  ]
+}

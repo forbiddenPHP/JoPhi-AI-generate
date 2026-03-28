@@ -215,6 +215,8 @@ class RetakePipeline:
         distilled: bool = False,
         tiling_config: TilingConfig | None = None,
         output_frames: int | None = None,
+        noise_scale: float = 1.0,
+        audio_noise_scale: float | None = None,
     ) -> tuple[Iterator[torch.Tensor], torch.Tensor]:
         """Regenerate ``[start_time, end_time]`` of the source video (retake).
         Parameters
@@ -440,6 +442,7 @@ class RetakePipeline:
             dtype=dtype,
             device=self.device,
             initial_latent=initial_video_latent,
+            noise_scale=noise_scale,
         )
         _bar.update(1); _bar.close()
 
@@ -453,6 +456,7 @@ class RetakePipeline:
             dtype=dtype,
             device=self.device,
             initial_latent=initial_audio_latent,
+            noise_scale=audio_noise_scale if audio_noise_scale is not None else noise_scale,
         )
         _bar.update(1); _bar.close()
 

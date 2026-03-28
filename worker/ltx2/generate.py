@@ -63,6 +63,7 @@ _MODEL_MAP = {
 
 _UPSCALER_FILE = "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
 _DISTILLED_LORA_FILE = "ltx-2.3-22b-distilled-lora-384.safetensors"
+_IC_LORA_UNION_FILE = "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors"
 _GEMMA_REPO = "google/gemma-3-12b-it"
 
 
@@ -190,13 +191,15 @@ def main():
     # Audio input (for A2V pipeline)
     parser.add_argument("--audio", default=None, help="Audio file for audio-to-video")
 
-    # Extend / Retake modes
+    # Extend / Retake / Clone modes
     parser.add_argument("--extend", nargs=2, metavar=("VIDEO", "SECONDS"),
                         help="Extend an existing video by N seconds")
+    parser.add_argument("--clone", nargs=2, metavar=("VIDEO", "SECONDS"),
+                        help="Clone: extend video, keep only the new part")
     parser.add_argument("--retake", nargs=3, metavar=("VIDEO", "START", "END"),
                         help="Retake a time region of an existing video")
-    parser.add_argument("--ref-seconds", type=float, default=2.0, dest="ref_seconds",
-                        help="Context seconds from source video for extend (default: 2)")
+    parser.add_argument("--ref-seconds", type=float, default=None, dest="ref_seconds",
+                        help="Context seconds from source video (default: 2 for extend, 5 for clone)")
 
     args = parser.parse_args()
 
@@ -329,8 +332,8 @@ def main():
     tiling_config = TilingConfig.default()
     video_chunks_number = get_video_chunks_number(args.num_frames, tiling_config)
 
-    if args.extend or args.retake:
-        # Extend / Retake pipeline
+    if args.extend or args.retake or args.clone:
+        # Extend / Retake / Clone pipeline
         from ltx_pipelines.retake import RetakePipeline
         from ltx_pipelines.utils.constants import detect_params
         from ltx_core.components.guiders import MultiModalGuiderParams
@@ -341,9 +344,11 @@ def main():
         extend_output_frames = None
         _extend_original_path = None  # for concat after pipeline
         _extend_ref_seconds = None
+        _clone_mode = args.clone is not None
 
-        if args.extend:
-            video_path, seconds_str = args.extend
+        if args.extend or args.clone:
+            src = args.extend or args.clone
+            video_path, seconds_str = src
             extend_seconds = float(seconds_str)
         else:
             video_path, start_str, end_str = args.retake
@@ -354,7 +359,43 @@ def main():
         target_w, target_h = args.width, args.height
         target_fps = args.frame_rate
 
-        # Transcode if resolution or FPS differs from source
+        if args.extend or args.clone:
+            ref_seconds = args.ref_seconds if args.ref_seconds is not None else (5.0 if _clone_mode else 2.0)
+            video_duration = src_frames / fps
+
+            if _clone_mode:
+                # Trim ZUERST auf genau 1+8*k frames, dann Pan & Scan
+                target_frames = max(9, ((int(ref_seconds * fps) - 1) // 8) * 8 + 1)
+                skip_frames = max(0, src_frames - target_frames)
+                if skip_frames > 0:
+                    print(f"  Trimming to last {ref_seconds:.0f}s context ({target_frames} frames) …", file=sys.stderr)
+                    tmp_trim = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+                    subprocess.run([
+                        "ffmpeg", "-y", "-i", video_path,
+                        "-vf", f"select='gte(n\\,{skip_frames})',setpts=PTS-STARTPTS",
+                        "-af", f"atrim=start={skip_frames / fps:.6f},asetpts=PTS-STARTPTS",
+                        tmp_trim.name,
+                    ], check=True, capture_output=True)
+                    video_path = tmp_trim.name
+                    fps, src_frames, src_w, src_h = get_videostream_metadata(video_path)
+                    video_duration = src_frames / fps
+            elif video_duration > ref_seconds:
+                _extend_original_path = video_path  # for concat later (extend only)
+                ref_frames = round(ref_seconds * fps)
+                skip_frames = src_frames - ref_frames
+                print(f"  Trimming to last {ref_seconds:.0f}s context ({ref_frames} frames) …", file=sys.stderr)
+                tmp_trim = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+                subprocess.run([
+                    "ffmpeg", "-y", "-i", video_path,
+                    "-vf", f"select='gte(n\\,{skip_frames})',setpts=PTS-STARTPTS",
+                    "-af", f"atrim=start={skip_frames / fps:.6f},asetpts=PTS-STARTPTS",
+                    tmp_trim.name,
+                ], check=True, capture_output=True)
+                video_path = tmp_trim.name
+                fps, src_frames, src_w, src_h = get_videostream_metadata(video_path)
+                video_duration = src_frames / fps
+
+        # Pan & Scan nach dem Trim
         needs_transcode = (target_w != src_w or target_h != src_h
                            or target_fps != int(fps))
         if needs_transcode:
@@ -387,33 +428,16 @@ def main():
             video_path = tmp.name
             fps, src_frames, src_w, src_h = get_videostream_metadata(video_path)
 
-        if args.extend:
-            # Trim source to last ref_seconds as context (saves VRAM + time)
-            ref_seconds = args.ref_seconds
+        if args.extend or args.clone:
             video_duration = src_frames / fps
-            if video_duration > ref_seconds:
-                _extend_original_path = video_path  # full video for concat later
-                ref_frames = round(ref_seconds * fps)
-                _extend_context_frames = ref_frames
-                skip_frames = src_frames - ref_frames
-                print(f"  Trimming to last {ref_seconds:.0f}s context ({ref_frames} frames) …", file=sys.stderr)
-                tmp_trim = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
-                subprocess.run([
-                    "ffmpeg", "-y", "-i", video_path,
-                    "-vf", f"select='gte(n\\,{skip_frames})',setpts=PTS-STARTPTS",
-                    "-af", f"atrim=start={skip_frames / fps:.6f},asetpts=PTS-STARTPTS",
-                    tmp_trim.name,
-                ], check=True, capture_output=True)
-                video_path = tmp_trim.name
-                fps, src_frames, src_w, src_h = get_videostream_metadata(video_path)
-                _extend_context_frames = src_frames  # actual frame count after trim
-                video_duration = src_frames / fps
-
             start_time = video_duration
             end_time = video_duration + extend_seconds
             raw_frames = int(end_time * fps)
             extend_output_frames = ((raw_frames // 8) * 8) + 1
-            mode_label = f"Extending video by {extend_seconds:.1f}s ({extend_output_frames} frames)"
+            if _clone_mode:
+                mode_label = f"Cloning video ({extend_seconds:.1f}s, extend pipeline, context={video_duration:.1f}s)"
+            else:
+                mode_label = f"Extending video by {extend_seconds:.1f}s ({extend_output_frames} frames)"
         else:
             mode_label = f"Retaking {start_time:.1f}s–{end_time:.1f}s"
 
@@ -421,8 +445,8 @@ def main():
         print(f"  Source: {src_w}x{src_h}, {src_frames} frames @ {fps}fps", file=sys.stderr)
 
         is_distilled = model_info["pipeline"] == "distilled"
-        print("  Loading Retake pipeline …", file=sys.stderr)
 
+        print("  Loading Retake pipeline …", file=sys.stderr)
         pipeline = RetakePipeline(
             checkpoint_path=checkpoint_path,
             gemma_root=gemma_root,
@@ -493,6 +517,26 @@ def main():
             os.unlink(_tmp_orig_trimmed.name)
             os.unlink(_concat_list.name)
             # Skip normal encode — output already written
+            sys.stderr.flush()
+            print(json.dumps([out_path]))
+            return
+
+        if _clone_mode:
+            # Encode full pipeline output (context + clone), then crop context off
+            _tmp_full = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+            encode_video(video=video, fps=int(fps), audio=audio,
+                         output_path=_tmp_full.name,
+                         video_chunks_number=video_chunks_number)
+            out_path = str(Path(args.output))
+            print(f"  Cropping source context ({video_duration:.2f}s / {src_frames} frames) from clone output …", file=sys.stderr)
+            subprocess.run([
+                "ffmpeg", "-y", "-i", _tmp_full.name,
+                "-vf", f"select='gte(n\\,{src_frames})',setpts=PTS-STARTPTS",
+                "-af", f"atrim=start={video_duration:.6f},asetpts=PTS-STARTPTS",
+                "-c:v", "libx264", "-crf", "18", "-preset", "fast",
+                "-c:a", "aac", out_path,
+            ], check=True, capture_output=True)
+            os.unlink(_tmp_full.name)
             sys.stderr.flush()
             print(json.dumps([out_path]))
             return

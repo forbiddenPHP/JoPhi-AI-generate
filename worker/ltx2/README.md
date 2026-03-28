@@ -20,6 +20,7 @@ Text/Image/Audio-to-Video generation using LTX-2.3 (22B parameters). macOS Apple
 - **Dev (Two-Stage)** — Stage 1: 30 steps at half resolution → 2x upscale → Stage 2: 3 steps refinement with distilled LoRA. Slower, higher quality.
 - **A2V** — Audio-to-video. Same two-stage process with audio conditioning. Video length matches audio duration.
 - **Extend** — Append new frames to an existing video. Uses last N seconds as context (default: 2s), generates continuation, then concatenates. Source video is auto-transcoded to target resolution/FPS if needed.
+- **Clone** — Generates a new video using a reference video as visual initialization. Uses RetakePipeline over the full output duration (start=0), so audio and video are fully regenerated from the prompt while the source latents provide appearance and motion context. Source videos longer than 5s are trimmed to the last 5s. Auto-transcoded to target resolution/FPS if needed.
 - **Retake** — Regenerate a time region of an existing video. Encodes full video to latents, applies temporal mask to the specified time window, regenerates only that section. Prompt should describe the entire scene with the desired change.
 
 ## Usage (via root generate.py)
@@ -43,6 +44,12 @@ python generate.py video ltx2.3 --model dev -p "The man says: hello" --extend vi
 # Extend with more context (3s instead of default 2s)
 python generate.py video ltx2.3 --model dev -p "She walks away" --extend video.mp4 5 --ref-seconds 3 --ratio 16:9 --quality 240p -o extended.mp4
 
+# Clone (generate 5s new video from reference, default)
+python generate.py video ltx2.3 --model dev -p "The person says: hello" --clone video.mp4 --ratio 16:9 --quality 720p -o clone.mp4
+
+# Clone with custom duration (8s)
+python generate.py video ltx2.3 --model dev -p "She laughs" --clone video.mp4 --seconds 8 --ratio 16:9 --quality 720p -o clone.mp4
+
 # Retake (replace 3.5s–5.0s)
 python generate.py video ltx2.3 --model dev -p "Full scene description with the changed dialog" --retake video.mp4 3.5 5.0 --ratio 16:9 --quality 240p -o retake.mp4
 ```
@@ -59,13 +66,6 @@ Quality tiers: 240p, 360p, 480p, 720p, 1080p, 1440p, 2160p, 4k
 - Must satisfy `8k+1` constraint (e.g., 9, 17, 25, 33, 41, 49, ..., 121, ..., 481)
 - 24 FPS default
 - For A2V: frames derived automatically from audio duration
-
-## Memory
-
-- Dynamic attention head chunking on MPS prevents OOM crashes
-- Auto-reduces frames if insufficient memory
-- Dev machine: M1 Max 64 GB — up to 20s video at 768x512
-- Production: M2 Ultra 192 GB — full resolution, long videos
 
 ## Setup
 

@@ -63,7 +63,6 @@ def _ensure_model():
 
 def main():
     if "--list-models" in sys.argv:
-        import json
         print(json.dumps([{"model": "", "notice": "single model"}]))
         return
 

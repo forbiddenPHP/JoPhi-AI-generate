@@ -71,7 +71,7 @@ generate.py <medium> <engine> [--model <variant>] [input] [options]
 | `image` | `sketch` | Sketch/edge extraction via HED |
 | `image` | `upscale` | Image upscaling via Real-ESRGAN |
 | `image` | `segment` | Background removal / object segmentation |
-| `video` | `ltx2.3` | Video generation (LTX-2.3, 22B, T2V/I2V/A2V/Extend/Retake, PyTorch MPS) |
+| `video` | `ltx2.3` | Video generation (LTX-2.3, 22B, T2V/I2V/A2V/Extend/Retake/Clone, PyTorch MPS) |
 
 Future mediums (stubs): `translation`, `comparison`
 
@@ -570,17 +570,25 @@ python generate.py video ltx2.3 -p "a sunset" -o sunset
 | `--negative-prompt` | | | Negative prompt |
 | `--enhance-prompt` | | | Auto-enhance prompt via Gemma |
 | `--extend` | | | `VIDEO SECONDS` — extend video by N seconds |
+| `--clone` | | | `VIDEO` — clone: generate new video from reference |
+| `--seconds` | `-s` | 5 | [clone] Output duration in seconds |
 | `--retake` | | | `VIDEO START END` — retake a time region (seconds) |
-| `--ref-seconds` | | 2.0 | Context seconds from source for extend |
+| `--ref-seconds` | | 2/5 | Context seconds from source (default: 2 for extend, 5 for clone) |
 | `--no-rescale` | | | Keep reference images in original resolution |
 
-#### Extend & Retake
+#### Extend, Clone & Retake
 
-Extend appends new content, retake replaces a time region. Both use the full original video as context.
+Extend appends new content, clone generates new content from a reference (keeping only the new part), retake replaces a time region.
 
 ```bash
 # Extend a video by 5 seconds
 python generate.py video ltx2.3 --model dev -p "The man says: hello" --extend video.mp4 5 --ratio 16:9 --quality 240p -o extended.mp4
+
+# Clone: generate 5s new video using reference as visual context (default 5s)
+python generate.py video ltx2.3 --model dev -p "The person says: hello" --clone video.mp4 --ratio 16:9 --quality 720p -o clone.mp4
+
+# Clone with custom duration (8s)
+python generate.py video ltx2.3 --model dev -p "She laughs" --clone video.mp4 --seconds 8 --ratio 16:9 --quality 720p -o clone.mp4
 
 # Retake a passage (replace 3.5s–5.0s with new content)
 python generate.py video ltx2.3 --model dev -p "Full scene description with changed dialog" --retake video.mp4 3.5 5.0 --ratio 16:9 --quality 240p -o retake.mp4
@@ -590,6 +598,8 @@ python generate.py video ltx2.3 --model dev -p "..." --extend video.mp4 5 --ref-
 ```
 
 **Extend** trims the source to the last `--ref-seconds` as context, generates context + new frames, then concatenates the original (minus context) with the full pipeline output. This keeps VRAM usage constant regardless of source video length.
+
+**Clone** generates a new video using the reference as visual initialization. Uses RetakePipeline over the full output duration (start=0), so audio and video are fully regenerated from the prompt while the source latents provide appearance and motion context. Source videos longer than 5s are trimmed to the last 5s.
 
 **Retake** loads the entire source video, applies a temporal mask to the specified time region, and regenerates only that region. The prompt should describe the **entire scene** with the change embedded — not just the changed part.
 
