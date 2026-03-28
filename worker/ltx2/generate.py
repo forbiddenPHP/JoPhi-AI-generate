@@ -428,6 +428,9 @@ def main():
             video_path = tmp.name
             fps, src_frames, src_w, src_h = get_videostream_metadata(video_path)
 
+        if _extend_original_path is not None:
+            _extend_context_frames = src_frames  # frames used as context (after trim + transcode)
+
         if args.extend or args.clone:
             video_duration = src_frames / fps
             start_time = video_duration
