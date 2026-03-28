@@ -8,7 +8,7 @@ einops==0.8.1
 filelock==3.25.2
 fire==0.7.1
 # Editable Git install with no remote (flux==0.1.0)
--e /Users/jophi/tts-mist/worker/image/flux2
+-e ./flux2
 fsspec==2026.2.0
 h11==0.16.0
 hf-xet==1.4.2
@@ -23,7 +23,7 @@ mpmath==1.3.0
 networkx==3.6.1
 numpy==2.4.3
 openai==2.8.1
-packaging @ file:///opt/miniconda3/conda-bld/packaging_1761049079150/work
+packaging==24.2
 pillow==12.1.1
 psutil==7.2.2
 pydantic==2.12.5

@@ -455,38 +455,44 @@ else
     echo "══════════════════════════════════════════════════════════════"
     echo ""
 
+    HF_CACHE="${HF_HOME:-$HOME/.cache/huggingface}/hub"
+
     # ── HeartMuLa checkpoints ────────────────────────────────────────────
     CKPT_DIR="$SCRIPT_DIR/worker/music/models/ckpt"
     mkdir -p "$CKPT_DIR"
 
     echo "── HeartMuLa checkpoints ──"
-    echo "  [1/4] HeartMuLa/HeartMuLaGen (tokenizer + config) ..."
-    "$CONDA_BIN" run -n heartmula python -c "
+    if [ -d "$CKPT_DIR/HeartMuLa-oss-3B" ]; then
+        echo "  HeartMuLa checkpoints already present — skipping"
+    else
+        echo "  [1/4] HeartMuLa/HeartMuLaGen (tokenizer + config) ..."
+        "$CONDA_BIN" run -n heartmula python -c "
 from huggingface_hub import snapshot_download
 snapshot_download('HeartMuLa/HeartMuLaGen', local_dir='$CKPT_DIR')
 print('  OK')
 "
-    echo "  [2/4] HeartMuLa/HeartMuLa-oss-3B-happy-new-year (model weights) ..."
-    "$CONDA_BIN" run -n heartmula python -c "
+        echo "  [2/4] HeartMuLa/HeartMuLa-oss-3B-happy-new-year (model weights) ..."
+        "$CONDA_BIN" run -n heartmula python -c "
 from huggingface_hub import snapshot_download
 snapshot_download('HeartMuLa/HeartMuLa-oss-3B-happy-new-year',
                   local_dir='$CKPT_DIR/HeartMuLa-oss-3B')
 print('  OK')
 "
-    echo "  [3/4] HeartMuLa/HeartCodec-oss-20260123 (codec) ..."
-    "$CONDA_BIN" run -n heartmula python -c "
+        echo "  [3/4] HeartMuLa/HeartCodec-oss-20260123 (codec) ..."
+        "$CONDA_BIN" run -n heartmula python -c "
 from huggingface_hub import snapshot_download
 snapshot_download('HeartMuLa/HeartCodec-oss-20260123',
                   local_dir='$CKPT_DIR/HeartCodec-oss')
 print('  OK')
 "
-    echo "  [4/4] HeartMuLa/HeartTranscriptor-oss (lyrics transcription) ..."
-    "$CONDA_BIN" run -n heartmula python -c "
+        echo "  [4/4] HeartMuLa/HeartTranscriptor-oss (lyrics transcription) ..."
+        "$CONDA_BIN" run -n heartmula python -c "
 from huggingface_hub import snapshot_download
 snapshot_download('HeartMuLa/HeartTranscriptor-oss',
                   local_dir='$CKPT_DIR/HeartTranscriptor-oss')
 print('  OK')
 "
+    fi
     echo -e "${GREEN}✓${NC} HeartMuLa checkpoints downloaded"
 
     # ── ACE-Step DiT models ──────────────────────────────────────────────
@@ -517,17 +523,24 @@ if not ok:
     # ── Whisper model ────────────────────────────────────────────────────
     echo ""
     echo "── Whisper model ──"
-    "$CONDA_BIN" run -n whisper python -c "
+    if [ -d "$HF_CACHE/models--mlx-community--whisper-large-v3-turbo" ]; then
+        echo "  Whisper model already present — skipping"
+    else
+        "$CONDA_BIN" run -n whisper python -c "
 from huggingface_hub import snapshot_download
 path = snapshot_download('mlx-community/whisper-large-v3-turbo')
 print(f'  Model cached at: {path}')
 "
+    fi
     echo -e "${GREEN}✓${NC} Whisper model downloaded"
 
     # ── Qwen3-TTS models ─────────────────────────────────────────────
     echo ""
     echo "── Qwen3-TTS models ──"
-    "$CONDA_BIN" run -n ai-tts python -c "
+    if [ -d "$HF_CACHE/models--mlx-community--Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit" ]; then
+        echo "  Qwen3-TTS models already present — skipping"
+    else
+        "$CONDA_BIN" run -n ai-tts python -c "
 from huggingface_hub import snapshot_download
 path = snapshot_download('mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit')
 print(f'  1.7B cached at: {path}')
@@ -536,6 +549,7 @@ print(f'  0.6B cached at: {path}')
 path = snapshot_download('mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit')
 print(f'  1.7B Base (voice cloning) cached at: {path}')
 "
+    fi
     echo -e "${GREEN}✓${NC} Qwen3-TTS models downloaded"
 
     # ── EzAudio checkpoints ───────────────────────────────────────────
@@ -558,19 +572,26 @@ print(f'  1.7B Base (voice cloning) cached at: {path}')
     # ── EzAudio text encoder (flan-t5-xl) ─────────────────────────────
     echo ""
     echo "── EzAudio text encoder (flan-t5-xl) ──"
-    "$CONDA_BIN" run -n ezaudio python -c "
+    if [ -d "$HF_CACHE/models--google--flan-t5-xl" ]; then
+        echo "  flan-t5-xl already present — skipping"
+    else
+        "$CONDA_BIN" run -n ezaudio python -c "
 from transformers import T5Tokenizer, T5EncoderModel
 T5Tokenizer.from_pretrained('google/flan-t5-xl')
 T5EncoderModel.from_pretrained('google/flan-t5-xl')
 print('  flan-t5-xl cached')
 "
+    fi
     echo -e "${GREEN}✓${NC} EzAudio text encoder downloaded"
 
     # ── FLUX.2 models ────────────────────────────────────────────────
     IMAGE_MODELS_DIR="$SCRIPT_DIR/worker/image/models"
     echo ""
     echo "── FLUX.2 models ──"
-    "$CONDA_BIN" run -n flux2 python -c "
+    if [ -d "$IMAGE_MODELS_DIR/hub/models--black-forest-labs--FLUX.2-klein-4B" ]; then
+        echo "  FLUX.2 models already present — skipping"
+    else
+        "$CONDA_BIN" run -n flux2 python -c "
 import os
 os.environ['HF_HOME'] = '$IMAGE_MODELS_DIR'
 from huggingface_hub import hf_hub_download
@@ -592,13 +613,17 @@ print('  Downloading Qwen/Qwen3-8B (text encoder for 9B models) ...')
 snapshot_download('Qwen/Qwen3-8B')
 print('  Done')
 "
+    fi
     echo -e "${GREEN}✓${NC} FLUX.2 models downloaded"
 
     # ── OpenPose (DWPose) models ──────────────────────────────────────
     POSE_MODELS_DIR="$SCRIPT_DIR/worker/pose/models"
     echo ""
     echo "── DWPose models ──"
-    "$CONDA_BIN" run -n openpose python -c "
+    if [ -d "$POSE_MODELS_DIR/hub/models--yzd-v--DWPose" ]; then
+        echo "  DWPose models already present — skipping"
+    else
+        "$CONDA_BIN" run -n openpose python -c "
 import os
 os.environ['HF_HOME'] = '$POSE_MODELS_DIR'
 from huggingface_hub import hf_hub_download
@@ -608,6 +633,7 @@ print('  Downloading dw-ll_ucoco_384.onnx (pose estimator) ...')
 hf_hub_download('yzd-v/DWPose', 'dw-ll_ucoco_384.onnx')
 print('  Done')
 "
+    fi
     echo -e "${GREEN}✓${NC} DWPose models downloaded"
 
     # ── SD 1.5 models (CivitAI) ──────────────────────────────────────
@@ -653,8 +679,10 @@ print('  Done')
     # ── Depth Anything V2 models ────────────────────────────────────────
     echo ""
     echo "── Depth Anything V2 models ──"
-
-    "$CONDA_BIN" run --no-capture-output -n depth python -c "
+    if [ -d "$HF_CACHE/models--depth-anything--Depth-Anything-V2-Small-hf" ]; then
+        echo "  Depth Anything V2 already present — skipping"
+    else
+        "$CONDA_BIN" run --no-capture-output -n depth python -c "
 import os
 os.environ['HF_HOME'] = '$SCRIPT_DIR/worker/depth/models'
 from transformers import pipeline
@@ -662,9 +690,9 @@ print('  Downloading Depth Anything V2 Small …')
 pipeline('depth-estimation', model='depth-anything/Depth-Anything-V2-Small-hf')
 print('  Done')
 " || {
-        echo "  ⚠ Failed to download Depth Anything V2"
-    }
-
+            echo "  ⚠ Failed to download Depth Anything V2"
+        }
+    fi
     echo -e "${GREEN}✓${NC} Depth Anything V2 models downloaded"
 
     # ── LTX-2.3 models ────────────────────────────────────────────────
@@ -672,7 +700,10 @@ print('  Done')
     mkdir -p "$LTX2_MODELS_DIR"
     echo ""
     echo "── LTX-2.3 models ──"
-    "$CONDA_BIN" run -n ltx2 python -c "
+    if [ -f "$LTX2_MODELS_DIR/ltx-2.3-22b-distilled.safetensors" ]; then
+        echo "  LTX-2.3 models already present — skipping"
+    else
+        "$CONDA_BIN" run -n ltx2 python -c "
 import os
 os.environ['HF_HOME'] = '$LTX2_MODELS_DIR'
 from huggingface_hub import hf_hub_download, snapshot_download
@@ -690,6 +721,7 @@ print('  Downloading Gemma 3 12B (text encoder) ...')
 snapshot_download('google/gemma-3-12b-it', local_dir='$LTX2_MODELS_DIR/gemma-3-12b-it')
 print('  Done')
 "
+    fi
     echo -e "${GREEN}✓${NC} LTX-2.3 models downloaded"
 
     echo ""
