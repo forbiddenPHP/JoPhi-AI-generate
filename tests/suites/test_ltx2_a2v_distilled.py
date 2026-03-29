@@ -44,7 +44,7 @@ def register(suite):
             sys.executable, "generate.py", "video", "ltx2.3",
             "-p", PROMPT,
             "--audio", str(dialog_wav),
-            "--ratio", "16:9", "--quality", "240p",
+            "--ratio", "16:9", "--quality", "480p",
             "--frame-rate", "24",
             "--seed", "42",
             "-o", str(out / "ltx2_a2v_distilled.mp4"),

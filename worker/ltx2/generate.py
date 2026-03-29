@@ -320,7 +320,7 @@ def main():
     upscaler_path = str(_resolve_model_path(_UPSCALER_FILE))
     gemma_root = str(_resolve_gemma_path())
 
-    # Distilled lora for stage-2 (only for dev/two_stage pipeline)
+    # Distilled lora for stage-2 (only dev/two_stage pipeline needs it)
     distilled_lora_path = None
     if model_info["pipeline"] == "two_stage":
         distilled_lora_path = str(_resolve_model_path(_DISTILLED_LORA_FILE))
@@ -573,6 +573,7 @@ def main():
             audio_path=args.audio,
             tiling_config=tiling_config,
             enhance_prompt=args.enhance_prompt,
+            distilled=model_info["pipeline"] == "distilled",
         )
 
     elif model_info["pipeline"] == "distilled":

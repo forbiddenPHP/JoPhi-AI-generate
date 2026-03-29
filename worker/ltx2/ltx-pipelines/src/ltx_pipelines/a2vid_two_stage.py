@@ -18,6 +18,7 @@ from ltx_core.types import Audio, AudioLatentShape, LatentState, VideoPixelShape
 from ltx_pipelines.utils import ModelLedger
 from ltx_pipelines.utils.args import default_2_stage_arg_parser
 from ltx_pipelines.utils.constants import (
+    DISTILLED_SIGMA_VALUES,
     STAGE_2_DISTILLED_SIGMA_VALUES,
 )
 from ltx_pipelines.utils.helpers import (
@@ -94,6 +95,7 @@ class A2VidPipelineTwoStage:
         audio_max_duration: float | None = None,
         tiling_config: TilingConfig | None = None,
         enhance_prompt: bool = False,
+        distilled: bool = False,
     ) -> tuple[Iterator[torch.Tensor], Audio]:
         assert_resolution(height=height, width=width, is_two_stage=True)
 
@@ -157,8 +159,12 @@ class A2VidPipelineTwoStage:
         bar = _tqdm(total=1, desc="Loading transformer", file=_sys.stderr); bar.refresh()
         transformer = self.stage_1_model_ledger.transformer()
         bar.update(1); bar.close()
-        sigmas = LTX2Scheduler().execute(steps=num_inference_steps).to(dtype=torch.float32, device=self.device)
-        n1 = num_inference_steps
+        if distilled:
+            sigmas = torch.Tensor(DISTILLED_SIGMA_VALUES).to(self.device)
+            n1 = len(DISTILLED_SIGMA_VALUES) - 1
+        else:
+            sigmas = LTX2Scheduler().execute(steps=num_inference_steps).to(dtype=torch.float32, device=self.device)
+            n1 = num_inference_steps
         print(f"  Stage 1: Denoising ({n1} steps, {width // 2}x{height // 2}) …", file=_sys.stderr)
 
         def first_stage_denoising_loop(
@@ -228,7 +234,8 @@ class A2VidPipelineTwoStage:
         cleanup_memory()
         bar.update(1); bar.close()
 
-        print("  Loading transformer (Stage 2 LoRA) …", file=_sys.stderr)
+        _lora_hint = " + LoRA" if self.stage_2_model_ledger.loras else ""
+        print(f"  Loading transformer (Stage 2{_lora_hint}) …", file=_sys.stderr)
         bar = _tqdm(total=1, desc="Loading transformer", file=_sys.stderr); bar.refresh()
         transformer = self.stage_2_model_ledger.transformer()
         bar.update(1); bar.close()

@@ -64,7 +64,7 @@ def register(suite):
             "-p", VIDEO_PROMPT,
             "--audio", str(dialog_wav),
             "--image-first", str(ref_image),
-            "--ratio", "16:9", "--quality", "240p",
+            "--ratio", "16:9", "--quality", "480p",
             "--frame-rate", "24",
             "--seed", "42",
             "-o", str(out / "ltx2_a2v_ref_distilled.mp4"),

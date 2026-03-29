@@ -30,10 +30,25 @@ def register(suite):
             "--model", "distilled",
             "-p", CLONE_PROMPT,
             "--clone", str(CLONE_VIDEO),
-        "--seconds", "5",
+            "--seconds", "5",
             "--ratio", "16:9", "--quality", "480p",
             "--seed", "42",
             "-o", str(out / "ltx2_clone.mp4"),
         ],
         output=out / "ltx2_clone.mp4",
+    )
+
+    suite.add(
+        name="Clone 5s (dev)",
+        cmd=[
+            sys.executable, "generate.py", "video", "ltx2.3",
+            "--model", "dev",
+            "-p", CLONE_PROMPT,
+            "--clone", str(CLONE_VIDEO),
+            "--seconds", "5",
+            "--ratio", "16:9", "--quality", "480p",
+            "--seed", "42",
+            "-o", str(out / "ltx2_clone_dev.mp4"),
+        ],
+        output=out / "ltx2_clone_dev.mp4",
     )
