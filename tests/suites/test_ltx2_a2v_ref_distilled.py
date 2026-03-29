@@ -41,7 +41,7 @@ def register(suite):
             "flux.2", "--model", "4b-distilled",
             "-p", SCENE_PROMPT,
             "--seed", "42",
-            "-W", "448", "-H", "256",
+            "--ratio", "16:9", "--quality", VIDEO_QUALITY,
             "-o", str(ref_image),
         ],
         output=ref_image,

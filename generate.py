@@ -3496,6 +3496,17 @@ def cmd_image(args):
     if engine == "segment":
         return _image_segment(args)
 
+    # ── Resolve --ratio + --quality → -W/-H (shared by flux.2 and sd1.5) ──
+    ratio = getattr(args, "ratio", None)
+    quality = getattr(args, "quality", None)
+    if ratio and quality:
+        w, h = _resolve_video_dims(ratio, quality)
+        args.width = w
+        args.height = h
+    elif ratio or quality:
+        _emit("ERROR: --ratio and --quality must be used together", "error")
+        sys.exit(1)
+
     # ── Parse --controlnet (shared by flux.2 and sd1.5) ───────────────────
     cn_mode, cn_path = None, None
     controlnet = getattr(args, "controlnet", None)
@@ -4143,6 +4154,12 @@ def build_parser():
     p_image.add_argument("--steps", type=int, default=None, help="Inference steps")
     p_image.add_argument("--cfg-scale", type=float, default=None, dest="cfg_scale",
                           help="Guidance scale")
+    p_image.add_argument("--ratio", default=None,
+                          choices=_VIDEO_RATIOS,
+                          help="Aspect ratio (e.g. 16:9, 1:1). Requires --quality")
+    p_image.add_argument("--quality", default=None,
+                          choices=_VIDEO_QUALITIES,
+                          help="Quality tier (e.g. 480p, 720p). Requires --ratio")
     p_image.add_argument("-W", "--width", type=int, default=1360, help="Image width (default: 1360)")
     p_image.add_argument("-H", "--height", type=int, default=768, help="Image height (default: 768)")
     p_image.add_argument("--images", nargs="+", default=None,

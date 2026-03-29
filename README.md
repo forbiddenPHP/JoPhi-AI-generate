@@ -683,8 +683,10 @@ python generate.py image flux.2 --images step1.png -p "add a bookshelf where the
 - `--seed` — Random seed for reproducibility
 - `--steps` — Inference steps (only for base models; distilled = fixed 4 steps)
 - `--cfg-scale` — Guidance scale
-- `-W, --width` — Image width (default: 1360)
-- `-H, --height` — Image height (default: 768)
+- `--ratio` — Aspect ratio (e.g. `16:9`, `1:1`). Requires `--quality`
+- `--quality` — Quality tier (e.g. `480p`, `720p`). Requires `--ratio`
+- `-W, --width` — Image width (default: 1360). Overridden by `--ratio`/`--quality`
+- `-H, --height` — Image height (default: 768). Overridden by `--ratio`/`--quality`
 - `--images` — Reference image path(s) for editing (up to 10). Auto-rescaled to target dimensions via Pan & Scan.
 - `--no-rescale` — Pass reference images in original resolution (skip Pan & Scan)
 - `--controlnet` — Conditioning: `mode:filepath` (e.g. `depth:depth.png`, `pose:pose.png`, `lineart:lines.png`, `normalmap:normals.png`, `sketch:sketch.png`). Always rescaled.
@@ -777,8 +779,10 @@ python generate.py image sd1.5 --controlnet pose:pose.png -p "woman in red dress
 - `-p, --prompt` — Text prompt (required)
 - `-o, --output` — Output file path (default: `image.png`)
 - `--negative-prompt` — Negative prompt (default: model-specific)
-- `-W, --width` — Image width (default: 1280, must be multiple of 64)
-- `-H, --height` — Image height (default: 768, must be multiple of 64)
+- `--ratio` — Aspect ratio (e.g. `16:9`, `1:1`). Requires `--quality`
+- `--quality` — Quality tier (e.g. `480p`, `720p`). Requires `--ratio`
+- `-W, --width` — Image width (default: 1280, must be multiple of 64). Overridden by `--ratio`/`--quality`
+- `-H, --height` — Image height (default: 768, must be multiple of 64). Overridden by `--ratio`/`--quality`
 - `--steps` — Inference steps (default: 20)
 - `--cfg-scale` — Guidance scale (default: 3.5)
 - `--seed` — Random seed (default: random)
