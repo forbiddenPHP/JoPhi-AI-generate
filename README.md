@@ -61,7 +61,6 @@ generate.py <medium> <engine> [--model <variant>] [input] [options]
 | `server` | — | RVC worker management |
 | `models` | `rvc`, `ollama`, `huggingface` | Model management (per engine) |
 | `ps` | — | Active models across all engines |
-
 | `image` | `flux.2` | Image generation & editing (FLUX.2 Klein, PyTorch MPS) |
 | `image` | `sd1.5` | Image generation (Stable Diffusion 1.5, CivitAI models + LoRAs) |
 | `image` | `openpose` | Pose estimation via DWPose (body, hands, face) |
