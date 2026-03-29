@@ -95,7 +95,7 @@ HF_CACHE="${HF_HOME:-$HOME/.cache/huggingface}/hub"
 HF_BACKED=0
 mkdir -p "$MODELS_DIR/huggingface"
 
-for pattern in "models--pyannote--*" "models--mlx-community--whisper-*" "models--mlx-community--Qwen3-TTS-*" "models--google--flan-t5-xl"; do
+for pattern in "models--pyannote--*" "models--mlx-community--whisper-*" "models--mlx-community--Qwen3-TTS-*" "models--google--flan-t5-xl" "models--depth-anything--*"; do
     for model_dir in "$HF_CACHE"/$pattern; do
         [ -d "$model_dir" ] || continue
         model_name=$(basename "$model_dir")

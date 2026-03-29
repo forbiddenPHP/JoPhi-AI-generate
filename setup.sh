@@ -336,7 +336,7 @@ if [ -d "$MODELS_DIR" ]; then
         fi
     fi
 
-    # HuggingFace models (pyannote, whisper) → ~/.cache/huggingface/hub/
+    # HuggingFace models (pyannote, whisper, Qwen3-TTS, flan-t5-xl, depth-anything) → ~/.cache/huggingface/hub/
     HF_CACHE="${HF_HOME:-$HOME/.cache/huggingface}/hub"
     if [ -d "$MODELS_DIR/huggingface" ]; then
         mkdir -p "$HF_CACHE"
@@ -347,7 +347,7 @@ if [ -d "$MODELS_DIR" ]; then
                 cp -a "$model_dir" "$HF_CACHE/$model_name"
             fi
         done
-        echo -e "  ${GREEN}✓${NC} HuggingFace models restored (pyannote, whisper, Qwen3-TTS)"
+        echo -e "  ${GREEN}✓${NC} HuggingFace models restored (pyannote, whisper, Qwen3-TTS, flan-t5-xl, depth-anything)"
     fi
 
     # Torch hub (demucs) → ~/.cache/torch/hub/checkpoints/
