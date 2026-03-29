@@ -145,6 +145,18 @@ if ! command -v unar &> /dev/null; then
     echo -e "${GREEN}✓${NC} unar installed"
 fi
 
+# ollama — local LLM inference server (text worker)
+if ! command -v ollama &> /dev/null; then
+    echo -e "${RED}ollama not found.${NC}"
+    read -p "  Install via brew? [Y/n] " yn
+    if [[ "$yn" =~ ^[Nn] ]]; then
+        echo "  Aborted. Install manually: brew install --cask ollama"
+    else
+        HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask ollama
+        echo -e "${GREEN}✓${NC} ollama installed"
+    fi
+fi
+
 # uv — package manager for ACE-Step (need >= 0.5 for pyproject.toml support)
 UV_MIN_VERSION="0.5"
 UV_PATH=""
