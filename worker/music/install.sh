@@ -11,7 +11,7 @@
 # snapshot_download is resumable — interrupted downloads continue on retry.
 # ──────────────────────────────────────────────────────────────────────────
 
-CONDA_BIN="/opt/miniconda3/bin/conda"
+CONDA_BIN="${CONDA_BIN:-$(cat ~/.ai-conda-path 2>/dev/null || command -v conda 2>/dev/null || echo conda)}"
 ENV_NAME="heartmula"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -61,10 +61,10 @@ fi
 
 # ── Create env ──────────────────────────────────────────────────────────
 
-if "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} " || [ -d "/opt/miniconda3/envs/$ENV_NAME" ]; then
+if "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} " || [ -d "$(dirname "$(dirname "$CONDA_BIN")")/envs/$ENV_NAME" ]; then
     echo "  Removing old '$ENV_NAME' env …"
     "$CONDA_BIN" env remove -y -n "$ENV_NAME" > /dev/null 2>&1
-    rm -rf "/opt/miniconda3/envs/$ENV_NAME" 2>/dev/null || true
+    rm -rf "$(dirname "$(dirname "$CONDA_BIN")")/envs/$ENV_NAME" 2>/dev/null || true
 fi
 
 echo "  Creating env: $ENV_NAME (Python 3.10) …"

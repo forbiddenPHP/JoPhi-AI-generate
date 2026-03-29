@@ -13,7 +13,7 @@ set -e
 #   Place models/ or models.zip next to setup.sh, then run setup.sh.
 # ─────────────────────────────────────────────────────────────────────────────
 
-CONDA_BIN="/opt/miniconda3/bin/conda"
+CONDA_BIN="${CONDA_BIN:-$(cat ~/.ai-conda-path 2>/dev/null || command -v conda 2>/dev/null || echo conda)}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MODELS_DIR="$SCRIPT_DIR/models"
 

@@ -4,7 +4,7 @@
 # Starts the rvc-python API server on localhost:5100
 # ─────────────────────────────────────────────────────────────────────────────
 
-CONDA_BIN="/opt/miniconda3/bin/conda"
+CONDA_BIN="${CONDA_BIN:-$(cat ~/.ai-conda-path 2>/dev/null || command -v conda 2>/dev/null || echo conda)}"
 ENV_NAME="rvc"
 PORT="${1:-5100}"
 MODELS_DIR="$(cd "$(dirname "$0")" && pwd)/models"

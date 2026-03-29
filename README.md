@@ -7,17 +7,22 @@ CLI for voice synthesis, voice conversion, audio enhancement, AI music generatio
 ## Quick Setup
 
 ```bash
-# 1. Install all environments
+# 1. Clone (with LFS files — wheels, models, etc.)
+git clone https://github.com/forbiddenPHP/JoPhi-AI-generate.git
+cd JoPhi-AI-generate
+git lfs install && git lfs pull
+
+# 2. Install all environments
 bash setup.sh
 
-# 2. Start RVC worker (needed for voice conversion)
+# 3. Start RVC worker (needed for voice conversion)
 python generate.py server start
 
-# 3. Install a voice model
+# 4. Install a voice model
 python generate.py models rvc search "neutral male"
 python generate.py models rvc install User/ModelName
 
-# 4. Ready!
+# 5. Ready!
 python generate.py voice rvc --model my-voice input.wav
 ```
 

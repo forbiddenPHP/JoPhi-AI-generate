@@ -127,7 +127,37 @@ RVC_MODELS_DIR = SCRIPT_DIR / "worker" / "rvc" / "models"
 ENHANCE_WORKER_DIR = SCRIPT_DIR / "worker" / "enhance"
 MUSIC_WORKER_DIR = SCRIPT_DIR / "worker" / "music"
 MUSIC_MODELS_DIR = SCRIPT_DIR / "worker" / "music" / "models"
-CONDA_BIN = Path(os.environ.get("CONDA_BIN", "/opt/miniconda3/bin/conda"))
+def _resolve_conda_bin() -> Path:
+    """Resolve conda binary: $CONDA_BIN → ~/.ai-conda-path → dynamic search."""
+    import shutil
+    # 1. Env var
+    env_val = os.environ.get("CONDA_BIN")
+    if env_val and Path(env_val).is_file():
+        return Path(env_val)
+    # 2. Cached path from setup.sh
+    cache = Path.home() / ".ai-conda-path"
+    if cache.is_file():
+        cached = cache.read_text().strip()
+        if cached and Path(cached).is_file():
+            return Path(cached)
+    # 3. conda in PATH
+    which = shutil.which("conda")
+    if which:
+        return Path(which)
+    # 4. Common locations
+    for p in [
+        Path("/opt/miniconda3/bin/conda"),
+        Path("/opt/homebrew/Caskroom/miniconda/base/bin/conda"),
+        Path.home() / "miniconda3" / "bin" / "conda",
+        Path.home() / "anaconda3" / "bin" / "conda",
+    ]:
+        if p.is_file():
+            return p
+    raise FileNotFoundError(
+        "conda not found. Run ./setup.sh first or set CONDA_BIN."
+    )
+
+CONDA_BIN = _resolve_conda_bin()
 RVC_ENV = "rvc"
 ENHANCE_ENV = "enhance"
 HEARTMULA_ENV = "heartmula"

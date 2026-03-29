@@ -27,7 +27,38 @@
 #   to be accepted. Run: sudo xcodebuild -license accept
 # ─────────────────────────────────────────────────────────────────────────────
 
-CONDA_BIN="/opt/miniconda3/bin/conda"
+# ── Detect conda — resolve once, cache in ~/.ai-conda-path ────────────────
+_resolve_conda() {
+    # 1. Already cached?
+    if [ -f "$HOME/.ai-conda-path" ]; then
+        local cached
+        cached=$(cat "$HOME/.ai-conda-path")
+        if [ -x "$cached" ]; then echo "$cached"; return; fi
+    fi
+    # 2. conda active in current shell? (e.g. user sees "(base)")
+    if command -v conda &>/dev/null; then
+        local base
+        base=$(conda info --base 2>/dev/null)
+        if [ -x "$base/bin/conda" ]; then echo "$base/bin/conda"; return; fi
+    fi
+    # 3. Search common locations
+    for p in \
+        /opt/miniconda3/bin/conda \
+        /opt/homebrew/Caskroom/miniconda/base/bin/conda \
+        "$HOME/miniconda3/bin/conda" \
+        "$HOME/anaconda3/bin/conda" \
+        /usr/local/Caskroom/miniconda/base/bin/conda; do
+        if [ -x "$p" ]; then echo "$p"; return; fi
+    done
+    return 1
+}
+CONDA_BIN=$(_resolve_conda)
+if [ -n "$CONDA_BIN" ]; then
+    echo "$CONDA_BIN" > "$HOME/.ai-conda-path"
+    export CONDA_BIN
+else
+    export CONDA_BIN=""   # will trigger install prompt below
+fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MODELS_DIR="$SCRIPT_DIR/models"
 MODELS_ZIP="$SCRIPT_DIR/models.zip"
@@ -53,15 +84,23 @@ fi
 
 # ── Prerequisites ────────────────────────────────────────────────────────────
 
-if [ ! -f "$CONDA_BIN" ]; then
-    echo -e "${RED}conda not found at $CONDA_BIN${NC}"
+if [ -z "$CONDA_BIN" ] || [ ! -x "$CONDA_BIN" ]; then
+    echo -e "${RED}conda not found${NC}"
     read -p "  Install Miniconda via brew? [Y/n] " ans
     if [[ "$ans" =~ ^[Nn] ]]; then
         echo "  Aborted. Install manually: brew install --cask miniconda"
         exit 1
     fi
     HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask miniconda
-    echo -e "${GREEN}✓${NC} Miniconda installed"
+    # Re-detect after install and cache
+    CONDA_BIN=$(_resolve_conda)
+    if [ -z "$CONDA_BIN" ]; then
+        echo -e "${RED}ERROR: conda still not found after install${NC}"
+        exit 1
+    fi
+    echo "$CONDA_BIN" > "$HOME/.ai-conda-path"
+    export CONDA_BIN
+    echo -e "${GREEN}✓${NC} Miniconda installed → $CONDA_BIN"
 fi
 
 # Check Xcode CLI tools + license
@@ -124,6 +163,13 @@ if ! command -v git-lfs &> /dev/null; then
     HOMEBREW_NO_AUTO_UPDATE=1 brew install git-lfs
     git lfs install
     echo -e "${GREEN}✓${NC} git-lfs installed"
+fi
+
+# Ensure LFS files are pulled (wheels, models, etc. may be pointer-only after clone)
+if git -C "$SCRIPT_DIR" lfs ls-files 2>/dev/null | grep -q ' - '; then
+    echo "  Pulling Git LFS files (wheels, models) ..."
+    git -C "$SCRIPT_DIR" lfs pull
+    echo -e "${GREEN}✓${NC} LFS files pulled"
 fi
 
 # Check macOS + Apple Silicon
@@ -296,10 +342,11 @@ echo "── Step 22/22: Main App (tts-mist) ──"
 
 ENV_NAME="tts-mist"
 
-if "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} " || [ -d "/opt/miniconda3/envs/$ENV_NAME" ]; then
+CONDA_BASE=$(dirname "$(dirname "$CONDA_BIN")")
+if "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} " || [ -d "$CONDA_BASE/envs/$ENV_NAME" ]; then
     echo "  Removing old '$ENV_NAME' env ..."
     "$CONDA_BIN" env remove -y -n "$ENV_NAME" > /dev/null 2>&1
-    rm -rf "/opt/miniconda3/envs/$ENV_NAME" 2>/dev/null || true
+    rm -rf "$CONDA_BASE/envs/$ENV_NAME" 2>/dev/null || true
 fi
 
 echo "  Creating env: $ENV_NAME (Python 3.11) ..."

@@ -137,7 +137,32 @@ def verify_stats(segments_json: list[dict], total_duration: float,
             print(f"      ... and {len(stats['overlaps']) - 5} more")
 
 
-CONDA_BIN = "/opt/miniconda3/bin/conda"
+def _resolve_conda_bin() -> str:
+    import shutil
+    env_val = os.environ.get("CONDA_BIN")
+    if env_val and Path(env_val).is_file():
+        return env_val
+    cache = Path.home() / ".ai-conda-path"
+    if cache.is_file():
+        cached = cache.read_text().strip()
+        if cached and Path(cached).is_file():
+            return cached
+    which = shutil.which("conda")
+    if which:
+        return which
+    for p in [
+        "/opt/miniconda3/bin/conda",
+        "/opt/homebrew/Caskroom/miniconda/base/bin/conda",
+        str(Path.home() / "miniconda3" / "bin" / "conda"),
+        str(Path.home() / "anaconda3" / "bin" / "conda"),
+    ]:
+        if Path(p).is_file():
+            return p
+    raise FileNotFoundError(
+        "conda not found. Run ./setup.sh first or set CONDA_BIN."
+    )
+
+CONDA_BIN = _resolve_conda_bin()
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent.parent
 
