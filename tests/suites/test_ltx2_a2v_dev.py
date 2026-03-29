@@ -1,7 +1,11 @@
 """Test: Video — LTX-2.3 audio-to-video (dev)."""
 
+import subprocess
 import sys
 from pathlib import Path
+
+_mem = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True))
+VIDEO_QUALITY = "720p" if _mem > 64 * 1024**3 else "480p"
 
 DIALOG = (
     "[Uncle_Fu:german] Hallo Dylan, wie geht es dir heute? "
@@ -45,7 +49,7 @@ def register(suite):
             "--model", "dev",
             "-p", PROMPT,
             "--audio", str(dialog_wav),
-            "--ratio", "16:9", "--quality", "480p",
+            "--ratio", "16:9", "--quality", VIDEO_QUALITY,
             "--frame-rate", "24",
             "--seed", "42",
             "-o", str(out / "ltx2_a2v_dev.mp4"),

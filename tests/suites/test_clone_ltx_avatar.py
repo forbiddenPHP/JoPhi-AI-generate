@@ -1,7 +1,11 @@
 """Test: Clone-TTS → LTX A2V — clone user voice, generate talking avatar video."""
 
+import subprocess
 import sys
 from pathlib import Path
+
+_mem = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True))
+VIDEO_QUALITY = "720p" if _mem > 64 * 1024**3 else "480p"
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 REF_IMAGE = ASSETS_DIR / "johannes.png"
@@ -42,7 +46,7 @@ def register(suite):
             "-p", VIDEO_PROMPT,
             "--audio", str(clone_wav),
             "--image-first", str(REF_IMAGE),
-            "--ratio", "16:9", "--quality", "480p",
+            "--ratio", "16:9", "--quality", VIDEO_QUALITY,
             "--frame-rate", "24",
             "--seed", "42",
             "-o", str(out / "clone_ltx_avatar.mp4"),

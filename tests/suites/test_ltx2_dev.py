@@ -1,7 +1,11 @@
 """Test: Video — LTX-2.3 dev (full model, 40 steps)."""
 
+import subprocess
 import sys
 from pathlib import Path
+
+_mem = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True))
+VIDEO_QUALITY = "720p" if _mem > 64 * 1024**3 else "480p"
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 REF_IMAGE = ASSETS_DIR / "johannes.png"
@@ -20,7 +24,7 @@ def register(suite):
             sys.executable, "generate.py", "video", "ltx2.3",
             "--model", "dev",
             "-p", PROMPT,
-            "--ratio", "16:9", "--quality", "480p",
+            "--ratio", "16:9", "--quality", VIDEO_QUALITY,
             "--num-frames", "48", "--frame-rate", "24",
             "--seed", "42",
             "-o", str(out / "ltx2_dev_t2v.mp4"),
@@ -36,7 +40,7 @@ def register(suite):
             "--model", "dev",
             "-p", PROMPT_I2V,
             "--image-first", str(REF_IMAGE),
-            "--ratio", "1:1", "--quality", "480p",
+            "--ratio", "1:1", "--quality", VIDEO_QUALITY,
             "--num-frames", "120", "--frame-rate", "24",
             "--seed", "42",
             "-o", str(out / "ltx2_dev_i2v.mp4"),

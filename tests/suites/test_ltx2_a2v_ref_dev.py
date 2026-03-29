@@ -1,7 +1,11 @@
 """Test: Video — LTX-2.3 A2V dev with FLUX-generated reference image."""
 
+import subprocess
 import sys
 from pathlib import Path
+
+_mem = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True))
+VIDEO_QUALITY = "720p" if _mem > 64 * 1024**3 else "480p"
 
 SCENE_PROMPT = (
     "Medium shot of two men sitting across from each other at a small café table. "
@@ -65,7 +69,7 @@ def register(suite):
             "-p", VIDEO_PROMPT,
             "--audio", str(dialog_wav),
             "--image-first", str(ref_image),
-            "--ratio", "16:9", "--quality", "480p",
+            "--ratio", "16:9", "--quality", VIDEO_QUALITY,
             "--frame-rate", "24",
             "--seed", "42",
             "-o", str(out / "ltx2_a2v_ref_dev.mp4"),

@@ -84,6 +84,25 @@ def run_cmd(cmd, cwd=None):
 
 def run_suite(suite: Suite, results: Results, counter: list, total: int, force: bool = False):
     """Execute all tests in a suite."""
+    # Skip entire suite (incl. preps) if all real tests already have output
+    real_tests = [t for t in suite.tests if not t.prep]
+    if not force and real_tests and all(
+        t.output and t.output.exists() and t.output.stat().st_size > 0
+        for t in real_tests
+    ):
+        for t in real_tests:
+            counter[0] += 1
+            print()
+            print()
+            print("━" * 64)
+            print(f"  [{counter[0]}/{total}] {t.name}")
+            print("━" * 64)
+            print()
+            print(f"  SKIP (exists): {t.output.name}")
+            results.entries.append(("SKIP", 0, t.name))
+            results.skipped += 1
+        return
+
     suite.out_dir.mkdir(parents=True, exist_ok=True)
     if any(t.prep for t in suite.tests):
         suite.prep_dir.mkdir(parents=True, exist_ok=True)
@@ -93,26 +112,13 @@ def run_suite(suite: Suite, results: Results, counter: list, total: int, force: 
         suite._setup_fn()
 
     try:
-        for test in suite.tests:
-            if test.prep:
-                # Prep steps: run silently, skip if output exists (--force skips cache)
-                if not force and test.output and test.output.exists() and test.output.stat().st_size > 0:
-                    print(f"  CACHED: {test.name}")
-                    continue
-                print(f"  PREP: {test.name}")
-                ok, dur = run_cmd(test.cmd)
-                if not ok:
-                    print(f"  PREP FAILED: {test.name} ({dur}s)")
-                    # Skip remaining tests in this suite
-                    for remaining in suite.tests:
-                        if not remaining.prep:
-                            counter[0] += 1
-                            print(f"\n  [{counter[0]}/{total}] SKIP: {remaining.name} (prep failed)")
-                            results.entries.append(("SKIP", 0, remaining.name))
-                            results.skipped += 1
-                    return
-                continue
+        # Separate preps from real tests, run preps just-in-time before
+        # the first real test that actually needs to execute.
+        preps = [t for t in suite.tests if t.prep]
+        real = [t for t in suite.tests if not t.prep]
+        preps_done = False
 
+        for test in real:
             counter[0] += 1
             idx = counter[0]
 
@@ -129,6 +135,27 @@ def run_suite(suite: Suite, results: Results, counter: list, total: int, force: 
                 results.entries.append(("SKIP", 0, test.name))
                 results.skipped += 1
                 continue
+
+            # Run preps once before the first real test that needs execution
+            if not preps_done:
+                preps_done = True
+                for prep in preps:
+                    if not force and prep.output and prep.output.exists() and prep.output.stat().st_size > 0:
+                        print(f"  CACHED: {prep.name}")
+                        continue
+                    print(f"  PREP: {prep.name}")
+                    ok, dur = run_cmd(prep.cmd)
+                    if not ok:
+                        print(f"  PREP FAILED: {prep.name} ({dur}s)")
+                        # Fail current + skip remaining
+                        results.entries.append(("FAIL", dur, test.name))
+                        results.failed += 1
+                        for remaining in real[real.index(test) + 1:]:
+                            counter[0] += 1
+                            print(f"\n  [{counter[0]}/{total}] SKIP: {remaining.name} (prep failed)")
+                            results.entries.append(("SKIP", 0, remaining.name))
+                            results.skipped += 1
+                        return
 
             ok, dur = run_cmd(test.cmd)
 

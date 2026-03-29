@@ -5,8 +5,12 @@ in latent space (denoise_mask=0 for context, =1 for new frames), then crops
 the context out — preserving person identity via hard latent conditioning.
 """
 
+import subprocess
 import sys
 from pathlib import Path
+
+_mem = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True))
+VIDEO_QUALITY = "720p" if _mem > 64 * 1024**3 else "480p"
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 CLONE_VIDEO = ASSETS_DIR / "VideoCloneTest.mov"
@@ -31,7 +35,7 @@ def register(suite):
             "-p", CLONE_PROMPT,
             "--clone", str(CLONE_VIDEO),
             "--seconds", "5",
-            "--ratio", "16:9", "--quality", "480p",
+            "--ratio", "16:9", "--quality", VIDEO_QUALITY,
             "--seed", "42",
             "-o", str(out / "ltx2_clone.mp4"),
         ],
@@ -46,7 +50,7 @@ def register(suite):
             "-p", CLONE_PROMPT,
             "--clone", str(CLONE_VIDEO),
             "--seconds", "5",
-            "--ratio", "16:9", "--quality", "480p",
+            "--ratio", "16:9", "--quality", VIDEO_QUALITY,
             "--seed", "42",
             "-o", str(out / "ltx2_clone_dev.mp4"),
         ],

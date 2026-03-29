@@ -13,8 +13,12 @@ All dev model.
 """
 
 import json
+import subprocess
 import sys
 from pathlib import Path
+
+_mem = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True))
+VIDEO_QUALITY = "720p" if _mem > 64 * 1024**3 else "480p"
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 BASE_VIDEO = ASSETS_DIR / "ltx2_retake_base.mp4"
@@ -65,7 +69,7 @@ def register(suite):
             "--model", "dev",
             "-p", RETAKE_PROMPT_1,
             "--retake", str(BASE_VIDEO), SEG1_START, SEG1_END,
-            "--ratio", "16:9", "--quality", "480p",
+            "--ratio", "16:9", "--quality", VIDEO_QUALITY,
             "--seed", "42",
             "-o", str(after_p1),
         ],
@@ -82,7 +86,7 @@ def register(suite):
             "--model", "dev",
             "-p", RETAKE_PROMPT_2,
             "--retake", str(after_p1), SEG2_START, SEG2_END,
-            "--ratio", "16:9", "--quality", "480p",
+            "--ratio", "16:9", "--quality", VIDEO_QUALITY,
             "--seed", "42",
             "-o", str(after_p2),
         ],
@@ -98,7 +102,7 @@ def register(suite):
             "--model", "dev",
             "-p", EXTEND_PROMPT,
             "--extend", str(after_p2), "5",
-            "--ratio", "16:9", "--quality", "480p",
+            "--ratio", "16:9", "--quality", VIDEO_QUALITY,
             "--seed", "42",
             "-o", str(out / "ltx2_retake_extend.mp4"),
         ],
