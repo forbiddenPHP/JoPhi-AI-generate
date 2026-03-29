@@ -554,8 +554,8 @@ python generate.py video ltx2.3 -p "a sunset" -o sunset
 | `--seed` | | random | Random seed |
 | `--steps` | | model default | Inference steps |
 | `--cfg-scale` | | model default | CFG guidance scale |
-| `--ratio` | | | Aspect ratio (16:9, 9:16, 21:9, 4:3, 1:1, etc.) |
-| `--quality` | | | Quality tier (240p, 360p, 480p, 720p, 1080p, etc.) |
+| `--ratio` | | | Aspect ratio (see resolution table below) |
+| `--quality` | | | Quality tier (see resolution table below) |
 | `--width` | `-W` | 768 | Video width (override, must be multiple of 64) |
 | `--height` | `-H` | 512 | Video height (override, must be multiple of 64) |
 | `--num-frames` | | 121 | Frame count (must be 8k+1, auto from audio) |
@@ -574,6 +574,28 @@ python generate.py video ltx2.3 -p "a sunset" -o sunset
 | `--retake` | | | `VIDEO START END` — retake a time region (seconds) |
 | `--ref-seconds` | | 2/5 | Context seconds from source (default: 2 for extend, 5 for clone) |
 | `--no-rescale` | | | Keep reference images in original resolution |
+
+#### Resolution Table (`--ratio` + `--quality`)
+
+Dimensions are approximate — all values are aligned to /128 boundaries (VAE requirement: width//2 and height//2 must each be divisible by 32 and even). Higher tiers require more VRAM and processing time.
+
+| Ratio | 240p | 360p | 480p | 720p | 1080p |
+|-------|------|------|------|------|-------|
+| 16:9 | 256x128 | 512x256 | 640x384 | 1152x640 | 1152x640 |
+| 9:16 | 128x256 | 256x512 | 384x640 | 640x1152 | 640x1152 |
+| 21:9 | 256x128 | 512x256 | 640x256 | 896x384 | 1792x768 |
+| 9:21 | 128x256 | 256x512 | 256x640 | 384x896 | 768x1792 |
+| 3:2 | 384x256 | 384x256 | 384x256 | 1152x768 | 1920x1280 |
+| 2:3 | 256x384 | 256x384 | 256x384 | 768x1152 | 1280x1920 |
+| 4:3 | 384x256 | 512x384 | 512x384 | 1024x768 | 1536x1152 |
+| 3:4 | 256x384 | 384x512 | 384x512 | 768x1024 | 1152x1536 |
+| 4:5 | 256x384 | 384x512 | 512x640 | 1024x1280 | 1536x1920 |
+| 5:4 | 384x384 | 512x384 | 640x512 | 1280x1024 | 1920x1536 |
+| 1:1 | 384x384 | 512x512 | 640x640 | 1280x1280 | 1920x1920 |
+| 1:2 | 128x256 | 256x512 | 256x512 | 640x1280 | 896x1792 |
+| 2:1 | 256x128 | 512x256 | 512x256 | 1280x640 | 1792x896 |
+
+Additional tiers available: 1440p, 2160p (4K). Use `--width`/`--height` for custom dimensions (must be multiples of 64).
 
 #### Extend, Clone & Retake
 
