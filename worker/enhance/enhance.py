@@ -121,7 +121,6 @@ def process_file(
 
 def main():
     if "--list-models" in sys.argv:
-        import json
         print(json.dumps([{"model": "", "notice": "single model"}]))
         return
 

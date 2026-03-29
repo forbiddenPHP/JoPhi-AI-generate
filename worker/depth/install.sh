@@ -6,7 +6,7 @@ CONDA_BIN="${CONDA_BIN:-/opt/miniconda3/bin/conda}"
 ENV_NAME="depth"
 WHEELS_DIR="$SCRIPT_DIR/wheels"
 
-echo "── Depth Worker (Apple Depth Pro) ──"
+echo "── Depth Worker (Depth Anything V2) ──"
 
 if "$CONDA_BIN" env list 2>/dev/null | grep -q "^${ENV_NAME} " || [ -d "/opt/miniconda3/envs/$ENV_NAME" ]; then
     echo "  Removing old '$ENV_NAME' env …"
@@ -20,11 +20,11 @@ echo "  Creating env: $ENV_NAME (Python 3.12) …"
 if [ -d "$WHEELS_DIR" ] && [ "$(ls -A "$WHEELS_DIR"/*.whl 2>/dev/null)" ]; then
     echo "  Using cached wheels (offline) …"
     "$CONDA_BIN" run --no-capture-output -n "$ENV_NAME" pip install -q --no-index --find-links "$WHEELS_DIR" \
-        depth-pro
+        transformers torch pillow
 else
-    echo "  Installing Depth Pro from GitHub …"
+    echo "  Installing Depth Anything V2 dependencies from PyPI …"
     "$CONDA_BIN" run --no-capture-output -n "$ENV_NAME" pip install -q \
-        git+https://github.com/apple/ml-depth-pro.git
+        transformers torch pillow
 fi
 
 echo "✓ depth env ready"
