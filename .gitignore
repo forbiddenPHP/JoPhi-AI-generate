@@ -27,6 +27,7 @@ demos/
 *.flac
 *.ogg
 *.m4a
+!worker/tts/default-reference.m4a
 
 # Python
 __pycache__/
