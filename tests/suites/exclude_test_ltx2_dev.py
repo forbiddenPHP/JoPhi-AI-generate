@@ -1,11 +1,9 @@
 """Test: Video — LTX-2.3 dev (full model, 40 steps)."""
 
-import subprocess
 import sys
 from pathlib import Path
 
-_mem = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True))
-VIDEO_QUALITY = "720p" if _mem > 64 * 1024**3 else "480p"
+VIDEO_QUALITY = "480p"
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 REF_IMAGE = ASSETS_DIR / "johannes.png"

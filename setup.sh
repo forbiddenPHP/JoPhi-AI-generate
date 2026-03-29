@@ -368,7 +368,7 @@ if [ -d "$MODELS_DIR" ]; then
 
     # RVC voice models → ./worker/rvc/models/
     if [ -d "$MODELS_DIR/rvc_models" ]; then
-        cp -a "$MODELS_DIR/rvc_models" "$SCRIPT_DIR/worker/rvc/models"
+        cp -a "$MODELS_DIR/rvc_models/." "$SCRIPT_DIR/worker/rvc/models/"
         echo -e "  ${GREEN}✓${NC} RVC models restored"
     fi
 

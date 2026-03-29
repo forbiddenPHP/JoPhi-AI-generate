@@ -27,8 +27,12 @@ SUITES_DIR = Path(__file__).resolve().parent / "suites"
 
 
 def discover_suites():
-    """Auto-discover test suites from tests/suites/test_*.py."""
-    return sorted(p.stem for p in SUITES_DIR.glob("test_*.py"))
+    """Auto-discover test suites from tests/suites/test_*.py.
+    Files prefixed with 'exclude_' are ignored."""
+    return sorted(
+        p.stem for p in SUITES_DIR.glob("test_*.py")
+        if not p.name.startswith("exclude_")
+    )
 
 
 class TestEntry:

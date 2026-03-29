@@ -26,24 +26,27 @@ class AttentionCallable(Protocol):
 
 
 def _optimal_head_chunks(heads: int, seq_len: int, dim_head: int, dtype: torch.dtype) -> int:
-    """Calculate optimal number of heads per chunk based on available memory.
+    """Calculate optimal number of heads per chunk based on truly available RAM.
 
-    Uses torch.mps.current_allocated_memory() for accurate MPS usage,
-    since psutil.virtual_memory().available is unreliable with Unified Memory
-    (memory-mapped model weights appear as 'available' but are MPS-occupied).
+    On Apple Silicon (unified memory), psutil.virtual_memory().available collapses
+    to near zero once the MPS heap is large (model weights occupy most of physical
+    RAM). The correct budget is: total_ram - mps_currently_allocated - os_safety.
+    MPS caches are flushed first so current_allocated_memory() reflects the minimum
+    footprint (weights only, no cached intermediates).
 
     Per-head peak = scores (seq_len²) + Q/K/V slices (3 × seq_len × dim_head).
-    free_for_compute = total_ram - mps_allocated - 5% OS overhead.
+    Safety factor = keep 15 % of the compute budget as headroom.
     Optimal chunk = free_for_compute // per_head_bytes, clamped to [1, heads].
     """
     import psutil
-    # Free cached MPS memory first for accurate measurement
+    # Flush MPS caches before measuring so wired memory reflects true minimum
     torch.mps.synchronize()
     torch.mps.empty_cache()
-    total_ram = psutil.virtual_memory().total
-    mps_allocated = torch.mps.current_allocated_memory()
-    os_overhead = total_ram // 9  # ~11% safety for OS + driver overhead
-    free_for_compute = total_ram - mps_allocated - os_overhead
+    vm = psutil.virtual_memory()
+    # vm.wired = non-pageable RAM (MPS heap + kernel) — the OS knows exactly
+    # what is hard-blocked. free_for_compute = what's left minus OS headroom.
+    os_safety = vm.total // 8           # ~12.5 % headroom for OS + other processes
+    free_for_compute = int((vm.total - vm.wired - os_safety) * 0.85)
 
     bytes_per_el = 2 if dtype in (torch.bfloat16, torch.float16) else 4
     # SDPA internally allocates scores + softmax buffer ≈ 2x scores size
@@ -51,12 +54,19 @@ def _optimal_head_chunks(heads: int, seq_len: int, dim_head: int, dtype: torch.d
     per_head_bytes = int(2.5 * seq_len * seq_len * bytes_per_el + 3 * seq_len * dim_head * bytes_per_el)
     total_needed = per_head_bytes * heads
 
-    if total_needed <= free_for_compute:
-        return heads  # fits entirely, no chunking
+    # Constraint 1: RAM — how many heads fit in available compute budget
+    ram_chunk = max(1, free_for_compute // per_head_bytes) if per_head_bytes > 0 else heads
 
-    # Doesn't fit — calculate how many heads fit
-    chunk_size = max(1, free_for_compute // per_head_bytes)
-    return min(chunk_size, heads)
+    # Constraint 2: MPS 32-bit index hard limit — B×chunk×S×S must stay < 2^31
+    # Exceeding this causes silent output corruption (no error, just garbage)
+    mps_chunk = max(1, (2**31) // (seq_len * seq_len)) if seq_len > 0 else heads
+
+    chunk_size = min(ram_chunk, mps_chunk, heads)
+
+    if chunk_size >= heads:
+        return heads  # fits entirely, no chunking needed
+
+    return chunk_size
 
 
 class PytorchAttention(AttentionCallable):

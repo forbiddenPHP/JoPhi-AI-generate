@@ -1,11 +1,9 @@
-"""Test: Video — LTX-2.3 A2V distilled with FLUX-generated reference image."""
+"""Test: Video — LTX-2.3 A2V dev with FLUX-generated reference image."""
 
-import subprocess
 import sys
 from pathlib import Path
 
-_mem = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True))
-VIDEO_QUALITY = "720p" if _mem > 64 * 1024**3 else "480p"
+VIDEO_QUALITY = "480p"
 
 SCENE_PROMPT = (
     "Medium shot of two men sitting across from each other at a small café table. "
@@ -60,18 +58,19 @@ def register(suite):
         prep=True,
     )
 
-    # A2V distilled with reference image
+    # A2V dev with reference image
     suite.add(
-        name="Video A2V distilled + ref image (dialog)",
+        name="Video A2V dev + ref image (dialog)",
         cmd=[
             sys.executable, "generate.py", "video", "ltx2.3",
+            "--model", "dev",
             "-p", VIDEO_PROMPT,
             "--audio", str(dialog_wav),
             "--image-first", str(ref_image),
             "--ratio", "16:9", "--quality", VIDEO_QUALITY,
             "--frame-rate", "24",
             "--seed", "42",
-            "-o", str(out / "ltx2_a2v_ref_distilled.mp4"),
+            "-o", str(out / "ltx2_a2v_ref_dev.mp4"),
         ],
-        output=out / "ltx2_a2v_ref_distilled.mp4",
+        output=out / "ltx2_a2v_ref_dev.mp4",
     )

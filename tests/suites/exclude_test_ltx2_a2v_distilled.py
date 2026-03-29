@@ -1,11 +1,9 @@
-"""Test: Video — LTX-2.3 audio-to-video (dev)."""
+"""Test: Video — LTX-2.3 audio-to-video (distilled)."""
 
-import subprocess
 import sys
 from pathlib import Path
 
-_mem = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True))
-VIDEO_QUALITY = "720p" if _mem > 64 * 1024**3 else "480p"
+VIDEO_QUALITY = "480p"
 
 DIALOG = (
     "[Uncle_Fu:german] Hallo Dylan, wie geht es dir heute? "
@@ -41,18 +39,17 @@ def register(suite):
         prep=True,
     )
 
-    # A2V dev
+    # A2V distilled
     suite.add(
-        name="Video A2V dev (dialog)",
+        name="Video A2V distilled (dialog)",
         cmd=[
             sys.executable, "generate.py", "video", "ltx2.3",
-            "--model", "dev",
             "-p", PROMPT,
             "--audio", str(dialog_wav),
             "--ratio", "16:9", "--quality", VIDEO_QUALITY,
             "--frame-rate", "24",
             "--seed", "42",
-            "-o", str(out / "ltx2_a2v_dev.mp4"),
+            "-o", str(out / "ltx2_a2v_distilled.mp4"),
         ],
-        output=out / "ltx2_a2v_dev.mp4",
+        output=out / "ltx2_a2v_distilled.mp4",
     )
