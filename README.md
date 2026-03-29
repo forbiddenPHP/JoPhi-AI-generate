@@ -29,7 +29,7 @@ python generate.py voice rvc --model my-voice input.wav
 - ffmpeg (`brew install ffmpeg`)
 - git-lfs (`brew install git-lfs`)
 - Xcode CLI tools with accepted license (`sudo xcodebuild -license accept`)
-- ~25 GB disk for model checkpoints
+- ~305 GB disk for model checkpoints
 
 ---
 
