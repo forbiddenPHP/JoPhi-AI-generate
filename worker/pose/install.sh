@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONDA_BIN="${CONDA_BIN:-/opt/miniconda3/bin/conda}"
 ENV_NAME="openpose"
 WHEELS_DIR="$SCRIPT_DIR/wheels"
+LOCKFILE="$SCRIPT_DIR/requirements.lock"
 
 echo "── Pose Worker (DWPose) ──"
 
@@ -19,10 +20,30 @@ echo "  Creating env: $ENV_NAME (Python 3.12) …"
 
 if [ -d "$WHEELS_DIR" ] && [ "$(ls -A "$WHEELS_DIR"/*.whl 2>/dev/null)" ]; then
     echo "  Using cached wheels (offline) …"
-    "$CONDA_BIN" run --no-capture-output -n "$ENV_NAME" pip install -q --no-index --find-links "$WHEELS_DIR" dwpose
+    "$CONDA_BIN" run --no-capture-output -n "$ENV_NAME" \
+        pip install -q --no-index --find-links "$WHEELS_DIR" -r "$LOCKFILE"
+elif [ -f "$LOCKFILE" ]; then
+    echo "  Using pinned versions from requirements.lock …"
+    "$CONDA_BIN" run --no-capture-output -n "$ENV_NAME" \
+        pip install -q -r "$LOCKFILE"
 else
-    echo "  Installing dwpose from PyPI …"
-    "$CONDA_BIN" run --no-capture-output -n "$ENV_NAME" pip install -q dwpose
+    echo "  No lockfile or wheels found, installing from PyPI …"
+    "$CONDA_BIN" run --no-capture-output -n "$ENV_NAME" \
+        pip install -q dwpose torch onnxruntime opencv-python numpy
+    echo "  Generating requirements.lock …"
+    "$CONDA_BIN" run --no-capture-output -n "$ENV_NAME" \
+        pip freeze > "$LOCKFILE" 2>/dev/null
 fi
 
-echo "✓ openpose env ready"
+# ── Verify ──
+if "$CONDA_BIN" run --no-capture-output -n "$ENV_NAME" python -c "
+from dwpose.wholebody import Wholebody
+import torch
+device = 'mps' if torch.backends.mps.is_available() else 'cpu'
+print(f'  DWPose OK (torch {torch.__version__}, device: {device})')
+" 2>/dev/null; then
+    echo "✓ openpose env ready"
+else
+    echo "✗ openpose env verification failed"
+    exit 1
+fi
