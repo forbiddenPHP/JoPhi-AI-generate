@@ -17,12 +17,12 @@ def _add_tui_json(suite, name, extra_args_str, out):
     out_json = out / f"config_{slug}_json.txt"
     suite.add(
         name=f"Config: {name} (TUI)",
-        cmd=["bash", "-c", f"{_BASE_STR} {extra_args_str} > {out_tui} 2>&1"],
+        cmd=["bash", "-c", f"{_BASE_STR} {extra_args_str} 2>&1 | tee {out_tui}"],
         output=out_tui,
     )
     suite.add(
         name=f"Config: {name} (JSON)",
-        cmd=["bash", "-c", f"{_BASE_STR} {extra_args_str} --screen-log-format json > {out_json} 2>&1"],
+        cmd=["bash", "-c", f"{_BASE_STR} {extra_args_str} --screen-log-format json 2>&1 | tee {out_json}"],
         output=out_json,
     )
 

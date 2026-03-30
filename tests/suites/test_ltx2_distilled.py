@@ -32,7 +32,7 @@ def register(suite):
             "-p", PROMPT,
             "--ratio", "16:9", "--quality", VIDEO_QUALITY,
             "--num-frames", "120", "--frame-rate", "24",
-            "--seed", "42",
+            "--seed", "324623462",
             "-o", str(out / "ltx2_distilled_t2v.mp4"),
         ],
         output=out / "ltx2_distilled_t2v.mp4",

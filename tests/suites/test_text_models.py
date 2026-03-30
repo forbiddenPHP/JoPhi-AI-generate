@@ -30,30 +30,30 @@ def register(suite):
 
     suite.add(
         name="Models: pull smollm2:360m",
-        cmd=["bash", "-c", f"{_MODELS} pull {TEST_MODEL} > {out / 'models_pull.txt'} 2>&1"],
+        cmd=["bash", "-c", f"{_MODELS} pull {TEST_MODEL} 2>&1 | tee {out / 'models_pull.txt'}"],
         output=out / "models_pull.txt",
     )
 
     suite.add(
         name="Models: show smollm2:360m (TUI)",
-        cmd=["bash", "-c", f"{_MODELS} show {TEST_MODEL} > {out / 'models_show_tui.txt'} 2>&1"],
+        cmd=["bash", "-c", f"{_MODELS} show {TEST_MODEL} 2>&1 | tee {out / 'models_show_tui.txt'}"],
         output=out / "models_show_tui.txt",
     )
 
     suite.add(
         name="Models: show smollm2:360m (JSON)",
-        cmd=["bash", "-c", f"{_MODELS} show {TEST_MODEL} --screen-log-format json > {out / 'models_show_json.txt'} 2>&1"],
+        cmd=["bash", "-c", f"{_MODELS} show {TEST_MODEL} --screen-log-format json 2>&1 | tee {out / 'models_show_json.txt'}"],
         output=out / "models_show_json.txt",
     )
 
     suite.add(
         name="Models: inference smollm2:360m",
-        cmd=["bash", "-c", f"{_GEN} text ollama --model {TEST_MODEL} --endpoint generate --prompt 'Say hi.' > {out / 'models_inference.txt'} 2>&1"],
+        cmd=["bash", "-c", f"{_GEN} text ollama --model {TEST_MODEL} --endpoint generate --prompt 'Say hi.' 2>&1 | tee {out / 'models_inference.txt'}"],
         output=out / "models_inference.txt",
     )
 
     suite.add(
         name="Models: remove smollm2:360m",
-        cmd=["bash", "-c", f"{_MODELS} remove {TEST_MODEL} > {out / 'models_remove.txt'} 2>&1"],
+        cmd=["bash", "-c", f"{_MODELS} remove {TEST_MODEL} 2>&1 | tee {out / 'models_remove.txt'}"],
         output=out / "models_remove.txt",
     )

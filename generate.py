@@ -1168,14 +1168,39 @@ def _ollama_maybe_update_models():
         _OLLAMA_MODEL_UPDATE_STAMP.touch()
         return
 
+    # Detect aliases: models whose Modelfile references another local model
+    local_names = {m.get("name", m.get("model", "")) for m in models}
+    aliases = set()
+    for m in models:
+        name = m.get("name", m.get("model", ""))
+        if not name:
+            continue
+        try:
+            resp = requests.post(f"{base_url}/api/show", json={"name": name}, timeout=10)
+            if resp.ok:
+                modelfile = resp.json().get("modelfile", "")
+                for line in modelfile.splitlines():
+                    if line.strip().upper().startswith("FROM "):
+                        from_ref = line.strip()[5:].strip()
+                        # If FROM references a local model name, it's an alias
+                        if from_ref in local_names or any(from_ref == n.split(":")[0] for n in local_names):
+                            aliases.add(name)
+                        break
+        except Exception:
+            pass
+
     _emit("Checking Ollama models for updates …", "stage")
     for m in models:
         name = m.get("name", m.get("model", ""))
         if not name:
             continue
+        if name in aliases:
+            _emit(f"  Skipping alias '{name}'")
+            _ollama_set_max_context(base_url, None, name)
+            continue
         # Pull (no-op if already up to date)
-        result = subprocess.run(["ollama", "pull", name],
-                                capture_output=True, text=True, timeout=600)
+        _emit(f"  Pulling '{name}' …")
+        result = run_worker(["ollama", "pull", name], on_event=_event_handler, timeout=600)
         if result.returncode == 0:
             # Ensure num_ctx is set to max
             _ollama_set_max_context(base_url, None, name)
@@ -1232,7 +1257,7 @@ def _ollama_set_max_context(base_url: str, api_key: str | None, model: str):
                                 capture_output=True, text=True, timeout=60)
         os.unlink(tmp_path)
         if result.returncode == 0:
-            _emit(f"  num_ctx set to {max_ctx:,d} (model maximum).")
+            _emit(f"  num_ctx set to {max_ctx:,d} for '{model}' (model maximum).")
         else:
             _emit(f"  WARNING: Could not set num_ctx: {result.stderr.strip()}", "log")
     except Exception:
