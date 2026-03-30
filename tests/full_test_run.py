@@ -203,6 +203,7 @@ def main():
     parser.add_argument("--only", help="Comma-separated suite names to run")
     parser.add_argument("--force", action="store_true", help="Re-run tests even if output exists")
     parser.add_argument("--list", action="store_true", help="List all tests and exit")
+    parser.add_argument("--probe", action="store_true", help="Show which tests still need to run and exit")
     args = parser.parse_args()
 
     os.chdir(SCRIPT_DIR)
@@ -222,6 +223,26 @@ def main():
                 else:
                     idx += 1
                     print(f"  [{idx:2d}/{total}]  {test.name}")
+            print()
+        return
+
+    if args.probe:
+        idx = 0
+        pending = []
+        for suite in suites:
+            for test in suite.tests:
+                if test.prep:
+                    continue
+                idx += 1
+                if test.output and test.output.exists() and test.output.stat().st_size > 0:
+                    continue
+                pending.append((idx, test.name))
+        if not pending:
+            print(f"\n  Alle {total} Tests haben Output. Nichts zu tun.\n")
+        else:
+            print(f"\n  {len(pending)} von {total} Tests noch offen:\n")
+            for i, name in pending:
+                print(f"  [{i:3d}/{total}]  {name}")
             print()
         return
 

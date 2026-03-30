@@ -3,12 +3,20 @@
 import sys
 from pathlib import Path
 
-VIDEO_QUALITY = "480p"
+import os
+VIDEO_QUALITY = "720p" if os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") > 64 * 1024**3 else "480p"
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 REF_IMAGE = ASSETS_DIR / "johannes.png"
 
-PROMPT = "A small orange cat running through a sunlit meadow, camera slowly tracking"
+PROMPT = (
+    "Wide shot of a small orange tabby cat bounding through a sunlit wildflower meadow. "
+    "Warm golden hour light, shallow depth of field, soft bokeh in the background. "
+    "The cat leaps over tall grass, ears perked forward, tail streaming behind. "
+    "The camera tracks alongside at low angle, keeping pace. "
+    "Pollen and tiny seeds drift through the warm air. "
+    "Birdsong fills the background, soft rustling of grass underfoot."
+)
 PROMPT_I2V = "A man smiles, nods slowly and says in German: \"Hallo, ich bin Johannes.\""
 
 
@@ -17,12 +25,13 @@ def register(suite):
 
     # T2V with distilled model — 16:9 240p (fast test)
     suite.add(
-        name="Video T2V distilled 2s",
+        name="Video T2V distilled 5s",
         cmd=[
             sys.executable, "generate.py", "video", "ltx2.3",
+            "--model", "distilled",
             "-p", PROMPT,
             "--ratio", "16:9", "--quality", VIDEO_QUALITY,
-            "--num-frames", "48", "--frame-rate", "24",
+            "--num-frames", "120", "--frame-rate", "24",
             "--seed", "42",
             "-o", str(out / "ltx2_distilled_t2v.mp4"),
         ],
@@ -34,6 +43,7 @@ def register(suite):
         name="Video I2V distilled 5s (johannes)",
         cmd=[
             sys.executable, "generate.py", "video", "ltx2.3",
+            "--model", "distilled",
             "-p", PROMPT_I2V,
             "--image-first", str(REF_IMAGE),
             "--ratio", "1:1", "--quality", VIDEO_QUALITY,

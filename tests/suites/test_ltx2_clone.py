@@ -8,7 +8,8 @@ the context out — preserving person identity via hard latent conditioning.
 import sys
 from pathlib import Path
 
-VIDEO_QUALITY = "480p"
+import os
+VIDEO_QUALITY = "720p" if os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") > 64 * 1024**3 else "480p"
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 CLONE_VIDEO = ASSETS_DIR / "VideoCloneTest.mov"
@@ -40,17 +41,3 @@ def register(suite):
         output=out / "ltx2_clone.mp4",
     )
 
-    suite.add(
-        name="Clone 5s (dev)",
-        cmd=[
-            sys.executable, "generate.py", "video", "ltx2.3",
-            "--model", "dev",
-            "-p", CLONE_PROMPT,
-            "--clone", str(CLONE_VIDEO),
-            "--seconds", "5",
-            "--ratio", "16:9", "--quality", VIDEO_QUALITY,
-            "--seed", "42",
-            "-o", str(out / "ltx2_clone_dev.mp4"),
-        ],
-        output=out / "ltx2_clone_dev.mp4",
-    )

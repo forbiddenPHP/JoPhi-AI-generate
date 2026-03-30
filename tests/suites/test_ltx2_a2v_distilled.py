@@ -3,7 +3,8 @@
 import sys
 from pathlib import Path
 
-VIDEO_QUALITY = "480p"
+import os
+VIDEO_QUALITY = "720p" if os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") > 64 * 1024**3 else "480p"
 
 DIALOG = (
     "[Uncle_Fu:german] Hallo Dylan, wie geht es dir heute? "
@@ -13,10 +14,11 @@ DIALOG = (
 
 PROMPT = (
     "Medium shot of two men sitting across from each other at a small café table. "
+    "A 60-year-old Japanese man with short grey hair (Uncle Fu) and a 20-year-old American man with brown hair (Dylan). "
     "Warm afternoon light, shallow depth of field. "
-    "The older man leans forward and says in German: \"Hallo Dylan, wie geht es dir heute?\" "
-    "The younger man nods, smiles and replies in German: \"Mir geht es bestens, danke der Nachfrage! Und dir?\" "
-    "The older man gestures toward the window and says in German: \"Kann nicht klagen. Schönes Wetter heute, findest du nicht?\""
+    "The older Japanese man leans forward and says in German: \"Hallo Dylan, wie geht es dir heute?\" "
+    "The young American nods, smiles and replies in German: \"Mir geht es bestens, danke der Nachfrage! Und dir?\" "
+    "The older Japanese man gestures toward the window and says in German: \"Kann nicht klagen. Schönes Wetter heute, findest du nicht?\""
 )
 
 # num_frames derived from audio length automatically
@@ -44,6 +46,7 @@ def register(suite):
         name="Video A2V distilled (dialog)",
         cmd=[
             sys.executable, "generate.py", "video", "ltx2.3",
+            "--model", "distilled",
             "-p", PROMPT,
             "--audio", str(dialog_wav),
             "--ratio", "16:9", "--quality", VIDEO_QUALITY,

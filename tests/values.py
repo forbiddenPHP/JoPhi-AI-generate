@@ -14,36 +14,67 @@ _VIDEO_RATIOS = {
     "1:1": (1, 1), "1:2": (1, 2), "2:1": (2, 1),
 }
 
-_VIDEO_QUALITY = {
-    "240p": 448, "360p": 576, "480p": 640, "720p": 1280,
-    "1080p": 1920, "1440p": 2560, "2160p": 3840, "4k": 4096,
+_VIDEO_QUALITY_TARGET = {
+    "240p": 240, "360p": 360, "480p": 480, "720p": 720,
+    "1080p": 1080, "1440p": 1440, "2160p": 2160, "4k": 4096,
 }
+
+ALIGN = 64  # two-stage pipeline requires width % 64 == 0 and height % 64 == 0
+
+
+def _nearest_aligned(val):
+    """Round to nearest multiple of ALIGN."""
+    return max(ALIGN, round(val / ALIGN) * ALIGN)
 
 
 def resolve_clone(ratio_str, quality_str):
     """Bestes /128-kompatibles (w, h) für gegebene ratio+quality.
-    Nimmt das Paar mit minimaler Ratio-Abweichung; bei Gleichstand das größere.
+    Der GRÖSSERE Wert liegt möglichst nah am Quality-Target.
+    Der kleinere Wert wird aus dem Ratio berechnet und auf /128 gerundet.
     """
     rw, rh = _VIDEO_RATIOS[ratio_str]
     ratio = rw / rh
-    max_dim = _VIDEO_QUALITY[quality_str]
+    target = _VIDEO_QUALITY_TARGET[quality_str]
 
-    best = None
-    best_dev = float("inf")
-    for w in range(128, max_dim + 1, 128):
-        for h in range(128, max_dim + 1, 128):
-            dev = abs(w / h - ratio) / ratio
-            area = w * h
-            if dev < best_dev or (dev == best_dev and area > best[0] * best[1]):
-                best_dev = dev
-                best = (w, h)
+    # Der größere Wert soll ~target sein
+    target_aligned = _nearest_aligned(target)
+
+    if ratio >= 1.0:
+        # width >= height
+        w = target_aligned
+        h = _nearest_aligned(w / ratio)
+    else:
+        # height > width
+        h = target_aligned
+        w = _nearest_aligned(h * ratio)
+
+    # Prüfe ob es mit target+ALIGN oder target-ALIGN ein besseres Ratio-Match gibt
+    best = (w, h)
+    best_dev = abs(w / h - ratio) / ratio
+
+    for offset in [-ALIGN, ALIGN]:
+        if ratio >= 1.0:
+            w2 = target_aligned + offset
+            if w2 < ALIGN:
+                continue
+            h2 = _nearest_aligned(w2 / ratio)
+        else:
+            h2 = target_aligned + offset
+            if h2 < ALIGN:
+                continue
+            w2 = _nearest_aligned(h2 * ratio)
+        dev2 = abs(w2 / h2 - ratio) / ratio
+        if dev2 < best_dev:
+            best_dev = dev2
+            best = (w2, h2)
+
     return best, best_dev
 
 
 if __name__ == "__main__":
     print(f"{'params':<20} {'width':>6} {'height':>6} {'width/2':>8} {'height/2':>9} {'w/2 %32':>8} {'h/2 %32':>8} {'w/2/32 even':>12} {'h/2/32 even':>12} {'Abweichung':>11}")
     print("-" * 105)
-    for quality in _VIDEO_QUALITY:
+    for quality in _VIDEO_QUALITY_TARGET:
         for ratio in _VIDEO_RATIOS:
             result, dev = resolve_clone(ratio, quality)
             if result:

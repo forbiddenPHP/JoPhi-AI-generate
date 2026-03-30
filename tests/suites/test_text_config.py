@@ -7,24 +7,28 @@ SCRIPT_DIR = Path(__file__).resolve().parent.parent.parent
 MODEL = "qwen3.5:latest"
 ENGINE = "ollama"
 
-_BASE = [sys.executable, "generate.py", "text", ENGINE, "--model", MODEL]
+_BASE_STR = f"{sys.executable} generate.py text {ENGINE} --model {MODEL}"
 
 
-def _add_tui_json(suite, name, extra_args):
+def _add_tui_json(suite, name, extra_args_str, out):
     """Register a test twice: once TUI, once JSON."""
-    suite.add(name=f"Config: {name} (TUI)", cmd=[*_BASE, *extra_args])
-    suite.add(name=f"Config: {name} (JSON)", cmd=[*_BASE, *extra_args, "--screen-log-format", "json"])
+    slug = name.replace(" ", "_")
+    out_tui = out / f"config_{slug}_tui.txt"
+    out_json = out / f"config_{slug}_json.txt"
+    suite.add(
+        name=f"Config: {name} (TUI)",
+        cmd=["bash", "-c", f"{_BASE_STR} {extra_args_str} > {out_tui} 2>&1"],
+        output=out_tui,
+    )
+    suite.add(
+        name=f"Config: {name} (JSON)",
+        cmd=["bash", "-c", f"{_BASE_STR} {extra_args_str} --screen-log-format json > {out_json} 2>&1"],
+        output=out_json,
+    )
 
 
 def register(suite):
-    _add_tui_json(suite, "set", [
-        "--endpoint", "set", "--context-length", "128000",
-    ])
-
-    _add_tui_json(suite, "show", [
-        "--endpoint", "show",
-    ])
-
-    _add_tui_json(suite, "reset", [
-        "--endpoint", "reset",
-    ])
+    out = suite.out_dir
+    _add_tui_json(suite, "set", "--endpoint set --context-length 128000", out)
+    _add_tui_json(suite, "show", "--endpoint show", out)
+    _add_tui_json(suite, "reset", "--endpoint reset", out)

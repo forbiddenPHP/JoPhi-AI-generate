@@ -3,7 +3,8 @@
 import sys
 from pathlib import Path
 
-VIDEO_QUALITY = "480p"
+import os
+VIDEO_QUALITY = "720p" if os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") > 64 * 1024**3 else "480p"
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 REF_IMAGE = ASSETS_DIR / "johannes.png"
@@ -41,10 +42,11 @@ def register(suite):
         name="LTX A2V avatar (clone voice + johannes.png)",
         cmd=[
             sys.executable, "generate.py", "video", "ltx2.3",
+            "--model", "distilled",
             "-p", VIDEO_PROMPT,
             "--audio", str(clone_wav),
             "--image-first", str(REF_IMAGE),
-            "--ratio", "16:9", "--quality", VIDEO_QUALITY,
+            "--ratio", "1:1", "--quality", VIDEO_QUALITY,
             "--frame-rate", "24",
             "--seed", "42",
             "-o", str(out / "clone_ltx_avatar.mp4"),

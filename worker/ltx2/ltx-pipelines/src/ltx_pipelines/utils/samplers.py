@@ -6,6 +6,7 @@ from typing import Callable
 import torch
 from tqdm import tqdm
 
+from ltx_core.model.transformer.model import set_denoise_step
 from ltx_core.components.diffusion_steps import Res2sDiffusionStep
 from ltx_core.components.protocols import DiffusionStepProtocol
 from ltx_core.utils import to_denoised, to_velocity
@@ -54,7 +55,9 @@ def euler_denoising_loop(
         A pair ``(video_state, audio_state)`` containing the final video and
         audio latent states after completing the denoising loop.
     """
+    n_steps = len(sigmas) - 1
     for step_idx, _ in enumerate(tqdm(sigmas[:-1], desc="Denoising")):
+        set_denoise_step(step_idx + 1, n_steps)
         denoised_video, denoised_audio = denoise_fn(video_state, audio_state, sigmas, step_idx)
 
         denoised_video = post_process_latent(denoised_video, video_state.denoise_mask, video_state.clean_latent)
@@ -104,7 +107,9 @@ def gradient_estimating_euler_denoising_loop(
             denoised_sample = to_denoised(noisy_sample, total_velocity, sigma)
         return current_velocity, denoised_sample
 
+    n_steps = len(sigmas) - 1
     for step_idx, _ in enumerate(tqdm(sigmas[:-1], desc="Denoising")):
+        set_denoise_step(step_idx + 1, n_steps)
         denoised_video, denoised_audio = denoise_fn(video_state, audio_state, sigmas, step_idx)
 
         denoised_video = post_process_latent(denoised_video, video_state.denoise_mask, video_state.clean_latent)

@@ -43,12 +43,16 @@ def register(suite):
         prep=True,
     )
 
-    # Start RVC server
+    # Start RVC server (prep) / Stop RVC server (cleanup)
     suite.add(
         name="RVC server start",
         cmd=[sys.executable, "generate.py", "server", "start"],
         prep=True,
     )
+    suite.on_cleanup(lambda: __import__('subprocess').run(
+        [sys.executable, "generate.py", "server", "stop"],
+        cwd=str(Path(__file__).resolve().parent.parent.parent),
+    ))
 
     # Test: Convert Say output through every installed model
     prep_say_name = prep_say.name
@@ -73,10 +77,6 @@ def register(suite):
             "--text", "Das ist ein Test der Say plus RVC Pipeline.",
             "-o", str(out),
         ],
+        output=out / "rvc" / "say_default_das_ist_ein_test_der.wav",
     )
 
-    # Stop RVC server
-    suite.add(
-        name="RVC server stop",
-        cmd=[sys.executable, "generate.py", "server", "stop"],
-    )

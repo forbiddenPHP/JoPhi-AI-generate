@@ -9,14 +9,15 @@ Steps:
   1. Retake passage 1 (her line, 0.0–1.0s) → German dialog
   2. Retake passage 2 (his line) → German dialog
   3. Extend by 5 seconds with continuation
-All dev model.
+All distilled model.
 """
 
 import json
 import sys
 from pathlib import Path
 
-VIDEO_QUALITY = "480p"
+import os
+VIDEO_QUALITY = "720p" if os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") > 64 * 1024**3 else "480p"
 
 ASSETS_DIR = Path(__file__).resolve().parent.parent / "assets"
 BASE_VIDEO = ASSETS_DIR / "ltx2_retake_base.mp4"
@@ -64,7 +65,7 @@ def register(suite):
         name=f"Retake pass 1 ({SEG1_START}–{SEG1_END}s, she)",
         cmd=[
             sys.executable, "generate.py", "video", "ltx2.3",
-            "--model", "dev",
+            "--model", "distilled",
             "-p", RETAKE_PROMPT_1,
             "--retake", str(BASE_VIDEO), SEG1_START, SEG1_END,
             "--ratio", "16:9", "--quality", VIDEO_QUALITY,
@@ -81,7 +82,7 @@ def register(suite):
         name=f"Retake pass 2 ({SEG2_START}–{SEG2_END}s, he)",
         cmd=[
             sys.executable, "generate.py", "video", "ltx2.3",
-            "--model", "dev",
+            "--model", "distilled",
             "-p", RETAKE_PROMPT_2,
             "--retake", str(after_p1), SEG2_START, SEG2_END,
             "--ratio", "16:9", "--quality", VIDEO_QUALITY,
@@ -97,7 +98,7 @@ def register(suite):
         name="Extend +5s",
         cmd=[
             sys.executable, "generate.py", "video", "ltx2.3",
-            "--model", "dev",
+            "--model", "distilled",
             "-p", EXTEND_PROMPT,
             "--extend", str(after_p2), "5",
             "--ratio", "16:9", "--quality", VIDEO_QUALITY,

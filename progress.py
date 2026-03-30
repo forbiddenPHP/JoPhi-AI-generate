@@ -524,16 +524,12 @@ def print_event_tui(event: ProgressEvent):
         counter_match = _COUNTER_RE.search(msg)
         label = _current_stage
         if counter_match:
-            # Extract the description after [i/n]
+            # Extract the description after [i/n] and use as bar label
             after_counter = msg[counter_match.end():].strip()
             if after_counter:
-                if _last_was_progress:
-                    # Move up to overwrite previous info+bar
-                    print(f"\033[A{_CLEAR_LINE}\r{_CLEAR_LINE}", end="", file=sys.stderr)
-                # Info line above bar
-                print(f"\r{_CLEAR_LINE}  {_MARKER_INFO} {after_counter}", file=sys.stderr, flush=True)
-            # Don't carry over stale stage label to counter-based progress
-            label = ""
+                label = after_counter
+            else:
+                label = ""
 
         # Use tqdm description as label if available
         if event.stage:

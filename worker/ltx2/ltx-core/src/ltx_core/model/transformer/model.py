@@ -16,6 +16,23 @@ from ltx_core.model.transformer.transformer_args import (
 from ltx_core.utils import to_denoised
 
 
+# ── Denoise step tracking (set by samplers, read by transformer) ─────────
+_denoise_step_info: tuple[int, int] | None = None
+_pass_info: tuple[int, int] | None = None
+
+
+def set_denoise_step(current: int, total: int):
+    """Called by samplers before each denoise_fn call."""
+    global _denoise_step_info
+    _denoise_step_info = (current, total)
+
+
+def set_pass_info(current: int, total: int):
+    """Called by guider before each transformer() call."""
+    global _pass_info
+    _pass_info = (current, total)
+
+
 class LTXModelType(Enum):
     AudioVideo = "ltx av model"
     VideoOnly = "ltx video only model"
@@ -344,15 +361,12 @@ class LTXModel(torch.nn.Module):
     ) -> tuple[TransformerArgs, TransformerArgs]:
         """Process transformer blocks for LTXAV."""
 
-        # Process transformer blocks
-        # On MPS: sync periodically to flush compute graph and free intermediate buffers.
-        # Without this, MPS accumulates the entire 48-layer graph and tries to allocate
-        # one giant MTLBuffer, causing OOM on memory-constrained devices.
-        is_mps = (video is not None and video.x.device.type == "mps") or \
-                 (audio is not None and audio.x.device.type == "mps")
-        sync_interval = self._mps_sync_interval(len(self.transformer_blocks)) if is_mps else 0
-
+        import sys as _sys
+        num_layers = len(self.transformer_blocks)
         for i, block in enumerate(self.transformer_blocks):
+            step_str = f" Denoise {_denoise_step_info[0]}/{_denoise_step_info[1]}" if _denoise_step_info else ""
+            pass_str = f" – Pass {_pass_info[0]}/{_pass_info[1]}" if _pass_info else ""
+            print(f"\r  [{i+1}/{num_layers}]{step_str}{pass_str}", end="", file=_sys.stderr)
             if self._enable_gradient_checkpointing and self.training:
                 video, audio = torch.utils.checkpoint.checkpoint(
                     block,
@@ -367,28 +381,9 @@ class LTXModel(torch.nn.Module):
                     audio=audio,
                     perturbations=perturbations,
                 )
-            if sync_interval and (i + 1) % sync_interval == 0:
-                torch.mps.synchronize()
+        print("", file=_sys.stderr)  # newline after final layer
 
         return video, audio
-
-    @staticmethod
-    def _mps_sync_interval(num_layers: int) -> int:
-        """Calculate how often to sync MPS based on available memory.
-
-        More free RAM → less frequent syncs (faster).
-        Less free RAM → more frequent syncs (safer).
-        """
-        import psutil
-        free_gb = psutil.virtual_memory().available / (1024 ** 3)
-        if free_gb > 32:
-            return 0  # plenty of room, no syncing needed
-        elif free_gb > 16:
-            return 8  # sync every 8 layers
-        elif free_gb > 8:
-            return 4  # sync every 4 layers
-        else:
-            return 1  # very tight, sync after every layer
 
     def _process_output(
         self,

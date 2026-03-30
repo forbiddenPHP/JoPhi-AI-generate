@@ -1,9 +1,16 @@
-"""Test: Video — LTX-2.3 audio-to-video (dev)."""
+"""Test: Video — LTX-2.3 A2V distilled with FLUX-generated reference image."""
 
 import sys
 from pathlib import Path
 
-VIDEO_QUALITY = "480p"
+import os
+VIDEO_QUALITY = "720p" if os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") > 64 * 1024**3 else "480p"
+
+SCENE_PROMPT = (
+    "Medium shot of a 60-year-old Japanese man with short grey hair and a 20-year-old American man with brown hair "
+    "sitting across from each other at a small café table. "
+    "Warm afternoon light from large windows, shallow depth of field, clean modern interior."
+)
 
 DIALOG = (
     "[Uncle_Fu:german] Hallo Dylan, wie geht es dir heute? "
@@ -11,7 +18,7 @@ DIALOG = (
     "[Uncle_Fu:german] Kann nicht klagen. Schönes Wetter heute, findest du nicht?"
 )
 
-PROMPT = (
+VIDEO_PROMPT = (
     "Medium shot of two men sitting across from each other at a small café table. "
     "Warm afternoon light, shallow depth of field. "
     "The older man leans forward and says in German: \"Hallo Dylan, wie geht es dir heute?\" "
@@ -19,15 +26,29 @@ PROMPT = (
     "The older man gestures toward the window and says in German: \"Kann nicht klagen. Schönes Wetter heute, findest du nicht?\""
 )
 
-# num_frames derived from audio length automatically
-
 
 def register(suite):
     out = suite.out_dir
     prep = suite.prep_dir
+    ref_image = prep / "a2v_ref_scene.png"
     dialog_wav = prep / "a2v_dialog.wav"
 
-    # Prep: Generate dialog via ai-tts
+    # Prep 1: Generate reference image with FLUX
+    suite.add(
+        name="FLUX scene image",
+        cmd=[
+            sys.executable, "generate.py", "image",
+            "flux.2", "--model", "4b-distilled",
+            "-p", SCENE_PROMPT,
+            "--seed", "42",
+            "--ratio", "16:9", "--quality", VIDEO_QUALITY,
+            "-o", str(ref_image),
+        ],
+        output=ref_image,
+        prep=True,
+    )
+
+    # Prep 2: Generate dialog via ai-tts
     suite.add(
         name="AI-TTS dialog",
         cmd=[
@@ -39,18 +60,19 @@ def register(suite):
         prep=True,
     )
 
-    # A2V dev
+    # A2V distilled with reference image
     suite.add(
-        name="Video A2V dev (dialog)",
+        name="Video A2V distilled + ref image (dialog)",
         cmd=[
             sys.executable, "generate.py", "video", "ltx2.3",
-            "--model", "dev",
-            "-p", PROMPT,
+            "--model", "distilled",
+            "-p", VIDEO_PROMPT,
             "--audio", str(dialog_wav),
+            "--image-first", str(ref_image),
             "--ratio", "16:9", "--quality", VIDEO_QUALITY,
             "--frame-rate", "24",
             "--seed", "42",
-            "-o", str(out / "ltx2_a2v_dev.mp4"),
+            "-o", str(out / "ltx2_a2v_ref_distilled.mp4"),
         ],
-        output=out / "ltx2_a2v_dev.mp4",
+        output=out / "ltx2_a2v_ref_distilled.mp4",
     )

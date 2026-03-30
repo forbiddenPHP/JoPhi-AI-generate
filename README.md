@@ -582,23 +582,23 @@ python generate.py video ltx2.3 -p "a sunset" -o sunset
 
 #### Resolution Table (`--ratio` + `--quality`)
 
-Dimensions are approximate — all values are aligned to /128 boundaries (VAE requirement: width//2 and height//2 must each be divisible by 32 and even). Higher tiers require more VRAM and processing time.
+Dimensions are approximate — all values are aligned to /64 boundaries (two-stage VAE requirement: width % 64 == 0, height % 64 == 0). The larger dimension targets the quality tier. Higher tiers require more VRAM and processing time.
 
 | Ratio | 240p | 360p | 480p | 720p | 1080p |
 |-------|------|------|------|------|-------|
-| 16:9 | 256x128 | 512x256 | 640x384 | 1152x640 | 1152x640 |
-| 9:16 | 128x256 | 256x512 | 384x640 | 640x1152 | 640x1152 |
-| 21:9 | 256x128 | 512x256 | 640x256 | 896x384 | 1792x768 |
-| 9:21 | 128x256 | 256x512 | 256x640 | 384x896 | 768x1792 |
-| 3:2 | 384x256 | 384x256 | 384x256 | 1152x768 | 1920x1280 |
-| 2:3 | 256x384 | 256x384 | 256x384 | 768x1152 | 1280x1920 |
-| 4:3 | 384x256 | 512x384 | 512x384 | 1024x768 | 1536x1152 |
-| 3:4 | 256x384 | 384x512 | 384x512 | 768x1024 | 1152x1536 |
-| 4:5 | 256x384 | 384x512 | 512x640 | 1024x1280 | 1536x1920 |
-| 5:4 | 384x384 | 512x384 | 640x512 | 1280x1024 | 1920x1536 |
-| 1:1 | 384x384 | 512x512 | 640x640 | 1280x1280 | 1920x1920 |
-| 1:2 | 128x256 | 256x512 | 256x512 | 640x1280 | 896x1792 |
-| 2:1 | 256x128 | 512x256 | 512x256 | 1280x640 | 1792x896 |
+| 16:9 | 320x192 | 448x256 | 576x320 | 704x384 | 1024x576 |
+| 9:16 | 192x320 | 256x448 | 320x576 | 384x704 | 576x1024 |
+| 21:9 | 320x128 | 448x192 | 448x192 | 768x320 | 1024x448 |
+| 9:21 | 128x320 | 192x448 | 192x448 | 320x768 | 448x1024 |
+| 3:2 | 192x128 | 384x256 | 576x384 | 768x512 | 1152x768 |
+| 2:3 | 128x192 | 256x384 | 384x576 | 512x768 | 768x1152 |
+| 4:3 | 256x192 | 448x320 | 512x384 | 768x576 | 1024x768 |
+| 3:4 | 192x256 | 320x448 | 384x512 | 576x768 | 768x1024 |
+| 4:5 | 256x320 | 256x320 | 448x576 | 512x640 | 832x1024 |
+| 5:4 | 320x256 | 320x256 | 576x448 | 640x512 | 1024x832 |
+| 1:1 | 256x256 | 384x384 | 512x512 | 704x704 | 1088x1088 |
+| 1:2 | 128x256 | 192x384 | 256x512 | 320x640 | 512x1024 |
+| 2:1 | 256x128 | 384x192 | 512x256 | 640x320 | 1024x512 |
 
 Additional tiers available: 1440p, 2160p (4K). Use `--width`/`--height` for custom dimensions (must be multiples of 64).
 

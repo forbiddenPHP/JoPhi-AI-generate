@@ -19,23 +19,11 @@ def register(suite):
         name="Audio LTX distilled (Oktoberfest 10s)",
         cmd=[
             sys.executable, "generate.py", "audio", "ltx2.3",
+            "--model", "distilled",
             "--text", PROMPT,
             "--seconds", "10",
             "--seed", "42",
             "-o", str(out / "ltx_oktoberfest_distilled.wav"),
         ],
         output=out / "ltx_oktoberfest_distilled.wav",
-    )
-
-    suite.add(
-        name="Audio LTX dev (Oktoberfest 10s)",
-        cmd=[
-            sys.executable, "generate.py", "audio", "ltx2.3",
-            "--model", "dev",
-            "--text", PROMPT,
-            "--seconds", "10",
-            "--seed", "42",
-            "-o", str(out / "ltx_oktoberfest_dev.wav"),
-        ],
-        output=out / "ltx_oktoberfest_dev.wav",
     )

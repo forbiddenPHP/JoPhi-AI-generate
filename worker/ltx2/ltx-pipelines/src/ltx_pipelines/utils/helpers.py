@@ -18,6 +18,7 @@ from ltx_core.guidance.perturbations import (
     PerturbationConfig,
     PerturbationType,
 )
+from ltx_core.model.transformer.model import set_pass_info
 from ltx_core.model.transformer import Modality, X0Model
 from ltx_core.model.video_vae import VideoEncoder
 from ltx_core.text_encoders.gemma import GemmaTextEncoder
@@ -389,6 +390,16 @@ def multi_modal_guider_denoising_func(
             audio_state, a_context, sigma, enabled=not audio_guider.should_skip_step(step_index)
         )
 
+        total_passes = 1
+        if video_guider.do_unconditional_generation() or audio_guider.do_unconditional_generation():
+            total_passes += 1
+        if video_guider.do_perturbed_generation() or audio_guider.do_perturbed_generation():
+            total_passes += 1
+        if video_guider.do_isolated_modality_generation() or audio_guider.do_isolated_modality_generation():
+            total_passes += 1
+        current_pass = 1
+        set_pass_info(current_pass, total_passes)
+
         denoised_video, denoised_audio = transformer(
             video=pos_video_modality, audio=pos_audio_modality, perturbations=None
         )
@@ -413,6 +424,8 @@ def multi_modal_guider_denoising_func(
                 sigma,
             )
 
+            current_pass += 1
+            set_pass_info(current_pass, total_passes)
             neg_denoised_video, neg_denoised_audio = transformer(
                 video=neg_video_modality, audio=neg_audio_modality, perturbations=None
             )
@@ -429,6 +442,8 @@ def multi_modal_guider_denoising_func(
                     Perturbation(type=PerturbationType.SKIP_AUDIO_SELF_ATTN, blocks=audio_guider.params.stg_blocks)
                 )
             perturbation_config = PerturbationConfig(perturbations=perturbations)
+            current_pass += 1
+            set_pass_info(current_pass, total_passes)
             ptb_denoised_video, ptb_denoised_audio = transformer(
                 video=pos_video_modality,
                 audio=pos_audio_modality,
@@ -442,6 +457,8 @@ def multi_modal_guider_denoising_func(
                 Perturbation(type=PerturbationType.SKIP_V2A_CROSS_ATTN, blocks=None),
             ]
             perturbation_config = PerturbationConfig(perturbations=perturbations)
+            current_pass += 1
+            set_pass_info(current_pass, total_passes)
             mod_denoised_video, mod_denoised_audio = transformer(
                 video=pos_video_modality,
                 audio=pos_audio_modality,

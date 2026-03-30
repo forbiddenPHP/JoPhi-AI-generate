@@ -25,50 +25,6 @@ class AttentionCallable(Protocol):
     ) -> torch.Tensor: ...
 
 
-def _optimal_head_chunks(heads: int, seq_len: int, dim_head: int, dtype: torch.dtype) -> int:
-    """Calculate optimal number of heads per chunk based on truly available RAM.
-
-    On Apple Silicon (unified memory), psutil.virtual_memory().available collapses
-    to near zero once the MPS heap is large (model weights occupy most of physical
-    RAM). The correct budget is: total_ram - mps_currently_allocated - os_safety.
-    MPS caches are flushed first so current_allocated_memory() reflects the minimum
-    footprint (weights only, no cached intermediates).
-
-    Per-head peak = scores (seq_len²) + Q/K/V slices (3 × seq_len × dim_head).
-    Safety factor = keep 15 % of the compute budget as headroom.
-    Optimal chunk = free_for_compute // per_head_bytes, clamped to [1, heads].
-    """
-    import psutil
-    # Flush MPS caches before measuring so wired memory reflects true minimum
-    torch.mps.synchronize()
-    torch.mps.empty_cache()
-    vm = psutil.virtual_memory()
-    # vm.wired = non-pageable RAM (MPS heap + kernel) — the OS knows exactly
-    # what is hard-blocked. free_for_compute = what's left minus OS headroom.
-    os_safety = vm.total // 8           # ~12.5 % headroom for OS + other processes
-    free_for_compute = int((vm.total - vm.wired - os_safety) * 0.85)
-
-    bytes_per_el = 2 if dtype in (torch.bfloat16, torch.float16) else 4
-    # SDPA internally allocates scores + softmax buffer ≈ 2x scores size
-    # Plus Q/K/V slices. Use 2.5x safety factor.
-    per_head_bytes = int(2.5 * seq_len * seq_len * bytes_per_el + 3 * seq_len * dim_head * bytes_per_el)
-    total_needed = per_head_bytes * heads
-
-    # Constraint 1: RAM — how many heads fit in available compute budget
-    ram_chunk = max(1, free_for_compute // per_head_bytes) if per_head_bytes > 0 else heads
-
-    # Constraint 2: MPS 32-bit index hard limit — B×chunk×S×S must stay < 2^31
-    # Exceeding this causes silent output corruption (no error, just garbage)
-    mps_chunk = max(1, (2**31) // (seq_len * seq_len)) if seq_len > 0 else heads
-
-    chunk_size = min(ram_chunk, mps_chunk, heads)
-
-    if chunk_size >= heads:
-        return heads  # fits entirely, no chunking needed
-
-    return chunk_size
-
-
 class PytorchAttention(AttentionCallable):
     def __call__(
         self, q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, heads: int, mask: torch.Tensor | None = None
@@ -83,20 +39,20 @@ class PytorchAttention(AttentionCallable):
             if mask.ndim == 3:
                 mask = mask.unsqueeze(1)
 
-        chunk_size = heads  # default: all at once
-        if q.device.type == "mps":
-            chunk_size = _optimal_head_chunks(heads, seq_len, dim_head, q.dtype)
-
-        if chunk_size < heads:
-            outs = []
-            for i in range(0, heads, chunk_size):
-                q_c = q[:, i:i + chunk_size]
-                k_c = k[:, i:i + chunk_size]
-                v_c = v[:, i:i + chunk_size]
-                m_c = mask[:, i:i + chunk_size] if mask is not None and mask.shape[1] > 1 else mask
-                outs.append(torch.nn.functional.scaled_dot_product_attention(
-                    q_c, k_c, v_c, attn_mask=m_c, dropout_p=0.0, is_causal=False))
-            out = torch.cat(outs, dim=1)
+        # MPS 32-bit index limit: B × H × S × S must stay under 2^31.
+        # Only chunk when this limit is exceeded — otherwise run full SDPA.
+        max_elements = 2 ** 31
+        if q.device.type == "mps" and b * heads * seq_len * seq_len > max_elements:
+            h_chunk = max(1, max_elements // (b * seq_len * seq_len))
+            output = torch.empty_like(q)
+            for h_start in range(0, heads, h_chunk):
+                h_end = min(h_start + h_chunk, heads)
+                m_c = mask[:, h_start:h_end, :, :] if mask is not None and mask.dim() == 4 else mask
+                output[:, h_start:h_end, :, :] = torch.nn.functional.scaled_dot_product_attention(
+                    q[:, h_start:h_end], k[:, h_start:h_end], v[:, h_start:h_end],
+                    attn_mask=m_c, dropout_p=0.0, is_causal=False)
+            torch.mps.synchronize()
+            out = output
         else:
             out = torch.nn.functional.scaled_dot_product_attention(
                 q, k, v, attn_mask=mask, dropout_p=0.0, is_causal=False)
