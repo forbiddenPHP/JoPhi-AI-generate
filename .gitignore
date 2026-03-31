@@ -28,6 +28,7 @@ worker/ace/ACE-Step-1.5/checkpoints/
 demos/
 *.wav
 *.mp3
+!tests/assets/podcast-5min.mp3
 *.flac
 *.ogg
 *.m4a
