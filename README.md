@@ -73,7 +73,7 @@ generate.py <medium> <engine> [--model <variant>] [input] [options]
 | `image` | `lineart` | Line art extraction via TEED/AnyLine |
 | `image` | `normalmap` | Normal map estimation via Marigold-Normals |
 | `image` | `sketch` | Sketch/edge extraction via HED |
-| `image` | `upscale` | Image upscaling via Real-ESRGAN |
+| `image` | `upscale` | Image upscaling via Real-ESRGAN (4x, 2x, anime, ultrasharp) |
 | `image` | `segment` | Background removal / object segmentation |
 | `video` | `ltx2.3` | Video generation (LTX-2.3, 22B, T2V/I2V/A2V/Extend/Retake/Clone, PyTorch MPS) |
 
@@ -919,8 +919,17 @@ python generate.py image upscale --images photo.png -o upscaled.png
 # 2x upscale
 python generate.py image upscale --images photo.png --model 2x -o upscaled.png
 
+# 4x UltraSharp (more detail, better textures)
+python generate.py image upscale --images photo.png --model ultrasharp -o upscaled.png
+
+# 2x via UltraSharp (4x model, rescaled to 2x output)
+python generate.py image upscale --images photo.png --model ultrasharp --outscale 2 -o upscaled.png
+
 # Anime-optimized 4x
 python generate.py image upscale --images photo.png --model anime -o upscaled.png
+
+# Custom output scale (e.g. 3x)
+python generate.py image upscale --images photo.png --model 4x --outscale 3 -o upscaled.png
 
 # Batch upscale
 python generate.py image upscale --images img1.png img2.png img3.png -o upscaled/
@@ -931,7 +940,8 @@ python generate.py image upscale --images img1.png img2.png img3.png -o upscaled
 
 - `--images` — Input image(s) (required)
 - `-o, --output` — Output file path or directory
-- `--model` — Model: `4x` (default), `2x`, `anime`
+- `--model` — Model: `4x` (default), `2x`, `anime`, `ultrasharp`
+- `-s, --outscale` — Final output scale factor (e.g. 2, 4, 3.5). Default: model's native scale
 
 </details>
 

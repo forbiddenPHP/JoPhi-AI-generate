@@ -3479,11 +3479,14 @@ def _image_upscale(args):
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     model = getattr(args, "model", None) or "4x"
+    outscale = getattr(args, "outscale", None)
     cmd = [
         str(CONDA_BIN), "run", "--no-capture-output", "-n", UPSCALE_ENV,
         "python", str(UPSCALE_WORKER),
         "--images"] + list(images) + ["-o", str(out_path), "--model", model,
     ]
+    if outscale is not None:
+        cmd += ["--outscale", str(outscale)]
 
     _emit(f"Upscaling ({model}, {len(images)} image(s)) …", "stage")
     result = run_worker(cmd, on_event=_event_handler)
@@ -4204,7 +4207,7 @@ def build_parser():
                                    "upscale", "segment"],
                           help="Image engine")
     p_image.add_argument("--model", "-m", default=None,
-                          help="Model: flux.2: 4b|4b-distilled|9b|9b-distilled; mm: mm (default)")
+                          help="Model: flux.2: 4b|4b-distilled|9b|9b-distilled; upscale: 4x|2x|anime|ultrasharp; mm: mm (default)")
     p_image.add_argument("--prompt", "-p", default=None, help="Text prompt")
     p_image.add_argument("-o", "--output", default=None, help="Output file path")
     p_image.add_argument("--seed", type=int, default=None, help="Random seed")
@@ -4237,6 +4240,8 @@ def build_parser():
                           help="[sd1.5] Disable default LoRA")
     p_image.add_argument("--no-rescale", action="store_true", dest="no_rescale",
                           help="[flux.2] Pass reference images in original resolution (skip Pan & Scan)")
+    p_image.add_argument("-s", "--outscale", type=float, default=None,
+                          help="[upscale] Final upsampling scale (e.g. 2, 4, 3.5). Default: model's native scale.")
     p_image.set_defaults(func=cmd_image)
 
     # ── video ──────────────────────────────────────────────────────────────

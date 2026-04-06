@@ -27,6 +27,7 @@ def _list_models():
         {"model": "4x", "notice": "default"},
         {"model": "2x", "notice": ""},
         {"model": "anime", "notice": ""},
+        {"model": "ultrasharp", "notice": "4x UltraSharp"},
     ]
     print(_json.dumps(models))
     sys.exit(0)
@@ -50,6 +51,12 @@ _MODEL_INFO = {
         "filename": "RealESRGAN_x4plus_anime_6B.pth",
         "scale": 4,
         "num_block": 6,
+    },
+    "ultrasharp": {
+        "url": "https://huggingface.co/uwg/upscaler/resolve/main/ESRGAN/4x-UltraSharp.pth",
+        "filename": "4x-UltraSharp.pth",
+        "scale": 4,
+        "num_block": 23,
     },
 }
 
@@ -147,17 +154,71 @@ def _download_model(model_key):
     return model_path
 
 
+def _convert_old_esrgan_keys(state_dict):
+    """Convert old ESRGAN key format to new RRDBNet format.
+
+    Old format (e.g. 4x-UltraSharp):
+      model.0.weight           → conv_first
+      model.1.sub.N.RDB*.conv* → body.N.rdb*.conv*
+      model.3.weight           → conv_body
+      model.6.weight           → conv_up1
+      model.8.weight           → conv_up2
+      model.10.weight          → conv_last
+    Note: model.2/4/5/7/9 are activations/upsamples with no weights.
+    """
+    import re
+    # Fixed mapping for structural layers
+    _FIXED = {
+        "model.0.": "conv_first.",
+        "model.3.": "conv_up1.",
+        "model.6.": "conv_up2.",
+        "model.8.": "conv_hr.",
+        "model.10.": "conv_last.",
+    }
+    new_dict = {}
+    for k, v in state_dict.items():
+        nk = k
+        if nk.startswith("model.1.sub."):
+            # Check if it's the conv_body (last sub-block, only weight/bias, no RDB)
+            parts = k.split(".")
+            block_idx = int(parts[3])
+            remainder = ".".join(parts[4:])  # e.g. "weight" or "RDB1.conv1.0.weight"
+            if remainder in ("weight", "bias"):
+                # Pure conv layer = conv_body
+                nk = f"conv_body.{remainder}"
+            else:
+                # RRDB block
+                nk = f"body.{block_idx}.{remainder}"
+                for i in range(1, 4):
+                    nk = nk.replace(f".RDB{i}.", f".rdb{i}.")
+                nk = re.sub(r'(conv\d)\.0\.(weight|bias)', r'\1.\2', nk)
+        else:
+            for old_prefix, new_prefix in _FIXED.items():
+                if nk.startswith(old_prefix):
+                    nk = nk.replace(old_prefix, new_prefix)
+                    break
+        new_dict[nk] = v
+    return new_dict
+
+
 def _upscale_image(img_np, model_path, scale, num_block, device):
     model = RRDBNet(num_in_ch=3, num_out_ch=3, scale=scale, num_feat=64,
                     num_block=num_block, num_grow_ch=32)
 
     loadnet = torch.load(str(model_path), map_location="cpu", weights_only=True)
     if "params_ema" in loadnet:
-        model.load_state_dict(loadnet["params_ema"], strict=True)
+        state_dict = loadnet["params_ema"]
     elif "params" in loadnet:
-        model.load_state_dict(loadnet["params"], strict=True)
+        state_dict = loadnet["params"]
     else:
-        model.load_state_dict(loadnet, strict=True)
+        state_dict = loadnet
+
+    # Detect old ESRGAN format (keys start with "model.")
+    first_key = next(iter(state_dict))
+    if first_key.startswith("model."):
+        state_dict = _convert_old_esrgan_keys(state_dict)
+
+    model.load_state_dict(state_dict, strict=True)
 
     model.eval()
     model = model.to(device)
@@ -197,14 +258,18 @@ def main():
     parser.add_argument("--images", nargs="+", required=True, help="Input image(s)")
     parser.add_argument("-o", "--output", default="upscaled.png", help="Output file path")
     parser.add_argument("--model", default="4x", choices=list(_MODEL_INFO.keys()),
-                        help="Model: 4x (default), 2x, anime")
+                        help="Model: 4x (default), 2x, anime, ultrasharp")
+    parser.add_argument("-s", "--outscale", type=float, default=None,
+                        help="Final upsampling scale (e.g. 2, 4, 3.5). Default: model's native scale.")
     args = parser.parse_args()
 
     device = _device()
     model_key = args.model
     info = _MODEL_INFO[model_key]
+    native_scale = info["scale"]
+    outscale = args.outscale or native_scale
 
-    print(f"Loading Real-ESRGAN ({model_key}, {info['scale']}x) …", file=sys.stderr)
+    print(f"Loading Real-ESRGAN ({model_key}, {native_scale}x) …", file=sys.stderr)
     model_path = _download_model(model_key)
 
     outputs = []
@@ -213,9 +278,17 @@ def main():
 
         img = Image.open(img_path).convert("RGB")
         img_np = np.array(img)
+        orig_w, orig_h = img.width, img.height
 
-        result_np = _upscale_image(img_np, model_path, info["scale"], info["num_block"], device)
+        result_np = _upscale_image(img_np, model_path, native_scale, info["num_block"], device)
         result = Image.fromarray(result_np)
+
+        # Resize to target outscale if different from native
+        if outscale != native_scale:
+            target_w = int(orig_w * outscale)
+            target_h = int(orig_h * outscale)
+            result = result.resize((target_w, target_h), Image.LANCZOS)
+            print(f"  Rescaled to {target_w}x{target_h} (outscale={outscale})", file=sys.stderr)
 
         out_base = Path(args.output)
         if len(args.images) == 1 and not str(out_base).endswith("/") and not out_base.is_dir():

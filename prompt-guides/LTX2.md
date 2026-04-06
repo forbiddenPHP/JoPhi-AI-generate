@@ -218,6 +218,25 @@ resting one hand on the glass. Traffic hums faintly from the street."
 - More reference images = more structured prompt, matching each transition
 - `--image-first` / `--image-last` shortcuts still need action described from start to end
 
+### Character Order Matches Image Layout
+
+When a reference image contains multiple characters, **describe them left to right** as they appear in the image. The model maps text to visual regions sequentially — if the prompt order doesn't match the spatial order, characters get swapped or confused.
+
+```
+# Keyframe: Johannes (left), Claude (right) sitting at a desk
+Good: "Johannes raises his hand for a high five, laughing.
+      Claude claps into Johannes' hand and laughs."
+
+Bad:  "Claude and Johannes high-five each other."
+      → Model can't resolve who is who, or swaps them
+```
+
+**Rules:**
+- One action per character, described separately — no collective terms ("both", "they", "the two")
+- Spatial order in the image = mention order in the prompt
+- Each character's action is its own sentence or clause
+- This applies to all image-conditioned generation (`--image`, `--image-first`, `--image-last`)
+
 ### Image-to-Video vs. Text-to-Video
 
 **Image-to-Video:** Focus on motion and action — the visual starting point is already defined. Describe what happens next: how the subject moves, how the camera follows, what sounds emerge. Avoid re-describing static elements already visible in the image.
