@@ -4,7 +4,8 @@ import torch
 
 from ltx_core.guidance.perturbations import BatchedPerturbationConfig
 from ltx_core.model.transformer.adaln import AdaLayerNormSingle, adaln_embedding_coefficient
-from ltx_core.model.transformer.attention import AttentionCallable, AttentionFunction
+from ltx_core.model.transformer.attention import AttentionCallable, AttentionFunction, _ltx_chunk_progress_callback
+import ltx_core.model.transformer.attention as _attn_module
 from ltx_core.model.transformer.modality import Modality
 from ltx_core.model.transformer.rope import LTXRopeType
 from ltx_core.model.transformer.transformer import BasicAVTransformerBlock, TransformerConfig
@@ -367,6 +368,11 @@ class LTXModel(torch.nn.Module):
             step_str = f" Denoise {_denoise_step_info[0]}/{_denoise_step_info[1]}" if _denoise_step_info else ""
             pass_str = f" – Pass {_pass_info[0]}/{_pass_info[1]}" if _pass_info else ""
             print(f"\r  [{i+1}/{num_layers}]{step_str}{pass_str}", end="", file=_sys.stderr)
+            # Set chunk callback with current block context
+            _attn_module._ltx_chunk_progress_callback = lambda ci, nc, _i=i, _nl=num_layers, _ss=step_str, _ps=pass_str: (
+                print(f"\r  [{_i+1}/{_nl}]{_ss}{_ps} Chunk {ci}/{nc}", end="", file=_sys.stderr),
+                _sys.stderr.flush(),
+            )
             if self._enable_gradient_checkpointing and self.training:
                 video, audio = torch.utils.checkpoint.checkpoint(
                     block,
@@ -381,6 +387,7 @@ class LTXModel(torch.nn.Module):
                     audio=audio,
                     perturbations=perturbations,
                 )
+        _attn_module._ltx_chunk_progress_callback = None
         print("", file=_sys.stderr)  # newline after final layer
 
         return video, audio

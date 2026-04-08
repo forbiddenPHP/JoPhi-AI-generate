@@ -1,3 +1,4 @@
+import sys
 from enum import Enum
 from typing import Protocol
 
@@ -44,9 +45,14 @@ class PytorchAttention(AttentionCallable):
         max_elements = 2 ** 31
         if q.device.type == "mps" and b * heads * seq_len * seq_len > max_elements:
             h_chunk = max(1, max_elements // (b * seq_len * seq_len))
+            num_chunks = (heads + h_chunk - 1) // h_chunk
             output = torch.empty_like(q)
-            for h_start in range(0, heads, h_chunk):
+            for ci, h_start in enumerate(range(0, heads, h_chunk)):
                 h_end = min(h_start + h_chunk, heads)
+                cb = _ltx_chunk_progress_callback
+                if cb:
+                    cb(ci + 1, num_chunks)
+                    sys.stderr.flush()
                 m_c = mask[:, h_start:h_end, :, :] if mask is not None and mask.dim() == 4 else mask
                 output[:, h_start:h_end, :, :] = torch.nn.functional.scaled_dot_product_attention(
                     q[:, h_start:h_end], k[:, h_start:h_end], v[:, h_start:h_end],
@@ -129,6 +135,10 @@ class FlashAttention3(AttentionCallable):
         out = flash_attn_interface.flash_attn_func(q.to(v.dtype), k.to(v.dtype), v)
         out = out.reshape(b, -1, heads * dim_head)
         return out
+
+
+# Global callback for chunk progress — set by transformer block loop, called by PytorchAttention
+_ltx_chunk_progress_callback = None
 
 
 class AttentionFunction(Enum):

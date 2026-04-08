@@ -1,4 +1,5 @@
 import math
+import sys
 from dataclasses import dataclass, field
 
 import torch
@@ -780,16 +781,24 @@ def _chunked_sdpa(q: Tensor, k: Tensor, v: Tensor) -> Tensor:
 
     N_q = q.shape[2]
     chunk_size = math.ceil(N_q / num_chunks)
+    global _chunk_block_counter
+    _chunk_block_counter += 1
+    block = _chunk_block_counter
     results = []
-    for i in range(0, N_q, chunk_size):
+    cb = _chunk_progress_callback
+    for chunk_idx, i in enumerate(range(0, N_q, chunk_size)):
+        if cb:
+            cb(block, chunk_idx + 1, num_chunks)
+            sys.stderr.flush()
         q_chunk = q[:, :, i:i + chunk_size, :]
         out_chunk = F.scaled_dot_product_attention(q_chunk, k, v, is_causal=False)
         results.append(out_chunk)
     return torch.cat(results, dim=2)
 
 
-# Global chunk info for progress reporting (set by denoise loop)
-_current_chunk_info = {"num_chunks": 1, "enabled": False}
+# Global callback for chunk progress — set by denoise loops, called by _chunked_sdpa
+_chunk_progress_callback = None
+_chunk_block_counter = 0   # increments per _chunked_sdpa call that actually chunks
 
 
 def causal_attn_fn(

@@ -3786,6 +3786,25 @@ def _resolve_video_dims(ratio_str: str, quality_str: str) -> tuple[int, int]:
     return _VIDEO_DIMS[(ratio_str, quality_str)]
 
 
+def _output_quality():
+    """Output the full quality/ratio/dimensions table. JSON or TUI."""
+    rows = []
+    for (ratio, quality), (w, h) in _VIDEO_DIMS.items():
+        rows.append({"quality": quality, "ratio": ratio, "width": w, "height": h})
+
+    if _event_handler is print_event_json:
+        print(json.dumps(rows, indent=2))
+        return
+
+    # TUI table
+    print(f"  {'QUALITY':<10} {'RATIO':<8} {'WIDTH':>6} {'HEIGHT':>6}", file=sys.stderr)
+    print(f"  {'-'*10} {'-'*8} {'-'*6} {'-'*6}", file=sys.stderr)
+    for r in rows:
+        print(f"  {r['quality']:<10} {r['ratio']:<8} {r['width']:>6} {r['height']:>6}", file=sys.stderr)
+    print(file=sys.stderr)
+    print(f"  {len(rows)} combinations, {len(_VIDEO_QUALITIES)} qualities, {len(_VIDEO_RATIOS)} ratios", file=sys.stderr)
+
+
 # ── Video generation ──────────────────────────────────────────────────────────
 
 def cmd_video(args):
@@ -4405,6 +4424,14 @@ def main():
             medium = argv[0] if idx > 0 and argv[0] != "models" else None
             engine = argv[1] if idx > 1 else None
             _models_list_all(medium=medium, engine=engine)
+            return
+
+    # ── Intercept "output quality" ─────────────────────────────────────
+    if "output" in argv and "quality" in argv:
+        oi = argv.index("output")
+        qi = argv.index("quality")
+        if qi == oi + 1:
+            _output_quality()
             return
 
     parser = build_parser()

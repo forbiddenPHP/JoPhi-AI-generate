@@ -283,18 +283,17 @@ def denoise(
     img_cond_seq_ids: Tensor | None = None,
 ):
     from tqdm import tqdm
-    from .model import _compute_attn_chunks
+    import flux2.model as _model
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
     steps = list(zip(timesteps[:-1], timesteps[1:]))
     num_steps = len(steps)
 
     pbar = tqdm(enumerate(steps), total=num_steps, desc="Denoising", file=sys.stderr)
     for step_idx, (t_curr, t_prev) in pbar:
-        num_chunks = _compute_attn_chunks(img, img)
-        if num_chunks > 1:
-            pbar.set_description(f"Denoising  {step_idx+1}/{num_steps} Chunk 1/{num_chunks}")
-        else:
-            pbar.set_description(f"Denoising")
+        # Callback is always set — _chunked_sdpa decides if it needs to chunk
+        _model._chunk_block_counter = 0
+        _model._chunk_progress_callback = lambda blk, ci, nc, _s=step_idx, _ns=num_steps, _p=pbar: _p.set_description(
+            f"Denoising  {_s+1}/{_ns} Block {blk} Chunk {ci}/{nc}")
         t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
         img_input = img
         img_input_ids = img_ids
@@ -317,6 +316,7 @@ def denoise(
 
         img = img + (t_prev - t_curr) * pred
 
+    _model._chunk_progress_callback = None
     return img
 
 
@@ -339,17 +339,15 @@ def denoise_cached(
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
 
     from tqdm import tqdm
-    from .model import _compute_attn_chunks
+    import flux2.model as _model
     steps_pairs = list(zip(timesteps[:-1], timesteps[1:]))
     num_steps = len(steps_pairs)
 
     pbar = tqdm(enumerate(steps_pairs), total=num_steps, desc="Denoising", file=sys.stderr)
     for step_idx, (t_curr, t_prev) in pbar:
-        num_chunks = _compute_attn_chunks(img, img)
-        if num_chunks > 1:
-            pbar.set_description(f"Denoising  {step_idx+1}/{num_steps} Chunk 1/{num_chunks}")
-        else:
-            pbar.set_description(f"Denoising")
+        _model._chunk_block_counter = 0
+        _model._chunk_progress_callback = lambda blk, ci, nc, _s=step_idx, _ns=num_steps, _p=pbar: _p.set_description(
+            f"Denoising  {_s+1}/{_ns} Block {blk} Chunk {ci}/{nc}")
         t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
 
         if step_idx == 0:
@@ -376,7 +374,7 @@ def denoise_cached(
 
         img = img + (t_prev - t_curr) * pred
 
-
+    _model._chunk_progress_callback = None
     return img
 
 
@@ -406,17 +404,15 @@ def denoise_cfg(
         img_cond_seq_ids = torch.cat([img_cond_seq_ids, img_cond_seq_ids], dim=0)
 
     from tqdm import tqdm
-    from .model import _compute_attn_chunks
+    import flux2.model as _model
     steps_pairs = list(zip(timesteps[:-1], timesteps[1:]))
     num_steps = len(steps_pairs)
 
     pbar = tqdm(enumerate(steps_pairs), total=num_steps, desc="Denoising", file=sys.stderr)
     for step_idx, (t_curr, t_prev) in pbar:
-        num_chunks = _compute_attn_chunks(img, img)
-        if num_chunks > 1:
-            pbar.set_description(f"Denoising  {step_idx+1}/{num_steps} Chunk 1/{num_chunks}")
-        else:
-            pbar.set_description(f"Denoising")
+        _model._chunk_block_counter = 0
+        _model._chunk_progress_callback = lambda blk, ci, nc, _s=step_idx, _ns=num_steps, _p=pbar: _p.set_description(
+            f"Denoising  {_s+1}/{_ns} Block {blk} Chunk {ci}/{nc}")
         t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
 
         img_input = img
@@ -443,6 +439,7 @@ def denoise_cfg(
 
         img = img + (t_prev - t_curr) * pred
 
+    _model._chunk_progress_callback = None
     return img.chunk(2)[0]
 
 

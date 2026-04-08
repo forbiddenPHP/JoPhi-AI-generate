@@ -46,6 +46,7 @@ class ProgressEvent:
     total: float | None = None      # counter: total steps (or bytes in display unit)
     stage: str | None = None
     chunk: int | None = None      # chunk index (1-based), set when progress resets
+    counters: list | None = None  # parsed desc counters: [{"label":"Step","current":1,"total":3}, ...]
     data: dict | None = None      # structured payload for @inference: events
     ts: float = 0.0
 
@@ -72,10 +73,81 @@ class ProgressEvent:
             d["stage"] = self.stage
         if self.chunk is not None:
             d["chunk"] = self.chunk
+        if self.counters:
+            d["counters"] = self.counters
         return json.dumps(d, ensure_ascii=False)
 
 
 # ── Parsers ───────────────────────────────────────────────────────────────────
+
+# Regex for parsing desc counters: "Denoising  3/20 Chunk 1/3" → label + counter pairs
+_DESC_COUNTER_RE = re.compile(r"(\d+)/(\d+)")
+# Match "Label N" (word followed by a standalone number, not part of x/y)
+_DESC_SINGLE_RE = re.compile(r"([A-Za-z]\w*)\s+(\d+)(?!\s*/)")
+
+
+def _parse_desc_counters(desc: str) -> tuple[str, list[dict] | None]:
+    """Parse a tqdm description into a clean label and counter list.
+
+    "Denoising  3/20 Chunk 1/3"     → ("Denoising", [{current:3,total:20}, {label:"Chunk",current:1,total:3}])
+    "Denoising  2/4 Block 7 Chunk 2/3" → ("Denoising", [{current:2,total:4}, {label:"Block",current:7}, {label:"Chunk",current:2,total:3}])
+    "Denoising" → ("Denoising", None)
+    """
+    if not desc:
+        return desc, None
+
+    # Collect all counter tokens with their positions
+    tokens = []
+
+    # x/y counters
+    for m in _DESC_COUNTER_RE.finditer(desc):
+        between = desc[:m.start()].split()
+        label = ""
+        # Find the word directly before this counter
+        text_before = desc[:m.start()].rstrip()
+        if text_before:
+            last_word = text_before.split()[-1]
+            # Don't use the stage label as a counter label for the first match
+            if not tokens:
+                label = ""
+            else:
+                label = last_word
+        tokens.append({
+            "pos": m.start(),
+            "label": label,
+            "current": int(m.group(1)),
+            "total": int(m.group(2)),
+        })
+
+    # Single-number counters (e.g. "Block 7") — only if not already part of x/y
+    for m in _DESC_SINGLE_RE.finditer(desc):
+        num_pos = m.start(2)
+        # Skip if this number is part of an x/y counter
+        already_covered = any(t["pos"] <= num_pos < t["pos"] + 10 for t in tokens)
+        if not already_covered:
+            tokens.append({
+                "pos": m.start(),
+                "label": m.group(1),
+                "current": int(m.group(2)),
+            })
+
+    if not tokens:
+        return desc, None
+
+    # Sort by position in the string
+    tokens.sort(key=lambda t: t["pos"])
+
+    # Build counters list (without pos)
+    counters = [{k: v for k, v in t.items() if k != "pos"} for t in tokens]
+
+    # Stage label: text before the first token
+    first_pos = tokens[0]["pos"]
+    stage_label = desc[:first_pos].strip()
+    if not stage_label:
+        stage_label = desc
+
+    return stage_label, counters
+
 
 # Regex for tqdm-style progress: "  5%|█         | 5/100 [00:02<00:38, 2.50it/s]"
 _TQDM_RE = re.compile(
@@ -261,24 +333,36 @@ def parse_stderr_line(line: str, duration_s: float = 0.0) -> ProgressEvent:
         cur, tot = _parse_tqdm_counter(raw_cur, raw_tot)
         # Extract tqdm description (text before "XX%|")
         desc = stripped[:m.start()].strip().rstrip(":").strip() or None
+        # Parse structured counters from desc (e.g. "Denoising  3/20 Chunk 1/3")
+        stage_label, counters = _parse_desc_counters(desc) if desc else (desc, None)
         return ProgressEvent(type="progress", message=stripped, percent=pct,
-                             current=cur, total=tot, stage=desc)
+                             current=cur, total=tot, stage=stage_label,
+                             counters=counters)
 
     m = _TQDM_SIMPLE_RE.search(stripped)
     if m:
         pct = float(m.group(1))
         desc = stripped[:m.start()].strip().rstrip(":").strip() or None
+        stage_label, counters = _parse_desc_counters(desc) if desc else (desc, None)
         return ProgressEvent(type="progress", message=stripped, percent=pct,
-                             stage=desc)
+                             stage=stage_label, counters=counters)
 
-    # 2. Check for [i/n] counter
+    # 2. Check for [i/n] counter — e.g. "[7/48] Denoise 2/8 – Pass 1/2"
     m = _COUNTER_RE.search(stripped)
     if m:
         current = int(m.group(1))
         total = int(m.group(2))
         pct = (current / total) * 100 if total > 0 else 0
+        # Parse text after [i/n] for additional counters (Denoise x/y, Pass a/b, etc.)
+        after = stripped[m.end():].strip().lstrip("–—-").strip()
+        stage_label, counters = _parse_desc_counters(after) if after else (None, None)
+        # Build counters: the [i/n] block counter first, then any parsed from the text
+        all_counters = [{"label": "Block", "current": current, "total": total}]
+        if counters:
+            all_counters.extend(counters)
         return ProgressEvent(type="progress", message=stripped, percent=pct,
-                             current=current, total=total)
+                             current=current, total=total, stage=stage_label,
+                             counters=all_counters)
 
     # 3. Check for ffmpeg time=
     if duration_s > 0:
@@ -409,11 +493,13 @@ def run_worker(
     Returns:
         WorkerResult with returncode, stdout, events list, and stderr tail.
     """
+    env = {**os.environ, "PYTHONUNBUFFERED": "1"}
     proc = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=False,  # binary mode for stderr reading
+        env=env,
     )
 
     events: list[ProgressEvent] = []
@@ -489,8 +575,9 @@ _MARKER_DONE    = "✓"
 
 
 def _format_bar(percent: float, current: float | None = None,
-                total: float | None = None, label: str = "") -> str:
-    """Build a unified progress bar line: Label  x/n  ██████  %"""
+                total: float | None = None, label: str = "",
+                counters: list | None = None) -> str:
+    """Build a unified progress bar line: Label  Step 1/3  Chunk 1/2  x/n  ██████  %"""
     bar_width = 30
     filled = int(bar_width * percent / 100)
     bar = "█" * filled + "░" * (bar_width - filled)
@@ -498,6 +585,12 @@ def _format_bar(percent: float, current: float | None = None,
     parts = []
     if label:
         parts.append(label)
+    # Show structured counters from desc (Step 1/3, Chunk 1/2, etc.)
+    if counters:
+        for c in counters:
+            lbl = c.get("label", "")
+            cur, tot = c["current"], c["total"]
+            parts.append(f"{lbl} {cur}/{tot}" if lbl else f"{cur}/{tot}")
     if current is not None and total is not None:
         if isinstance(current, float) or isinstance(total, float):
             parts.append(f"{current:.1f}/{total:.1f}")
@@ -540,6 +633,7 @@ def print_event_tui(event: ProgressEvent):
             current=event.current,
             total=event.total,
             label=label,
+            counters=event.counters,
         )
         print(f"\r{_CLEAR_LINE}{bar_line}",
               end="", file=sys.stderr, flush=True)

@@ -63,6 +63,7 @@ generate.py <medium> <engine> [--model <variant>] [input] [options]
 | `text` | `ollama` | LLM inference via Ollama |
 | `output` | `audio-concatenate` | Concatenate audio files (with per-clip trim, fades, volume, crossfade) |
 | `output` | `audio-mucs` | Mix/overlay audio files in parallel (with per-clip trim, fades, volume, pan) |
+| `output` | `quality` | List all quality/ratio/dimension combinations (for automation) |
 | `server` | — | RVC worker management |
 | `models` | `rvc`, `ollama`, `huggingface` | Model management (per engine) |
 | `ps` | — | Active models across all engines |
@@ -1197,6 +1198,36 @@ python generate.py output audio-mucs \
 **Per-clip keys:** Same as `audio-concatenate` (`fade-in`, `fade-out`, `volume`, `start`, `end`, `pan`). `crossfade` is ignored (not applicable for parallel mix).
 
 All inputs are normalized to 44100 Hz stereo. Output is passed through `alimiter` to prevent clipping.
+
+</details>
+
+<details>
+<summary><h3>Quality/Dimensions Table (<code>output quality</code>)</h3></summary>
+
+Lists all quality/ratio/dimension combinations. Useful for automation and UI integration.
+
+```bash
+python generate.py output quality
+python generate.py output quality --screen-log-format json
+```
+
+TUI output:
+```
+  QUALITY    RATIO     WIDTH HEIGHT
+  ---------- -------- ------ ------
+  240p       16:9        320    192
+  480p       16:9        576    320
+  720p       16:9        704    384
+  1080p      16:9       1024    576
+  1440p      16:9       1472    832
+  2160p      16:9       2176   1216
+  4k         16:9       4096   2304
+  ...
+```
+
+JSON output: array of `{"quality", "ratio", "width", "height"}` objects.
+
+All dimensions are divisible by 64 (two-stage VAE requirement).
 
 </details>
 
