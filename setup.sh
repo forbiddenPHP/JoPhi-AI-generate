@@ -577,6 +577,22 @@ if not ok:
             cd "$SCRIPT_DIR"
         fi
     done
+
+    # XL models (sharded, ~20 GB each)
+    for XL_MODEL in acestep-v15-xl-base acestep-v15-xl-turbo; do
+        if [ -f "$ACESTEP_DIR/checkpoints/$XL_MODEL/model.safetensors.index.json" ]; then
+            echo "  $XL_MODEL already present — skipping"
+        else
+            echo "  Downloading $XL_MODEL (~20 GB) ..."
+            cd "$ACESTEP_DIR"
+            "$UV_BIN" run python -c "
+from huggingface_hub import snapshot_download
+snapshot_download('ACE-Step/$XL_MODEL', local_dir='$ACESTEP_DIR/checkpoints/$XL_MODEL')
+print('  OK')
+"
+            cd "$SCRIPT_DIR"
+        fi
+    done
     echo -e "${GREEN}✓${NC} ACE-Step models downloaded"
 
     # ── Whisper model ────────────────────────────────────────────────────

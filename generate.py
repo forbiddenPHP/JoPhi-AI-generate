@@ -2019,6 +2019,8 @@ _ACE_MODEL_MAP = {
     "turbo": "acestep-v15-turbo",
     "sft": "acestep-v15-sft",
     "base": "acestep-v15-base",
+    "xl": "acestep-v15-xl-base",
+    "xl-turbo": "acestep-v15-xl-turbo",
 }
 
 
@@ -2073,8 +2075,8 @@ def _audio_ace(args):
         sys.exit(1)
 
     # Map --model to ACE config
-    ace_model = getattr(args, "model", None) or "turbo"
-    ace_config = _ACE_MODEL_MAP.get(ace_model, "acestep-v15-turbo")
+    ace_model = getattr(args, "model", None) or "xl-turbo"
+    ace_config = _ACE_MODEL_MAP.get(ace_model, "acestep-v15-xl-turbo")
 
     def _ace_base_cmd(lyrics_override=None, task=None, src_audio=None,
                       repaint_start=None, repaint_end=None, output_override=None):
@@ -4077,7 +4079,7 @@ def build_parser():
     p_audio.add_argument("input", nargs="*", help="Input audio file(s)")
     p_audio.add_argument("--model", default=None,
                          help="Model variant: [demucs] htdemucs/htdemucs_ft, "
-                              "[ace-step] turbo/sft/base")
+                              "[ace-step] turbo/sft/base/xl/xl-turbo")
     p_audio.add_argument("-o", "--output", help="Output path or directory")
     # enhance
     p_audio.add_argument("--denoise-only", action="store_true",

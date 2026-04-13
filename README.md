@@ -425,6 +425,14 @@ python generate.py audio ace-step \
 python generate.py audio ace-step --model sft \
   -f lyrics.txt -t "cinematic orchestral" -s 60
 
+# ACE-Step XL (4B model, highest quality)
+python generate.py audio ace-step --model xl \
+  -l "[instrumental]" -t "movie score,orchestral,cinematic,epic" -s 60
+
+# ACE-Step XL-Turbo (4B model, fast 8-step)
+python generate.py audio ace-step --model xl-turbo \
+  -l "[instrumental]" -t "movie score,orchestral,cinematic,epic" -s 30
+
 # ACE-Step with language hint (improves vocal pronunciation)
 python generate.py audio ace-step \
   -l "[Verse] Die Sonne geht auf" -t "german pop, female vocal" \
@@ -449,7 +457,7 @@ python generate.py audio heartmula \
 - `--temperature` — Sampling temperature
 - `--cfg-scale` — CFG scale
 
-ACE-Step `--model` variants: `turbo` (default if omitted, 8 steps), `sft` (50 steps), `base` (50 steps)
+ACE-Step `--model` variants: `xl-turbo` (default, 8 steps, 4B), `xl` (50 steps, 4B), `turbo` (8 steps), `sft` (50 steps), `base` (50 steps)
 
 </details>
 

@@ -12,6 +12,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "8790", "--directory", "demos/claude"],
       "port": 8790
+    },
+    {
+      "name": "spatialedit",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-c", "import time\nwhile True: time.sleep(60)"],
+      "port": 7860
     }
   ]
 }

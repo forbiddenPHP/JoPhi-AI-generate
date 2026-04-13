@@ -1829,7 +1829,7 @@ class AceStepConditionGenerationModel(AceStepPreTrainedModel):
         infer_method: str = "ode",
         use_cache: bool = True,
         infer_steps: int = 30,
-        diffusion_guidance_sale: float = 7.0,
+        diffusion_guidance_scale: float = 7.0,
         audio_cover_strength: float = 1.0,
         non_cover_text_hidden_states: Optional[torch.FloatTensor] = None,
         non_cover_text_attention_mask: Optional[torch.FloatTensor] = None,
@@ -1938,7 +1938,7 @@ class AceStepConditionGenerationModel(AceStepPreTrainedModel):
             xt = noise
         
         # main task condition
-        do_cfg_guidance = diffusion_guidance_sale > 1.0
+        do_cfg_guidance = diffusion_guidance_scale > 1.0
         if do_cfg_guidance:
             encoder_hidden_states = torch.cat([encoder_hidden_states, self.null_condition_emb.expand_as(encoder_hidden_states)], dim=0)
             encoder_attention_mask = torch.cat([encoder_attention_mask, encoder_attention_mask], dim=0)
@@ -1986,7 +1986,7 @@ class AceStepConditionGenerationModel(AceStepPreTrainedModel):
                             vt = apg_forward(
                                 pred_cond=pred_cond,
                                 pred_uncond=pred_null_cond,
-                                guidance_scale=diffusion_guidance_sale,
+                                guidance_scale=diffusion_guidance_scale,
                                 momentum_buffer=momentum_buffer,
                                 dims=[1],
                             )
@@ -1996,7 +1996,7 @@ class AceStepConditionGenerationModel(AceStepPreTrainedModel):
                                 noise_pred_cond=pred_cond,
                                 noise_pred_uncond=pred_null_cond,
                                 sigma=t_curr,
-                                guidance_scale=diffusion_guidance_sale,
+                                guidance_scale=diffusion_guidance_scale,
                             )
                     else:
                         vt = pred_cond

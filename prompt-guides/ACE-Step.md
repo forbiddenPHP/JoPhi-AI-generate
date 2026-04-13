@@ -233,6 +233,18 @@ python generate.py audio ace-step -l "[inst]" -t "jazz piano trio" --seed 123 -s
 python generate.py audio ace-step -l "[inst]" -t "jazz piano trio" --seed 7777 -s 30
 ```
 
+## XL Models (4B)
+
+The XL variants (`--model xl`, `--model xl-turbo`) use a 4B parameter DiT decoder and support a wider range of genres than the standard models, including cinematic film scores and orchestral music. As with all ACE-Step models, results improve significantly at durations of 90 seconds or more — the model needs time to develop musical structure, dynamics, and transitions.
+
+```bash
+# XL with descriptive caption for film score
+python generate.py audio ace-step --model xl \
+  -l "[instrumental]" \
+  -t "A slow piano intro that builds into soaring strings, followed by a brass crescendo leading to a full orchestra climax, ending with a soft emotional fade out. Cinematic film soundtrack." \
+  -s 120
+```
+
 ## Known Limitations
 
 - **Seed sensitivity:** Results vary significantly with different seeds ("gacha-style")

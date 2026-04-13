@@ -24,6 +24,11 @@ if "HF_TOKEN" not in os.environ and _DEFAULT_TOKEN.exists():
 
 import torch
 from einops import rearrange
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except ImportError:
+    pass
 from PIL import Image
 
 from flux2.sampling import (

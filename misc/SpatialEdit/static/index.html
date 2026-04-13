@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<title>SpatialEdit</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#111; color:#ccc; font-family:system-ui,sans-serif; }
+  h1 { padding:16px 24px 8px; font-size:22px; color:#fff; }
+
+  .layout { display:flex; gap:16px; padding:12px 24px; }
+  .col { flex:1; display:flex; flex-direction:column; gap:12px; }
+
+  #widget-wrap { position:relative; background:#1a1a2e; border-radius:8px; overflow:hidden; }
+  #widget-canvas { display:block; width:100%; height:450px; cursor:grab; }
+  #widget-canvas:active { cursor:grabbing; }
+  #cam-info { position:absolute; bottom:10px; left:0; right:0; text-align:center;
+              color:#ff6600; font:bold 13px sans-serif; text-shadow:0 1px 4px #000; }
+  #vp-hint { position:absolute; top:8px; left:12px; color:#666; font:11px sans-serif; }
+
+  .ctrl { background:#1e1e2e; border-radius:8px; padding:14px; }
+  .ctrl h3 { font-size:13px; color:#888; margin-bottom:8px; }
+  label { display:block; font-size:12px; color:#999; margin:6px 0 2px; }
+  input[type=text], input[type=number], select { width:100%; padding:6px 8px; border:1px solid #333;
+    border-radius:4px; background:#222; color:#ddd; font-size:13px; }
+  input[type=range] { width:100%; }
+  .prompt-preview { background:#0a0a1a; padding:8px; border-radius:4px; font:12px monospace;
+    color:#ff6600; min-height:36px; word-break:break-word; }
+  button#gen-btn { width:100%; padding:12px; background:#ff6600; color:#fff; border:none;
+    border-radius:6px; font-size:15px; font-weight:bold; cursor:pointer; }
+  button#gen-btn:hover { background:#e55500; }
+  button#gen-btn:disabled { background:#555; cursor:not-allowed; }
+  .status { font:11px monospace; color:#888; min-height:60px; max-height:200px;
+    overflow-y:auto; background:#0a0a1a; border-radius:4px; padding:6px 8px;
+    white-space:pre-wrap; word-break:break-word; }
+
+  #output-wrap { background:#1e1e2e; border-radius:8px; padding:14px; min-height:400px;
+    display:flex; align-items:center; justify-content:center; }
+  #output-wrap img { max-width:100%; max-height:500px; border-radius:4px; }
+
+  .upload-area { border:2px dashed #333; border-radius:8px; padding:20px; text-align:center;
+    cursor:pointer; color:#666; font-size:13px; position:relative; }
+  .upload-area:hover { border-color:#ff6600; color:#999; }
+  .upload-area input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; }
+  #upload-preview { max-height:150px; border-radius:4px; margin-top:8px; }
+
+  details { background:#1e1e2e; border-radius:8px; padding:10px 14px; }
+  summary { cursor:pointer; font-size:13px; color:#888; }
+  details[open] summary { margin-bottom:8px; }
+
+  .slider-row { display:flex; align-items:center; gap:8px; }
+  .slider-row input[type=range] { flex:1; }
+  .slider-row .val { min-width:40px; text-align:right; font:12px monospace; color:#ff6600; }
+  button.reset-btn { background:#333; color:#999; border:none; border-radius:4px;
+    padding:4px 10px; font-size:11px; cursor:pointer; }
+  button.reset-btn:hover { background:#444; color:#fff; }
+</style>
+</head><body>
+<h1>SpatialEdit</h1>
+
+<div class="layout">
+  <div class="col">
+    <!-- 3D Camera View -->
+    <div id="widget-wrap">
+      <canvas id="widget-canvas"></canvas>
+      <div id="cam-info">Front · Eye level</div>
+      <div id="vp-hint">Drag to orbit camera around object</div>
+    </div>
+
+    <!-- Camera Controls (sync with 3D) -->
+    <div class="ctrl">
+      <h3>Camera Position <button class="reset-btn" id="reset-cam">Reset</button></h3>
+      <label>Azimut (horizontal)</label>
+      <div class="slider-row">
+        <input type="range" id="cam-azimut" min="0" max="360" step="1" value="0">
+        <span class="val" id="azimut-val">0°</span>
+      </div>
+      <label>Elevation (vertical)</label>
+      <div class="slider-row">
+        <input type="range" id="cam-elevation" min="-80" max="80" step="1" value="20">
+        <span class="val" id="elevation-val">20°</span>
+      </div>
+      <label>Distance</label>
+      <div class="slider-row">
+        <input type="range" id="cam-distance" min="2" max="10" step="0.1" value="5">
+        <span class="val" id="distance-val">5.0</span>
+      </div>
+    </div>
+
+    <!-- Prompt Preview -->
+    <div class="ctrl">
+      <h3>Generated Prompt</h3>
+      <div class="prompt-preview" id="prompt-preview">Now, viewed from the front at eye level.</div>
+    </div>
+
+    <!-- Upload + Resolution -->
+    <div class="ctrl">
+      <h3>Image</h3>
+      <label>Resolution</label>
+      <select id="dims" style="margin-bottom:10px;"></select>
+      <div class="upload-area" id="upload-area">
+        Drop image here or click to upload
+        <input type="file" id="file-input" accept="image/*,.heic,.heif,.HEIC,.HEIF">
+        <br><img id="upload-preview" style="display:none">
+      </div>
+      <div id="upload-info" style="font:11px monospace; color:#888; margin-top:4px;"></div>
+    </div>
+
+    <details>
+      <summary>Advanced Settings</summary>
+      <label>Model</label>
+      <select id="model" style="margin-bottom:8px;"></select>
+      <label>Negative Prompt</label>
+      <input type="text" id="neg-prompt" value="">
+      <label>Steps</label>
+      <input type="number" id="steps" value="8" min="1" max="100">
+      <label>Guidance Scale</label>
+      <input type="number" id="guidance" value="4.0" min="0" max="20" step="0.5">
+      <label>Seed</label>
+      <input type="number" id="seed" value="42">
+    </details>
+
+    <button id="gen-btn" disabled>Generate</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="col">
+    <div id="output-wrap">
+      <span id="output-placeholder">Output will appear here</span>
+    </div>
+  </div>
+</div>
+
+<!-- Three.js -->
+<script type="importmap">
+{"imports":{"three":"/static/three/three.module.js"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from '/static/three/OrbitControls.js';
+
+const canvas = document.getElementById('widget-canvas');
+const camInfoEl = document.getElementById('cam-info');
+
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setClearColor(0x1a1a2e);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+camera.position.set(0, 2.0, 5.0);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enablePan = false;
+controls.enableZoom = true;
+controls.minDistance = 2;
+controls.maxDistance = 10;
+controls.maxPolarAngle = Math.PI * 0.95;
+controls.minPolarAngle = Math.PI * 0.05;
+controls.target.set(0, 0.2, 0);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const dl = new THREE.DirectionalLight(0xffffff, 0.9);
+dl.position.set(3, 5, 4);
+scene.add(dl);
+
+// Ground
+const grid = new THREE.GridHelper(8, 16, 0x333355, 0x222244);
+grid.position.y = -0.5;
+scene.add(grid);
+
+// Reference object (box with colored faces)
+const boxGeo = new THREE.BoxGeometry(0.9, 1.1, 0.9);
+const faceMats = [
+  new THREE.MeshStandardMaterial({color:0x5599dd, roughness:0.6}), // +X right
+  new THREE.MeshStandardMaterial({color:0x5599dd, roughness:0.6}), // -X left
+  new THREE.MeshStandardMaterial({color:0x999999, roughness:0.5}), // +Y top
+  new THREE.MeshStandardMaterial({color:0x666666, roughness:0.5}), // -Y bottom
+  new THREE.MeshStandardMaterial({color:0xff6644, roughness:0.5}), // +Z front (orange)
+  new THREE.MeshStandardMaterial({color:0x44aa66, roughness:0.5}), // -Z rear (green)
+];
+const box = new THREE.Mesh(boxGeo, faceMats);
+box.position.y = 0.05;
+scene.add(box);
+
+// Face labels
+function makeSprite(text, pos, color) {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 48;
+  const ctx = c.getContext('2d');
+  ctx.font = 'bold 24px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#000'; ctx.fillText(text, 65, 33);
+  ctx.fillStyle = color; ctx.fillText(text, 64, 32);
+  const tex = new THREE.CanvasTexture(c);
+  const mat = new THREE.SpriteMaterial({map:tex, transparent:true, depthTest:false});
+  const s = new THREE.Sprite(mat);
+  s.scale.set(0.55, 0.2, 1);
+  s.position.copy(pos);
+  return s;
+}
+scene.add(makeSprite('FRONT', new THREE.Vector3(0, -0.65, 0.65), '#ff6644'));
+scene.add(makeSprite('REAR', new THREE.Vector3(0, -0.65, -0.65), '#44aa66'));
+scene.add(makeSprite('LEFT', new THREE.Vector3(-0.65, -0.65, 0), '#5599dd'));
+scene.add(makeSprite('RIGHT', new THREE.Vector3(0.65, -0.65, 0), '#5599dd'));
+
+// ── Camera position → natural language ────────────────
+
+function describeCameraPosition(azimutDeg, elevationDeg, distance) {
+  // AZIMUT — 32 positions (11.25° each)
+  const azNames = [
+    [0, 'the front'],
+    [11.25, 'just barely right of front'],
+    [22.5, 'slightly right of front'],
+    [33.75, 'between front and front-right, favoring front'],
+    [45, 'the front-right diagonal'],
+    [56.25, 'between front-right and right, favoring front-right'],
+    [67.5, 'mostly from the right but angled toward front'],
+    [78.75, 'nearly from the right, just barely angled toward front'],
+    [90, 'the right side'],
+    [101.25, 'nearly from the right, just barely angled toward rear'],
+    [112.5, 'mostly from the right but angled toward rear'],
+    [123.75, 'between right and rear-right, favoring rear-right'],
+    [135, 'the rear-right diagonal'],
+    [146.25, 'between rear-right and rear, favoring rear'],
+    [157.5, 'slightly right of rear'],
+    [168.75, 'just barely right of rear'],
+    [180, 'directly behind'],
+    [191.25, 'just barely left of rear'],
+    [202.5, 'slightly left of rear'],
+    [213.75, 'between rear-left and rear, favoring rear'],
+    [225, 'the rear-left diagonal'],
+    [236.25, 'between left and rear-left, favoring rear-left'],
+    [247.5, 'mostly from the left but angled toward rear'],
+    [258.75, 'nearly from the left, just barely angled toward rear'],
+    [270, 'the left side'],
+    [281.25, 'nearly from the left, just barely angled toward front'],
+    [292.5, 'mostly from the left but angled toward front'],
+    [303.75, 'between front-left and left, favoring front-left'],
+    [315, 'the front-left diagonal'],
+    [326.25, 'between front and front-left, favoring front-left'],
+    [337.5, 'slightly left of front'],
+    [348.75, 'just barely left of front'],
+  ];
+  // Mirror left/right only (negate azimut)
+  let mirroredAz = (360 - azimutDeg) % 360;
+  let bestAz = azNames[0];
+  let bestDist = 999;
+  for (const [deg, name] of azNames) {
+    let d = Math.abs(mirroredAz - deg);
+    if (d > 180) d = 360 - d;
+    if (d < bestDist) { bestDist = d; bestAz = [deg, name]; }
+  }
+
+  // ELEVATION — 18 tiers, mirrored for above/below
+  let elevDesc = '';
+  const absElev = Math.abs(elevationDeg);
+  const above = elevationDeg >= 0;
+  if (absElev <= 2) elevDesc = 'at eye level';
+  else if (absElev <= 5) elevDesc = above ? 'just a touch above eye level' : 'just a touch below eye level';
+  else if (absElev <= 8) elevDesc = above ? 'looking very slightly downward' : 'looking very slightly upward';
+  else if (absElev <= 12) elevDesc = above ? 'marginally above eye level' : 'marginally below eye level';
+  else if (absElev <= 16) elevDesc = above ? 'slightly above, looking gently down' : 'slightly below, looking gently up';
+  else if (absElev <= 20) elevDesc = above ? 'noticeably above eye level' : 'noticeably below eye level';
+  else if (absElev <= 25) elevDesc = above ? 'moderately elevated vantage point' : 'moderately low vantage point';
+  else if (absElev <= 30) elevDesc = above ? 'raised angle, roughly a third to overhead' : 'lowered angle, roughly a third to ground';
+  else if (absElev <= 35) elevDesc = above ? 'decidedly high angle' : 'decidedly low angle';
+  else if (absElev <= 40) elevDesc = above ? 'steep high angle, approaching dramatic' : 'steep low angle, approaching dramatic';
+  else if (absElev <= 45) elevDesc = above ? 'halfway between eye level and overhead' : 'halfway between eye level and below';
+  else if (absElev <= 50) elevDesc = above ? 'more overhead than level' : 'more underneath than level';
+  else if (absElev <= 55) elevDesc = above ? 'steeply above, well past halfway' : 'steeply below, well past halfway';
+  else if (absElev <= 60) elevDesc = above ? 'very steep overhead angle' : 'very steep low angle';
+  else if (absElev <= 65) elevDesc = above ? 'nearly overhead, almost straight down' : 'nearly underneath, almost straight up';
+  else if (absElev <= 70) elevDesc = above ? "approaching bird's eye" : "approaching worm's eye";
+  else if (absElev <= 75) elevDesc = above ? "near bird's eye, almost directly above" : "near worm's eye, almost directly below";
+  else elevDesc = above ? "bird's eye, nearly perpendicular" : "worm's eye, nearly perpendicular";
+
+  // DISTANCE — 10 tiers + default omission
+  let distDesc = '';
+  if (distance <= 2.2) distDesc = ', extreme close-up, filling the frame';
+  else if (distance <= 2.6) distDesc = ', tight close-up';
+  else if (distance <= 3.0) distDesc = ', close-up';
+  else if (distance <= 3.5) distDesc = ', medium close-up, cropped just beyond the edges';
+  else if (distance <= 4.2) distDesc = ', medium shot';
+  else if (distance <= 5.0) distDesc = '';  // standard — omit
+  else if (distance <= 5.8) distDesc = ', slightly pulled back from standard framing';
+  else if (distance <= 6.5) distDesc = ', medium-wide, generous space around subject';
+  else if (distance <= 7.5) distDesc = ', wide shot, subject roughly half the frame';
+  else if (distance <= 8.5) distDesc = ', full wide shot, substantial environment';
+  else distDesc = ', very wide establishing shot, subject small';
+
+  // PERSPECTIVE EXTRAS — extreme combinations
+  let extra = '';
+  if (absElev >= 60 && distance <= 3) extra = ' Dramatic foreshortening.';
+  else if (absElev >= 50 && distance <= 3.5) extra = ' Strong perspective distortion.';
+  else if (absElev <= 5 && distance <= 2.5) extra = ' Intimate, confrontational framing.';
+  else if (absElev <= 5 && distance >= 8) extra = ' Detached, observational framing.';
+  else if (elevationDeg >= 45 && distance >= 7) extra = ' Surveillance-like vantage.';
+  else if (elevationDeg <= -40 && distance <= 3) extra = ' Heroic low angle, exaggerated scale.';
+  else if (elevationDeg <= -30 && distance <= 4) extra = ' Empowering upward gaze.';
+  else if (elevationDeg >= 30 && distance <= 3) extra = ' Dominating downward gaze.';
+
+  return `Now, viewed from ${bestAz[1]}, ${elevDesc}${distDesc}. Make sure that the background and the lighting matches the new situation.${extra}`;
+}
+
+// ── Camera ↔ UI sync ─────────────────────────────────
+
+const azimutEl = document.getElementById('cam-azimut');
+const elevationEl = document.getElementById('cam-elevation');
+const distanceEl = document.getElementById('cam-distance');
+const azimutValEl = document.getElementById('azimut-val');
+const elevationValEl = document.getElementById('elevation-val');
+const distanceValEl = document.getElementById('distance-val');
+
+// Read camera spherical coordinates
+function getCameraSpherical() {
+  const dx = camera.position.x - controls.target.x;
+  const dy = camera.position.y - controls.target.y;
+  const dz = camera.position.z - controls.target.z;
+  const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+  let azimut = Math.atan2(dx, dz) * 180 / Math.PI;
+  if (azimut < 0) azimut += 360;
+  const elevation = Math.asin(dy / dist) * 180 / Math.PI;
+  return { azimut, elevation, distance: dist };
+}
+
+// Set camera from spherical coordinates
+function setCameraFromSpherical(azDeg, elDeg, dist) {
+  const azRad = azDeg * Math.PI / 180;
+  const elRad = elDeg * Math.PI / 180;
+  camera.position.set(
+    controls.target.x + dist * Math.sin(azRad) * Math.cos(elRad),
+    controls.target.y + dist * Math.sin(elRad),
+    controls.target.z + dist * Math.cos(azRad) * Math.cos(elRad)
+  );
+  camera.lookAt(controls.target);
+}
+
+// Update UI from camera
+function updateUIFromCamera() {
+  const s = getCameraSpherical();
+  azimutEl.value = Math.round(s.azimut);
+  elevationEl.value = Math.round(s.elevation);
+  distanceEl.value = s.distance.toFixed(1);
+  azimutValEl.textContent = Math.round(s.azimut) + '°';
+  elevationValEl.textContent = Math.round(s.elevation) + '°';
+  distanceValEl.textContent = s.distance.toFixed(1);
+
+  const desc = describeCameraPosition(s.azimut, s.elevation, s.distance);
+  camInfoEl.textContent = desc.replace('Now, viewed from ', '').replace('.', '');
+  document.getElementById('prompt-preview').textContent = desc;
+}
+
+// OrbitControls → update UI on every change
+controls.addEventListener('change', updateUIFromCamera);
+
+// Sliders → move camera
+azimutEl.addEventListener('input', () => {
+  const s = getCameraSpherical();
+  setCameraFromSpherical(parseFloat(azimutEl.value), s.elevation, s.distance);
+  updateUIFromCamera();
+});
+elevationEl.addEventListener('input', () => {
+  const s = getCameraSpherical();
+  setCameraFromSpherical(s.azimut, parseFloat(elevationEl.value), s.distance);
+  updateUIFromCamera();
+});
+distanceEl.addEventListener('input', () => {
+  const s = getCameraSpherical();
+  setCameraFromSpherical(s.azimut, s.elevation, parseFloat(distanceEl.value));
+  updateUIFromCamera();
+});
+
+// Reset button
+document.getElementById('reset-cam').addEventListener('click', () => {
+  setCameraFromSpherical(0, 20, 5);
+  updateUIFromCamera();
+});
+
+// Resize
+function resize() {
+  const w = canvas.parentElement.clientWidth;
+  const h = 450;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+resize();
+new ResizeObserver(resize).observe(canvas.parentElement);
+
+// Animate
+(function anim() {
+  requestAnimationFrame(anim);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+
+// Initial state
+updateUIFromCamera();
+
+// ── Upload ────────────────────────────────────────────
+const fileInput = document.getElementById('file-input');
+const uploadPreview = document.getElementById('upload-preview');
+const uploadInfo = document.getElementById('upload-info');
+
+// ── Model dropdown ────────────────────────────────────
+const modelEl = document.getElementById('model');
+
+async function loadModels() {
+  try {
+    const resp = await fetch('/models');
+    const models = await resp.json();
+    modelEl.innerHTML = '';
+    for (const m of models) {
+      const opt = document.createElement('option');
+      opt.value = m.model;
+      opt.textContent = m.model + (m.notice ? ` (${m.notice})` : '');
+      modelEl.appendChild(opt);
+    }
+    const def = models.findIndex(m => m.notice === 'default');
+    if (def >= 0) modelEl.selectedIndex = def;
+  } catch(e) {
+    modelEl.innerHTML = '<option value="4b-distilled">4b-distilled</option>';
+  }
+}
+loadModels();
+
+// Load dims table from generate.py and populate dropdown
+let dimsTable = [];
+const dimsEl = document.getElementById('dims');
+
+async function loadDims() {
+  try {
+    const resp = await fetch('/dims');
+    dimsTable = await resp.json();
+    dimsEl.innerHTML = '';
+    // Group by ratio
+    const byRatio = {};
+    for (const d of dimsTable) {
+      if (!byRatio[d.ratio]) byRatio[d.ratio] = [];
+      byRatio[d.ratio].push(d);
+    }
+    for (const [ratio, entries] of Object.entries(byRatio)) {
+      const group = document.createElement('optgroup');
+      group.label = ratio;
+      for (const d of entries) {
+        const opt = document.createElement('option');
+        opt.value = JSON.stringify(d);
+        opt.textContent = `${d.quality} (${d.width}×${d.height})`;
+        group.appendChild(opt);
+      }
+      dimsEl.appendChild(group);
+    }
+    // Default to 480p 3:4
+    const allOpts = dimsEl.querySelectorAll('option');
+    for (const opt of allOpts) {
+      const d = JSON.parse(opt.value);
+      if (d.quality === '480p' && d.ratio === '3:4') { opt.selected = true; break; }
+    }
+  } catch(e) {
+    dimsEl.innerHTML = '<option>Failed to load</option>';
+  }
+}
+loadDims();
+
+// Auto-select best ratio match on every new upload
+function autoSelectDims(imgW, imgH) {
+  const imgRatio = imgW / imgH;
+  const curQuality = JSON.parse(dimsEl.value || '{}').quality || '480p';
+  const allOpts = dimsEl.querySelectorAll('option');
+  let bestOpt = null, bestDiff = 999;
+  for (const opt of allOpts) {
+    const d = JSON.parse(opt.value);
+    if (d.quality !== curQuality) continue;
+    const [rw, rh] = d.ratio.split(':').map(Number);
+    const diff = Math.abs(rw/rh - imgRatio);
+    if (diff < bestDiff) { bestDiff = diff; bestOpt = opt; }
+  }
+  if (bestOpt) bestOpt.selected = true;
+}
+
+async function uploadImage() {
+  if (!fileInput.files[0]) return;
+  const dims = JSON.parse(dimsEl.value || '{}');
+  const fd = new FormData();
+  fd.append('image', fileInput.files[0]);
+  fd.append('width', dims.width || 384);
+  fd.append('height', dims.height || 512);
+  uploadInfo.textContent = 'Converting...';
+  try {
+    const resp = await fetch('/upload', {method:'POST', body:fd});
+    const data = await resp.json();
+    if (data.preview_url) {
+      uploadPreview.src = data.preview_url + '?t=' + Date.now();
+      uploadPreview.style.display = 'block';
+      uploadInfo.textContent = data.filename;
+      document.getElementById('gen-btn').disabled = false;
+      // Auto-select ratio from original file dimensions
+      const tmpImg = new window.Image();
+      tmpImg.onload = () => {
+        autoSelectDims(tmpImg.naturalWidth, tmpImg.naturalHeight);
+        uploadInfo.textContent = data.filename + ' (' + tmpImg.naturalWidth + 'x' + tmpImg.naturalHeight + ')';
+      };
+      tmpImg.src = URL.createObjectURL(fileInput.files[0]);
+    }
+  } catch(e) {
+    uploadInfo.textContent = 'Upload failed: ' + e.message;
+  }
+}
+fileInput.addEventListener('change', uploadImage);
+// Allow re-selecting the same file
+fileInput.addEventListener('click', () => { fileInput.value = ''; });
+dimsEl.addEventListener('change', uploadImage);
+
+// ── Generate ──────────────────────────────────────────
+const statusEl = document.getElementById('status');
+
+document.getElementById('gen-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('gen-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+  statusEl.textContent = '';
+  let logOffset = 0;
+
+  function logStatus(msg) {
+    const ts = new Date().toLocaleTimeString();
+    statusEl.textContent += `[${ts}] ${msg}\n`;
+    statusEl.scrollTop = statusEl.scrollHeight;
+  }
+  logStatus('Starting inference...');
+
+  const pollId = setInterval(async () => {
+    try {
+      const r = await fetch('/status?after=' + logOffset);
+      const data = await r.json();
+      if (data.entries && data.entries.length > 0) {
+        for (const e of data.entries) {
+          logStatus(e.msg + (e.total ? ` [Stage ${e.step}/${e.total}]` : ''));
+        }
+        logOffset = data.total;
+      }
+    } catch(e) {
+      logStatus('Server not responding...');
+    }
+  }, 1000);
+
+  const prompt = document.getElementById('prompt-preview').textContent;
+  const fd = new FormData();
+  fd.append('prompt', prompt);
+  fd.append('model', modelEl.value);
+  fd.append('neg_prompt', document.getElementById('neg-prompt').value);
+  fd.append('steps', document.getElementById('steps').value);
+  fd.append('guidance', document.getElementById('guidance').value);
+  fd.append('seed', document.getElementById('seed').value);
+  const dims = JSON.parse(dimsEl.value || '{}');
+  fd.append('quality', dims.quality || '480p');
+  fd.append('ratio', dims.ratio || '3:4');
+  if (fileInput.files[0]) fd.append('image', fileInput.files[0]);
+
+  try {
+    const resp = await fetch('/generate', {method:'POST', body:fd});
+    const startData = await resp.json();
+    if (startData.error) {
+      logStatus('ERROR: ' + startData.error);
+      clearInterval(pollId);
+      btn.disabled = false;
+      btn.textContent = 'Generate';
+      return;
+    }
+    const resultPoll = setInterval(async () => {
+      try {
+        const r = await fetch('/result');
+        const data = await r.json();
+        if (data.done) {
+          clearInterval(resultPoll);
+          clearInterval(pollId);
+          if (data.error) {
+            logStatus('ERROR: ' + data.error);
+          } else {
+            document.getElementById('output-wrap').innerHTML =
+              `<img src="data:image/png;base64,${data.image}">`;
+            logStatus(data.status);
+          }
+          btn.disabled = false;
+          btn.textContent = 'Generate';
+        }
+      } catch(e) {
+        logStatus('Result poll failed: ' + e.message);
+      }
+    }, 2000);
+  } catch(e) {
+    logStatus('Request failed: ' + e.message);
+    clearInterval(pollId);
+    btn.disabled = false;
+    btn.textContent = 'Generate';
+  }
+});
+</script>
+</body></html>

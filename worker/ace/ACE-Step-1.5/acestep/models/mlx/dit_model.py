@@ -438,11 +438,13 @@ class MLXDiTDecoder(nn.Module):
         layer_types: Optional[list] = None,
         rope_theta: float = 1_000_000.0,
         max_position_embeddings: int = 32768,
+        encoder_hidden_dim: Optional[int] = None,
     ):
         super().__init__()
         self.hidden_size = hidden_size
         self.patch_size = patch_size
         inner_dim = hidden_size
+        encoder_hidden_dim = encoder_hidden_dim or inner_dim
 
         if layer_types is None:
             layer_types = [
@@ -469,8 +471,8 @@ class MLXDiTDecoder(nn.Module):
         self.time_embed = MLXTimestepEmbedding(in_channels=256, time_embed_dim=inner_dim)
         self.time_embed_r = MLXTimestepEmbedding(in_channels=256, time_embed_dim=inner_dim)
 
-        # Condition embedder
-        self.condition_embedder = nn.Linear(inner_dim, inner_dim, bias=True)
+        # Condition embedder (encoder_hidden_dim may differ from inner_dim for XL)
+        self.condition_embedder = nn.Linear(encoder_hidden_dim, inner_dim, bias=True)
 
         # Transformer layers
         self.layers = [
@@ -626,4 +628,5 @@ class MLXDiTDecoder(nn.Module):
             layer_types=config.layer_types,
             rope_theta=config.rope_theta,
             max_position_embeddings=config.max_position_embeddings,
+            encoder_hidden_dim=getattr(config, "encoder_hidden_size", None),
         )

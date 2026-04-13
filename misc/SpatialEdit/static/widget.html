@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#1a1a2e; overflow:hidden; font-family:sans-serif; }
+  canvas { display:block; width:100vw; height:100vh; cursor:grab; }
+  canvas:active { cursor:grabbing; }
+  #label { position:absolute; bottom:10px; left:0; right:0; text-align:center;
+           color:#ff6600; font:bold 14px sans-serif; text-shadow:0 1px 4px #000; }
+  #hint { position:absolute; top:8px; left:12px; color:#666; font:11px sans-serif; }
+</style>
+</head><body>
+<canvas id="c"></canvas>
+<div id="label">View: front</div>
+<div id="hint">Drag to rotate around object</div>
+
+<script type="importmap">
+{"imports":{"three":"/static/three/three.module.js"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from '/static/three/OrbitControls.js';
+
+const canvas = document.getElementById('c');
+const labelEl = document.getElementById('label');
+
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setClearColor(0x1a1a2e);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, window.innerWidth/window.innerHeight, 0.1, 100);
+camera.position.set(0, 2.0, 4.5);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enablePan = false;
+controls.enableZoom = true;
+controls.minDistance = 2.5;
+controls.maxDistance = 7;
+controls.maxPolarAngle = Math.PI * 0.8;
+controls.minPolarAngle = Math.PI * 0.2;
+controls.target.set(0, 0.2, 0);
+
+// Lights
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const dl = new THREE.DirectionalLight(0xffffff, 0.9);
+dl.position.set(3, 5, 4);
+scene.add(dl);
+
+// Ground
+const grid = new THREE.GridHelper(8, 16, 0x333355, 0x222244);
+grid.position.y = -0.5;
+scene.add(grid);
+
+// Ground ring (cyan, like original)
+const ringGeo = new THREE.TorusGeometry(1.9, 0.01, 8, 80);
+const ringMat = new THREE.MeshBasicMaterial({color:0x00cccc, transparent:true, opacity:0.6});
+const ring = new THREE.Mesh(ringGeo, ringMat);
+ring.rotation.x = -Math.PI/2;
+ring.position.y = -0.49;
+scene.add(ring);
+
+// 3D Object (block with distinct faces)
+const boxGeo = new THREE.BoxGeometry(0.9, 1.1, 0.9);
+const faceMats = [
+  new THREE.MeshStandardMaterial({color:0x5599dd, roughness:0.6}), // +X right
+  new THREE.MeshStandardMaterial({color:0x5599dd, roughness:0.6}), // -X left
+  new THREE.MeshStandardMaterial({color:0x999999, roughness:0.5}), // +Y top
+  new THREE.MeshStandardMaterial({color:0x666666, roughness:0.5}), // -Y bottom
+  new THREE.MeshStandardMaterial({color:0xff6644, roughness:0.5}), // +Z front (orange)
+  new THREE.MeshStandardMaterial({color:0x44aa66, roughness:0.5}), // -Z rear (green)
+];
+const box = new THREE.Mesh(boxGeo, faceMats);
+box.position.y = 0.05;
+scene.add(box);
+
+// Face labels as sprites
+function makeSprite(text, pos, color) {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 48;
+  const ctx = c.getContext('2d');
+  ctx.font = 'bold 24px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#000';
+  ctx.fillText(text, 65, 33);
+  ctx.fillStyle = color;
+  ctx.fillText(text, 64, 32);
+  const tex = new THREE.CanvasTexture(c);
+  const mat = new THREE.SpriteMaterial({map:tex, transparent:true, depthTest:false});
+  const s = new THREE.Sprite(mat);
+  s.scale.set(0.55, 0.2, 1);
+  s.position.copy(pos);
+  return s;
+}
+scene.add(makeSprite('FRONT', new THREE.Vector3(0, -0.65, 0.65), '#ff6644'));
+scene.add(makeSprite('REAR', new THREE.Vector3(0, -0.65, -0.65), '#44aa66'));
+scene.add(makeSprite('LEFT', new THREE.Vector3(-0.65, -0.65, 0), '#5599dd'));
+scene.add(makeSprite('RIGHT', new THREE.Vector3(0.65, -0.65, 0), '#5599dd'));
+
+// Viewpoint markers
+const VP = {
+  'front':0, 'front-right':45, 'right':90, 'rear-right':135,
+  'rear':180, 'rear-left':225, 'left':270, 'front-left':315,
+};
+const markers = {};
+for (const [name, deg] of Object.entries(VP)) {
+  const rad = deg * Math.PI / 180;
+  const x = Math.sin(rad) * 1.9;
+  const z = Math.cos(rad) * 1.9;
+  // Marker dot
+  const geo = new THREE.SphereGeometry(0.06, 10, 10);
+  const mat = new THREE.MeshBasicMaterial({color:0x666666});
+  const dot = new THREE.Mesh(geo, mat);
+  dot.position.set(x, -0.49, z);
+  scene.add(dot);
+  // Label
+  const lbl = makeSprite(name, new THREE.Vector3(x * 1.25, -0.35, z * 1.25), '#888888');
+  lbl.scale.set(0.7, 0.2, 1);
+  scene.add(lbl);
+  markers[name] = {dot, mat, lbl};
+}
+
+// Highlight
+let current = 'front';
+function highlight(name) {
+  current = name;
+  for (const [vp, m] of Object.entries(markers)) {
+    const sel = vp === name;
+    m.mat.color.setHex(sel ? 0xff6600 : 0x666666);
+    m.dot.scale.setScalar(sel ? 2.0 : 1.0);
+  }
+  labelEl.textContent = 'View: ' + name;
+  // Notify parent (Gradio) via postMessage
+  window.parent.postMessage({type:'viewpoint', value:name}, '*');
+}
+
+// Snap on release
+function snap() {
+  const cx = camera.position.x, cz = camera.position.z;
+  let angle = Math.atan2(cx, cz) * 180 / Math.PI;
+  if (angle < 0) angle += 360;
+  let best = 'front', bestDist = 999;
+  for (const [name, a] of Object.entries(VP)) {
+    let d = Math.abs(angle - a);
+    if (d > 180) d = 360 - d;
+    if (d < bestDist) { bestDist = d; best = name; }
+  }
+  highlight(best);
+}
+
+// Live preview while dragging
+controls.addEventListener('change', () => {
+  const cx = camera.position.x, cz = camera.position.z;
+  let angle = Math.atan2(cx, cz) * 180 / Math.PI;
+  if (angle < 0) angle += 360;
+  let best = 'front', bestDist = 999;
+  for (const [name, a] of Object.entries(VP)) {
+    let d = Math.abs(angle - a);
+    if (d > 180) d = 360 - d;
+    if (d < bestDist) { bestDist = d; best = name; }
+  }
+  for (const [vp, m] of Object.entries(markers)) {
+    const sel = vp === best;
+    m.mat.color.setHex(sel ? 0xff6600 : 0x666666);
+    m.dot.scale.setScalar(sel ? 2.0 : 1.0);
+  }
+  labelEl.textContent = 'View: ' + best;
+});
+controls.addEventListener('end', snap);
+
+// Listen for messages from parent (Gradio setting viewpoint)
+window.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'setViewpoint') {
+    const deg = VP[e.data.value] || 0;
+    const rad = deg * Math.PI / 180;
+    const dist = Math.sqrt(camera.position.x**2 + camera.position.z**2);
+    camera.position.x = Math.sin(rad) * dist;
+    camera.position.z = Math.cos(rad) * dist;
+    highlight(e.data.value);
+  }
+});
+
+// Resize
+function resize() {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+}
+resize();
+window.addEventListener('resize', resize);
+
+// Animate
+(function anim() {
+  requestAnimationFrame(anim);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+
+highlight('front');
+</script>
+</body></html>
