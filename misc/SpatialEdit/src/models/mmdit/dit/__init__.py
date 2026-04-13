@@ -1,4 +1,0 @@
-from .models import Transformer3DModel
-
-
-__all__ = ["Transformer3DModel"]
