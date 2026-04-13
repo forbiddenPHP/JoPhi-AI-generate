@@ -75,3 +75,6 @@ test_*.mp3
 # Temp
 *.tmp
 *.bak
+
+# SpatialEdit demo temp files
+misc/SpatialEdit/static/input_temp.*
